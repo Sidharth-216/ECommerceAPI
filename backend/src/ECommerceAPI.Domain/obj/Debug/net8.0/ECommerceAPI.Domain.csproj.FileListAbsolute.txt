@@ -1,0 +1,15 @@
+/home/sidhu/Desktop/ECommerceAPI/src/ECommerceAPI.Domain/obj/Debug/net8.0/ECommerceAPI.Domain.GeneratedMSBuildEditorConfig.editorconfig
+/home/sidhu/Desktop/ECommerceAPI/src/ECommerceAPI.Domain/obj/Debug/net8.0/ECommerceAPI.Domain.AssemblyInfoInputs.cache
+/home/sidhu/Desktop/ECommerceAPI/src/ECommerceAPI.Domain/obj/Debug/net8.0/ECommerceAPI.Domain.AssemblyInfo.cs
+/home/sidhu/Desktop/ECommerceAPI/src/ECommerceAPI.Domain/obj/Debug/net8.0/ECommerceAPI.Domain.csproj.CoreCompileInputs.cache
+/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.Domain/bin/Debug/net8.0/ECommerceAPI.Domain.deps.json
+/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.Domain/bin/Debug/net8.0/ECommerceAPI.Domain.dll
+/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.Domain/bin/Debug/net8.0/ECommerceAPI.Domain.pdb
+/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.Domain/obj/Debug/net8.0/ECommerceAPI.Domain.GeneratedMSBuildEditorConfig.editorconfig
+/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.Domain/obj/Debug/net8.0/ECommerceAPI.Domain.AssemblyInfoInputs.cache
+/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.Domain/obj/Debug/net8.0/ECommerceAPI.Domain.AssemblyInfo.cs
+/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.Domain/obj/Debug/net8.0/ECommerceAPI.Domain.csproj.CoreCompileInputs.cache
+/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.Domain/obj/Debug/net8.0/ECommerceAPI.Domain.dll
+/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.Domain/obj/Debug/net8.0/refint/ECommerceAPI.Domain.dll
+/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.Domain/obj/Debug/net8.0/ECommerceAPI.Domain.pdb
+/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.Domain/obj/Debug/net8.0/ref/ECommerceAPI.Domain.dll
