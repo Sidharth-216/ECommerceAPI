@@ -13,3 +13,5 @@
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.Domain/obj/Debug/net8.0/refint/ECommerceAPI.Domain.dll
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.Domain/obj/Debug/net8.0/ECommerceAPI.Domain.pdb
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.Domain/obj/Debug/net8.0/ref/ECommerceAPI.Domain.dll
+/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.Domain/obj/Debug/net8.0/ECommerceAPI.Domain.sourcelink.json
+/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.Domain/obj/Debug/net8.0/ECommerceAPI.Domain.csproj.AssemblyReference.cache

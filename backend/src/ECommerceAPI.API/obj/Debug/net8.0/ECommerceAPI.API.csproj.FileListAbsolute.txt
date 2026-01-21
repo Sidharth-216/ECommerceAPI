@@ -143,3 +143,10 @@
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/obj/Debug/net8.0/ECommerceAPI.API.pdb
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/obj/Debug/net8.0/ECommerceAPI.API.genruntimeconfig.cache
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/obj/Debug/net8.0/ref/ECommerceAPI.API.dll
+/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/obj/Debug/net8.0/ECommerceAPI.API.sourcelink.json
+/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/bin/Debug/net8.0/DnsClient.dll
+/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/bin/Debug/net8.0/MongoDB.Bson.dll
+/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/bin/Debug/net8.0/MongoDB.Driver.dll
+/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/bin/Debug/net8.0/SharpCompress.dll
+/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/bin/Debug/net8.0/Snappier.dll
+/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/bin/Debug/net8.0/ZstdSharp.dll

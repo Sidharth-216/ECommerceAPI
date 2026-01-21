@@ -15,3 +15,4 @@
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.Application/obj/Debug/net8.0/refint/ECommerceAPI.Application.dll
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.Application/obj/Debug/net8.0/ECommerceAPI.Application.pdb
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.Application/obj/Debug/net8.0/ref/ECommerceAPI.Application.dll
+/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.Application/obj/Debug/net8.0/ECommerceAPI.Application.sourcelink.json

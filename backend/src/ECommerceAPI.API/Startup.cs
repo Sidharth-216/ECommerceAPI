@@ -17,6 +17,7 @@ using ECommerceAPI.Infrastructure.Repositories.Implementations;
 using ECommerceAPI.Infrastructure.Repositories;
 using ECommerceAPI.Infrastructure.Services;
 using ECommerceAPI.API.Middleware;
+using MongoDB.Driver;
 
 namespace ECommerceAPI.API
 {
@@ -118,7 +119,19 @@ namespace ECommerceAPI.API
             services.AddScoped<IOtpService, OtpService>();
             services.AddScoped<IEmailOtpService, EmailOtpService>();
             services.AddScoped<IEmailService, EmailService>();
+            // Program.cs or Startup.cs
+            services.Configure<MongoDbSettings>(
+                Configuration.GetSection("MongoDbSettings"));
 
+            services.AddSingleton<IMongoClient>(sp =>
+                new MongoClient(Configuration.GetConnectionString("MongoDB")));
+
+            // Register both repositories
+            services.AddScoped<IProductRepository, ProductRepository>();
+            services.AddScoped<IProductMongoRepository, ProductMongoRepository>();
+
+            // Use hybrid service
+            services.AddScoped<IProductService, ProductServiceHybrid>();
             // ============================================================
             // Razorpay Configuration
             // ============================================================
@@ -208,5 +221,12 @@ namespace ECommerceAPI.API
                 endpoints.MapControllers();
             });
         }
+    }
+
+    // Simple POCO for MongoDB configuration bound from appsettings.json
+    public class MongoDbSettings
+    {
+        public string ConnectionString { get; set; }
+        public string DatabaseName { get; set; }
     }
 }
