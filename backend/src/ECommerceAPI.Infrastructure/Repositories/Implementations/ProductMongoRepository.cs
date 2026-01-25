@@ -45,13 +45,17 @@ namespace ECommerceAPI.Infrastructure.Repositories.Implementations
                 .Ascending(p => p.Brand);
             _products.Indexes.CreateOne(new CreateIndexModel<ProductMongo>(filterIndex));
         }
-
         public async Task<IEnumerable<ProductMongo>> GetAllAsync()
         {
-            return await _products
-                .Find(p => p.IsActive)
-                .ToListAsync();
+            // Include products where IsActive is missing or true
+            var filter = Builders<ProductMongo>.Filter.Or(
+                Builders<ProductMongo>.Filter.Eq(p => p.IsActive, true),
+                Builders<ProductMongo>.Filter.Exists(p => p.IsActive, false)
+            );
+
+            return await _products.Find(filter).ToListAsync();
         }
+
 
         public async Task<ProductMongo> GetByIdAsync(string id)
         {

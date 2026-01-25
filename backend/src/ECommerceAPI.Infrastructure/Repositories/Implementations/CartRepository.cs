@@ -39,5 +39,15 @@ namespace ECommerceAPI.Infrastructure.Repositories.Implementations
             _context.Carts.Update(cart);
             await _context.SaveChangesAsync();
         }
+        /// <summary>
+        /// ✅ NEW: Get all carts - needed for migration utility
+        /// </summary>
+        public async Task<IEnumerable<Cart>> GetAllAsync()
+        {
+            return await _context.Carts
+                .Include(c => c.CartItems)
+                    .ThenInclude(ci => ci.Product)
+                .ToListAsync();
+        }
     }
 }

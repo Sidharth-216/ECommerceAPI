@@ -134,12 +134,40 @@ export const productsAPI = {
 };
 
 // ===================== CART API =====================
+// ===================== CART API (FIXED FOR HYBRID SERVICE) =====================
 export const cartAPI = {
-  view: () => api.get('/cart/view'),
-  add: (data) => api.post('/cart/add', data),
-  remove: (productId) => api.delete(`/cart/remove/${productId}`),
-  update: (productId, quantity) => api.put('/cart/update', { productId, quantity }),
-  clear: () => api.delete('/cart/clear')
+  // Get user's cart
+  view: (userId) => {
+    if (!userId) throw new Error('User ID is required');
+    return api.get(`/cart/user/${userId}`);
+  },
+  
+  // Add item to cart
+  add: (userId, data) => {
+    if (!userId) throw new Error('User ID is required');
+    return api.post(`/cart/user/${userId}/items`, {
+      productId: data.productId,
+      quantity: data.quantity || 1
+    });
+  },
+  
+  // Update item quantity
+  update: (userId, productId, quantity) => {
+    if (!userId) throw new Error('User ID is required');
+    return api.put(`/cart/user/${userId}/items/${productId}`, { quantity });
+  },
+  
+  // Remove item
+  remove: (userId, productId) => {
+    if (!userId) throw new Error('User ID is required');
+    return api.delete(`/cart/user/${userId}/items/${productId}`);
+  },
+  
+  // Clear cart
+  clear: (userId) => {
+    if (!userId) throw new Error('User ID is required');
+    return api.delete(`/cart/user/${userId}`);
+  }
 };
 
 // ===================== ORDERS API =====================

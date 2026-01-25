@@ -254,6 +254,50 @@ const loadProducts = async () => {
     setProducts(getSampleProducts());
   }
 };
+/*const loadProducts = async () => {
+  try {
+    setLoading(true);
+    const response = await productsAPI.getAll();
+    console.log('Products API response:', response);
+
+    // Handle both array and object response formats
+    let productData = Array.isArray(response.data)
+      ? response.data
+      : response.data?.data || response.data?.products || [];
+
+    // Map fields so Mongo and SQL products work consistently
+    productData = productData.map(p => ({
+      id: p.id || p.mongoId || Date.now(), // fallback for Mongo products
+      name: p.name,
+      description: p.description || '',
+      price: p.price || 0,
+      brand: p.brand || 'Unknown',
+      imageUrl: p.imageUrl || p.image || 'https://via.placeholder.com/300x300/3b82f6/ffffff?text=Product',
+      stockQuantity: p.stockQuantity || 0,
+      specs: typeof p.specifications === 'string'
+        ? p.specifications
+        : p.specifications
+          ? JSON.stringify(p.specifications)
+          : p.specs || '',
+      rating: p.rating || 0,
+      reviewCount: p.reviewCount || 0,
+      category: p.categoryName || 'Product'
+    }));
+
+    if (productData.length > 0) {
+      setProducts(productData);
+    } else {
+      console.warn('No products received from API, using sample data');
+      setProducts(getSampleProducts());
+    }
+  } catch (err) {
+    console.error('Error loading products:', err);
+    setProducts(getSampleProducts());
+  } finally {
+    setLoading(false);
+  }
+};*/
+
 
 // Load user data (profile, cart, products)
 const loadUserData = async () => {
@@ -569,11 +613,28 @@ const handleLogin = async () => {
       );
     }
 
-    // Persist session
+    // ✅ FIXED: Check capital 'Id' FIRST since that's the Users table column name
+    const userId = data.Id || data.id || data.userId || data.user_id || data.User_Id;
+    if (!userId) {
+      console.error('Login response data:', data);
+      throw new Error('User ID not found in login response. Please contact support.');
+    }
+
+    // Persist session with all necessary user data
+    const userData = { 
+      ...data, 
+      role: userRole, 
+      Id: userId,
+      id: userId,
+      userId: userId
+    };
     sessionStorage.setItem('token', data.token);
-    sessionStorage.setItem('user', JSON.stringify({ ...data, role: userRole }));
+    sessionStorage.setItem('user', JSON.stringify(userData));
 
     setUser({
+      id: userId,
+      userId: userId,
+      Id: userId,
       email: data.email,
       role: userRole,
       name: data.fullName,
@@ -829,48 +890,95 @@ const fetchCart = async () => {
 useEffect(() => {
   fetchCart();
 }, [user]); // Re-fetch when user logs in/out
-
-// ✅ FIXED: Add to cart with proper backend sync
+// ✅ FIXED: Add to cart with proper backend sync and userId
 const addToCart = async (product) => {
+  // Normalize product fields to ensure all required fields are present
+  const normalizedProduct = {
+    productId: product.productId || product.id || product._id || product.mongoId || String(Date.now()),
+    productName: product.productName || product.name || 'Unknown Product',
+    price: product.price || 0,
+    imageUrl: product.imageUrl || product.image || 'https://via.placeholder.com/300x300/e5e7eb/9ca3af?text=Product',
+    ...product
+  };
+  // Ensure product has valid structure for cart operations
+  if (!normalizedProduct.productId) {
+    console.warn('Product missing ID, generating temporary ID:', normalizedProduct);
+    normalizedProduct.productId = String(Date.now() + Math.random());
+  }
+  if (!normalizedProduct.productId || !normalizedProduct.productName) {
+    setError('Product not found or missing required fields.');
+    return;
+  }
+
   if (user) {
     // Logged-in user → backend cart
     try {
-      const response = await cartAPI.add({ 
-        productId: product.id, 
+      // ✅ FIX: Extract userId from user object - check capital 'Id' FIRST
+      const userId = user.Id || user.id || user.userId;
+      
+      if (!userId) {
+        console.error('User object:', user);
+        setError('User ID not found. Please login again.');
+        return;
+      }
+
+      // ✅ FIX: Call the correct API endpoint with userId
+      const response = await cartAPI.add(userId, { 
+        productId: parseInt(normalizedProduct.productId) || normalizedProduct.productId, 
         quantity: 1 
       });
+
+      // ✅ FIX: Handle response properly - backend returns CartDto
+      const cartData = response.data;
+      const updatedCart = Array.isArray(cartData?.items) 
+        ? cartData.items 
+        : Array.isArray(cartData) 
+        ? cartData 
+        : [];
       
-      const updatedCart = response.data?.items || response.data || [];
       setCart(updatedCart);
       localStorage.setItem('cart', JSON.stringify(updatedCart));
+      setError(''); // Clear any previous errors
+      
+      // Optional: Show success message
+      console.log('✅ Item added to cart successfully');
       
     } catch (err) {
       console.error('Error adding to cart:', err);
-      setError(err.response?.data?.message || 'Failed to add item to cart.');
+      
+      // Better error handling
+      if (err.response?.status === 404) {
+        setError('Product not found or cart service unavailable.');
+      } else if (err.response?.status === 400) {
+        setError(err.response?.data?.message || 'Invalid request. Please check product details.');
+      } else {
+        setError(err.response?.data?.message || err.message || 'Failed to add item to cart.');
+      }
     }
   } else {
     // Guest user → localStorage cart
     const updatedCart = [...cart];
-    const existing = updatedCart.find(item => item.productId === product.id);
+    const existing = updatedCart.find(item => 
+      String(item.productId) === String(normalizedProduct.productId)
+    );
     
     if (existing) {
       existing.quantity += 1;
     } else {
       updatedCart.push({
-        productId: product.id,
-        productName: product.name,
-        price: product.price,
+        productId: normalizedProduct.productId,
+        productName: normalizedProduct.productName,
+        price: normalizedProduct.price,
         quantity: 1,
-        imageUrl: product.image
+        imageUrl: normalizedProduct.imageUrl
       });
     }
     
     setCart(updatedCart);
     localStorage.setItem('cart', JSON.stringify(updatedCart));
-    setError('Login to save your cart permanently.');
+    setError(''); // Clear error on successful add
   }
 };
-
 // ✅ FIXED: Update cart quantity with backend sync
 const updateCartQuantity = async (productId, quantity) => {
   if (quantity <= 0) {

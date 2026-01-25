@@ -8,5 +8,6 @@ namespace ECommerceAPI.Infrastructure.Repositories.Interfaces
         Task<Cart> GetByUserIdAsync(int userId);
         Task<Cart> AddAsync(Cart cart);
         Task UpdateAsync(Cart cart);
+        Task<IEnumerable<Cart>> GetAllAsync();
     }
 }

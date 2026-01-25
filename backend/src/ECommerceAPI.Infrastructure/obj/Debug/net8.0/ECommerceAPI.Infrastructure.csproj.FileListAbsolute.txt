@@ -9,10 +9,10 @@
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.Infrastructure/obj/Debug/net8.0/ECommerceAPI.Infrastructure.AssemblyInfoInputs.cache
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.Infrastructure/obj/Debug/net8.0/ECommerceAPI.Infrastructure.AssemblyInfo.cs
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.Infrastructure/obj/Debug/net8.0/ECommerceAPI.Infrastructure.csproj.CoreCompileInputs.cache
+/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.Infrastructure/obj/Debug/net8.0/ECommerceAPI.Infrastructure.sourcelink.json
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.Infrastructure/obj/Debug/net8.0/ECommerc.89EB8045.Up2Date
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.Infrastructure/obj/Debug/net8.0/ECommerceAPI.Infrastructure.dll
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.Infrastructure/obj/Debug/net8.0/refint/ECommerceAPI.Infrastructure.dll
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.Infrastructure/obj/Debug/net8.0/ECommerceAPI.Infrastructure.pdb
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.Infrastructure/obj/Debug/net8.0/ECommerceAPI.Infrastructure.genruntimeconfig.cache
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.Infrastructure/obj/Debug/net8.0/ref/ECommerceAPI.Infrastructure.dll
-/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.Infrastructure/obj/Debug/net8.0/ECommerceAPI.Infrastructure.sourcelink.json

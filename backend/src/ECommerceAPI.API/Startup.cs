@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Builder;
+/*using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -228,5 +228,248 @@ namespace ECommerceAPI.API
     {
         public string ConnectionString { get; set; }
         public string DatabaseName { get; set; }
+    }
+}*/
+
+
+// ==================== Startup.cs ====================
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using ECommerceAPI.Infrastructure.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+using System.Security.Claims;
+using ECommerceAPI.Infrastructure.Data;
+using ECommerceAPI.Application.Interfaces;
+using ECommerceAPI.Application.Services;
+using ECommerceAPI.Application.Helpers;
+using ECommerceAPI.Infrastructure.Repositories.Interfaces;
+using ECommerceAPI.Infrastructure.Repositories.Implementations;
+using ECommerceAPI.Infrastructure.Repositories;
+using ECommerceAPI.Infrastructure.Services;
+using ECommerceAPI.API.Middleware;
+using MongoDB.Driver;
+using System;
+
+namespace ECommerceAPI.API
+{
+    public class Startup
+    {
+        public Startup(IConfiguration configuration)
+        {
+            Configuration = configuration;
+        }
+
+        public IConfiguration Configuration { get; }
+
+        public void ConfigureServices(IServiceCollection services)
+        {
+            // Database Configuration
+            services.AddDbContext<ApplicationDbContext>(options =>
+                options.UseSqlServer(
+                    Configuration.GetConnectionString("DefaultConnection")));
+
+            // Register JwtHelper
+            services.AddScoped<JwtHelper>();
+
+            // JWT Authentication
+            var jwtKey = Configuration["Jwt:Key"];
+
+            services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+                .AddJwtBearer(options =>
+                {
+                    options.TokenValidationParameters = new TokenValidationParameters
+                    {
+                        ValidateIssuer = true,
+                        ValidateAudience = true,
+                        ValidateLifetime = true,
+                        ValidateIssuerSigningKey = true,
+
+                        ValidIssuer = Configuration["Jwt:Issuer"],
+                        ValidAudience = Configuration["Jwt:Audience"],
+
+                        IssuerSigningKey = new SymmetricSecurityKey(
+                            Encoding.UTF8.GetBytes(jwtKey)),
+
+                        // 🔥 CRITICAL FIXES
+                        NameClaimType = ClaimTypes.NameIdentifier,
+                        RoleClaimType = ClaimTypes.Role
+                    };
+                });
+
+            // CORS Configuration
+            services.AddCors(options =>
+            {
+                options.AddPolicy("AllowReactApp",
+                    builder => builder
+                        .WithOrigins("http://localhost:3000")
+                        .AllowAnyMethod()
+                        .AllowAnyHeader()
+                        .AllowCredentials());
+
+                options.AddPolicy("AllowAll",
+                    builder => builder
+                        .AllowAnyOrigin()
+                        .AllowAnyMethod()
+                        .AllowAnyHeader());
+            });
+
+            // HTTP Client Factory
+            services.AddHttpClient();
+
+            // ========================= MongoDB Configuration =========================
+            // ✅ CRITICAL: Configure MongoDB serialization FIRST before any MongoDB usage
+            MongoDbConfiguration.Configure();
+
+            // Bind MongoDB settings from appsettings.json
+            services.Configure<MongoDbSettings>(
+                Configuration.GetSection("MongoDbSettings"));
+
+            var mongoSettings = Configuration
+                .GetSection("MongoDbSettings")
+                .Get<MongoDbSettings>();
+
+            // Validate MongoDB settings
+            if (mongoSettings == null)
+                throw new Exception("MongoDbSettings binding failed. Check appsettings.json");
+
+            if (string.IsNullOrWhiteSpace(mongoSettings.ConnectionString))
+                throw new Exception("MongoDB ConnectionString is missing in appsettings.json");
+
+            if (string.IsNullOrWhiteSpace(mongoSettings.DatabaseName))
+                throw new Exception("MongoDB DatabaseName is missing in appsettings.json");
+
+            if (string.IsNullOrWhiteSpace(mongoSettings.ProductsCollectionName))
+                throw new Exception("MongoDB ProductsCollectionName is missing in appsettings.json");
+
+            // ✅ NEW: Validate CartsCollectionName
+            if (string.IsNullOrWhiteSpace(mongoSettings.CartsCollectionName))
+                throw new Exception("MongoDB CartsCollectionName is missing in appsettings.json");
+
+            // Register MongoDB client as singleton
+            services.AddSingleton<IMongoClient>(sp =>
+            {
+                try
+                {
+                    return new MongoClient(mongoSettings.ConnectionString);
+                }
+                catch (Exception ex)
+                {
+                    throw new Exception($"Failed to create MongoDB client: {ex.Message}", ex);
+                }
+            });
+            // =========================================================================
+
+            // ========================= SQL Repositories =========================
+            services.AddScoped<IUserRepository, UserRepository>();
+            services.AddScoped<IProductRepository, ProductRepository>();
+            services.AddScoped<ICartRepository, CartRepository>();
+            services.AddScoped<IOrderRepository, OrderRepository>();
+            services.AddScoped<IPaymentRepository, PaymentRepository>();
+            services.AddScoped<IAddressRepository, AddressRepository>();
+            services.AddScoped<IOtpRepository, OtpRepository>();
+            services.AddScoped<IEmailOtpRepository, EmailOtpRepository>();
+            // ====================================================================
+
+            // ========================= MongoDB Repositories =========================
+            services.AddScoped<IProductMongoRepository, ProductMongoRepository>();
+            services.AddScoped<ICartMongoRepository, CartMongoRepository>(); // ✅ NEW
+            // =======================================================================
+
+            // ========================= Hybrid Services =========================
+            // Use hybrid product service (handles both SQL and MongoDB)
+            services.AddScoped<IProductService, ProductServiceHybrid>();
+            
+            // ✅ NEW: Use hybrid cart service (handles both SQL and MongoDB)
+            services.AddScoped<ICartService, CartServiceHybrid>();
+            // ==================================================================
+
+            // ========================= Other Services =========================
+            services.AddScoped<IAuthService, AuthService>();
+            services.AddScoped<IOrderService, OrderService>();
+            services.AddScoped<IRecommendationService, RecommendationService>();
+            services.AddScoped<IPaymentService, PaymentService>();
+            services.AddScoped<IAdminService, AdminService>();
+            services.AddScoped<IOtpService, OtpService>();
+            services.AddScoped<IEmailOtpService, EmailOtpService>();
+            services.AddScoped<IEmailService, EmailService>();
+            // ==================================================================
+
+            // Razorpay Validation
+            var razorpayKeyId = Configuration["Razorpay:KeyId"];
+            var razorpayKeySecret = Configuration["Razorpay:KeySecret"];
+            if (string.IsNullOrEmpty(razorpayKeyId) || string.IsNullOrEmpty(razorpayKeySecret))
+            {
+                throw new InvalidOperationException(
+                    "Razorpay configuration is missing. Please add 'Razorpay:KeyId' and 'Razorpay:KeySecret' to appsettings.json");
+            }
+
+            services.AddControllers();
+            services.AddSwaggerGen(c =>
+            {
+                c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
+                {
+                    Title = "E-Commerce API",
+                    Version = "v1",
+                    Description = "E-Commerce API with Razorpay Payment Integration and MongoDB Hybrid Support"
+                });
+
+                c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+                {
+                    Description = "JWT Authorization header using the Bearer scheme. Enter 'Bearer' [space] and then your token.",
+                    Name = "Authorization",
+                    In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+                    Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey,
+                    Scheme = "Bearer"
+                });
+
+                c.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+                {
+                    {
+                        new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+                        {
+                            Reference = new Microsoft.OpenApi.Models.OpenApiReference
+                            {
+                                Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+                                Id = "Bearer"
+                            }
+                        },
+                        new string[] {}
+                    }
+                });
+            });
+        }
+
+        public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
+        {
+            if (env.IsDevelopment())
+            {
+                app.UseDeveloperExceptionPage();
+                app.UseSwagger();
+                app.UseSwaggerUI(c =>
+                {
+                    c.SwaggerEndpoint("/swagger/v1/swagger.json", "E-Commerce API V1");
+                    c.RoutePrefix = string.Empty;
+                });
+            }
+
+            app.UseMiddleware<ErrorHandlerMiddleware>();
+
+            app.UseHttpsRedirection();
+            app.UseRouting();
+            app.UseCors("AllowAll");
+            app.UseAuthentication();
+            app.UseAuthorization();
+
+            app.UseEndpoints(endpoints =>
+            {
+                endpoints.MapControllers();
+            });
+        }
     }
 }

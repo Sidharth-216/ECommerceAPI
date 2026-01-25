@@ -8,6 +8,7 @@
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/bin/Debug/net8.0/Azure.Core.dll
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/bin/Debug/net8.0/Azure.Identity.dll
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/bin/Debug/net8.0/BCrypt.Net-Next.dll
+/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/bin/Debug/net8.0/DnsClient.dll
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/bin/Debug/net8.0/Humanizer.dll
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/bin/Debug/net8.0/Microsoft.AspNetCore.Authentication.JwtBearer.dll
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/bin/Debug/net8.0/Microsoft.Bcl.AsyncInterfaces.dll
@@ -34,7 +35,11 @@
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/bin/Debug/net8.0/Microsoft.OpenApi.dll
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/bin/Debug/net8.0/Microsoft.SqlServer.Server.dll
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/bin/Debug/net8.0/Microsoft.Win32.SystemEvents.dll
+/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/bin/Debug/net8.0/MongoDB.Bson.dll
+/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/bin/Debug/net8.0/MongoDB.Driver.dll
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/bin/Debug/net8.0/Mono.TextTemplating.dll
+/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/bin/Debug/net8.0/SharpCompress.dll
+/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/bin/Debug/net8.0/Snappier.dll
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/bin/Debug/net8.0/Swashbuckle.AspNetCore.Swagger.dll
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/bin/Debug/net8.0/Swashbuckle.AspNetCore.SwaggerGen.dll
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/bin/Debug/net8.0/Swashbuckle.AspNetCore.SwaggerUI.dll
@@ -52,6 +57,7 @@
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/bin/Debug/net8.0/System.Security.Cryptography.ProtectedData.dll
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/bin/Debug/net8.0/System.Security.Permissions.dll
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/bin/Debug/net8.0/System.Windows.Extensions.dll
+/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/bin/Debug/net8.0/ZstdSharp.dll
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/bin/Debug/net8.0/cs/Microsoft.CodeAnalysis.resources.dll
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/bin/Debug/net8.0/de/Microsoft.CodeAnalysis.resources.dll
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/bin/Debug/net8.0/es/Microsoft.CodeAnalysis.resources.dll
@@ -129,6 +135,7 @@
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/obj/Debug/net8.0/ECommerceAPI.API.csproj.CoreCompileInputs.cache
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/obj/Debug/net8.0/ECommerceAPI.API.MvcApplicationPartsAssemblyInfo.cs
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/obj/Debug/net8.0/ECommerceAPI.API.MvcApplicationPartsAssemblyInfo.cache
+/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/obj/Debug/net8.0/ECommerceAPI.API.sourcelink.json
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/obj/Debug/net8.0/staticwebassets.build.json
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/obj/Debug/net8.0/staticwebassets.development.json
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/obj/Debug/net8.0/staticwebassets/msbuild.ECommerceAPI.API.Microsoft.AspNetCore.StaticWebAssets.props
@@ -143,10 +150,3 @@
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/obj/Debug/net8.0/ECommerceAPI.API.pdb
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/obj/Debug/net8.0/ECommerceAPI.API.genruntimeconfig.cache
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/obj/Debug/net8.0/ref/ECommerceAPI.API.dll
-/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/obj/Debug/net8.0/ECommerceAPI.API.sourcelink.json
-/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/bin/Debug/net8.0/DnsClient.dll
-/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/bin/Debug/net8.0/MongoDB.Bson.dll
-/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/bin/Debug/net8.0/MongoDB.Driver.dll
-/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/bin/Debug/net8.0/SharpCompress.dll
-/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/bin/Debug/net8.0/Snappier.dll
-/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/bin/Debug/net8.0/ZstdSharp.dll
