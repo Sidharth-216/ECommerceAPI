@@ -119,7 +119,7 @@ namespace ECommerceAPI.Application.Services
             if (existingItem != null) existingItem.Quantity += quantity;
             else
             {
-                sqlCart.CartItems.Add(new CartItem
+                sqlCart.CartItems.Add(new ECommerceAPI.Domain.Entities.CartItem
                 {
                     ProductId = sqlProductId,
                     Quantity = quantity,
@@ -254,7 +254,7 @@ namespace ECommerceAPI.Application.Services
             {
                 UserId = userId,
                 CreatedAt = DateTime.UtcNow,
-                CartItems = new List<CartItem>()
+                CartItems = new List<ECommerceAPI.Domain.Entities.CartItem>()
             };
 
             await _sqlRepository.AddAsync(cart);
@@ -273,7 +273,7 @@ namespace ECommerceAPI.Application.Services
 
             mongoCart.Items.Clear();
 
-            foreach (var item in sqlCart.CartItems ?? new List<CartItem>())
+            foreach (var item in sqlCart.CartItems ?? new List<ECommerceAPI.Domain.Entities.CartItem>())
             {
                 var product = await _sqlProductRepository.GetByIdAsync(item.ProductId);
                 if (product == null) continue;
