@@ -1,9 +1,12 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using ECommerceAPI.Domain.Entities.Mongo;
+using ECommerceAPI.Domain.Entities.MongoDB;
 
-namespace ECommerceAPI.Infrastructure.Repositories.Interfaces.Mongo
+namespace ECommerceAPI.Infrastructure.Repositories.Interfaces
 {
+    /// <summary>
+    /// MongoDB User Repository Interface
+    /// </summary>
     public interface IMongoUserRepository
     {
         Task<MongoUser> GetByIdAsync(string id);
@@ -15,5 +18,6 @@ namespace ECommerceAPI.Infrastructure.Repositories.Interfaces.Mongo
         Task<bool> MobileExistsAsync(string mobile);
         Task<IEnumerable<MongoUser>> GetAllAsync();
         Task DeleteAsync(string id);
+        Task<MongoUser> GetBySqlUserIdAsync(int sqlUserId);
     }
 }

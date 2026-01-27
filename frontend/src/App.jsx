@@ -9,7 +9,9 @@ import {
   ordersAPI,
   recommendationsAPI,
   addressAPI,
-  paymentAPI
+  paymentAPI,
+  mongoAuthAPI, 
+  getUserIdFromToken 
 } from './api'; // adjusted to use services/api which exports addressAPI and attaches JWT
 
 // Setup interceptors function (will be called in useEffect)
@@ -586,25 +588,44 @@ useEffect(() => {
   ];
 
 
+// ==========================================
+// LOGIN HANDLER (MongoDB)
+// ==========================================
 const handleLogin = async () => {
   setError('');
   setLoading(true);
 
   try {
-    const response = await authAPI.login(
+    // Validate input before sending
+    if (!loginData.email?.trim()) {
+      throw new Error('Email is required');
+    }
+    if (!loginData.password) {
+      throw new Error('Password is required');
+    }
+
+    // USE MONGODB AUTHENTICATION
+    const response = await mongoAuthAPI.login(
       loginData.email.trim(),
       loginData.password
     );
 
-    const data = response.data;
+    const data = response?.data;
 
-    if (!data?.token && data?.role === undefined) {
-      throw new Error('Invalid login response');
+    if (!data) {
+      throw new Error('No response data from server');
     }
 
-    // Convert numeric role to string (0 = Customer, 1 = Admin)
-    const roleMap = { 0: 'Customer', 1: 'Admin' };
-    const userRole = typeof data.role === 'number' ? roleMap[data.role] : data.role;
+    if (!data.token) {
+      throw new Error('Authentication token not received from server');
+    }
+
+    // MongoDB returns role as string directly (not numeric)
+    const userRole = String(data.role || '').trim();
+
+    if (!userRole || (userRole !== 'Customer' && userRole !== 'Admin')) {
+      throw new Error('Invalid user role received from server');
+    }
 
     // 🔐 Role mismatch protection
     if (userRole !== loginRole) {
@@ -613,31 +634,36 @@ const handleLogin = async () => {
       );
     }
 
-    // ✅ FIXED: Check capital 'Id' FIRST since that's the Users table column name
-    const userId = data.Id || data.id || data.userId || data.user_id || data.User_Id;
-    if (!userId) {
+    // Extract MongoDB ObjectId from JWT token
+    const userIdFromToken = getUserIdFromToken();
+    
+    // ✅ Use response data as fallback if token extraction fails
+    const finalUserId = userIdFromToken || data.mongoUserId || data.userId || data.id;
+    
+    if (!finalUserId) {
       console.error('Login response data:', data);
-      throw new Error('User ID not found in login response. Please contact support.');
+      console.error('Decoded token userId:', userIdFromToken);
+      throw new Error('User ID not found. Please contact support.');
     }
 
     // Persist session with all necessary user data
     const userData = { 
       ...data, 
       role: userRole, 
-      Id: userId,
-      id: userId,
-      userId: userId
+      userId: finalUserId, // MongoDB ObjectId from token or response
+      id: finalUserId,
+      email: data.email
     };
+    
     sessionStorage.setItem('token', data.token);
     sessionStorage.setItem('user', JSON.stringify(userData));
 
     setUser({
-      id: userId,
-      userId: userId,
-      Id: userId,
-      email: data.email,
+      id: userIdFromToken,
+      userId: userIdFromToken,
+      email: data.email || '',
       role: userRole,
-      name: data.fullName,
+      name: data.fullName || data.name || '',
       mobile: data.mobile || ''
     });
 
@@ -649,17 +675,22 @@ const handleLogin = async () => {
     }
 
   } catch (err) {
+    console.error('Login error details:', err);
     setError(
       err.response?.data?.message ||
+      err.response?.data?.title ||
       err.message ||
-      'Login failed'
+      'Login failed. Please try again.'
     );
   } finally {
     setLoading(false);
   }
 };
-  
 
+
+// ==========================================
+// REGISTER HANDLER (MongoDB)
+// ==========================================
 const handleRegister = async () => {
   const { fullName, email, mobile, password, confirmPassword } = registerData;
   
@@ -677,6 +708,7 @@ const handleRegister = async () => {
   if (!mobile?.trim()) {
     setError('Mobile number is required');
     return;
+    
   }
   
   if (!password) {
@@ -700,19 +732,13 @@ const handleRegister = async () => {
   try {
     console.log('Attempting registration:', { fullName, email, mobile, role: loginRole });
     
-    const response = await authAPI.register(
+    // USE MONGODB AUTHENTICATION
+    const response = await mongoAuthAPI.register(
       fullName.trim(),
       email.trim(),
       mobile.trim(),
-      password,
-      loginRole
+      password
     );
-
-    // Verify the backend returned a valid role
-    if (!response.data.role) {
-      throw new Error('No role returned from server');
-    }
-
     
     console.log('Registration response:', response.data);
     
@@ -722,13 +748,38 @@ const handleRegister = async () => {
     if (!data.token) {
       throw new Error('No token received from server');
     }
+
+    if (!data.role) {
+      throw new Error('No role returned from server');
+    }
+
+    // Store token FIRST before extracting user ID
+    sessionStorage.setItem('token', data.token);
+    
+    // Extract MongoDB ObjectId from JWT token
+    const userIdFromToken = getUserIdFromToken();
+    
+    // Use fallback: try response data or generate from timestamp
+    const finalUserId = userIdFromToken || data.userId || data.id || data.mongoUserId || `user_${Date.now()}`;
+    
+    if (!finalUserId) {
+      console.error('Registration response data:', data);
+      throw new Error('User ID not found in token. Please contact support.');
+    }
     
     // Store token and user data
-    sessionStorage.setItem('token', data.token);
-    sessionStorage.setItem('user', JSON.stringify(data));
+    const userData = {
+      ...data,
+      userId: finalUserId,
+      id: finalUserId
+    };
+    
+    sessionStorage.setItem('user', JSON.stringify(userData));
     
     // Set user state
     setUser({
+      id: finalUserId,
+      userId: finalUserId,
       email: data.email,
       role: data.role,
       name: data.fullName,
@@ -743,7 +794,7 @@ const handleRegister = async () => {
       addresses: []
     });
     
-    console.log('Registration successful');
+    console.log('Registration successful with userId:', finalUserId);
     
     // Redirect to products (new users are always customers)
     setCurrentPage('products');
@@ -762,8 +813,11 @@ const handleRegister = async () => {
   } finally {
     setLoading(false);
   }
-};                           
+};
 
+// ==========================================
+// LOGOUT (No changes needed)
+// ==========================================
 const handleLogout = () => {
   // Clear storage
   sessionStorage.removeItem('token');
@@ -1319,70 +1373,146 @@ useEffect(() => {
 
 
 
-// Add this handler for requesting Email OTP:
+// ==========================================
+// EMAIL OTP HANDLERS (MongoDB)
+// ==========================================
 const handleRequestEmailOTP = async () => {
-  if (!emailForOtp || !emailForOtp.includes('@')) {
+  if (!emailForOtp.includes('@')) {
     setError('Please enter a valid email address');
     return;
   }
-  setError('');
+
   setLoading(true);
+  setError('');
 
   try {
-    const response = await authAPI.requestEmailOtp(emailForOtp);
+    // USE MONGODB EMAIL OTP
+    const response = await mongoAuthAPI.requestEmailOtp(emailForOtp);
     
-    if (response && response.status >= 200 && response.status < 300) {
+    if (response.data.success) {
       setEmailOtpSent(true);
-      setOtpTimer(300);
+      setOtpTimer(300); // 5 minutes
       setCanResend(false);
-      alert('✅ OTP sent successfully to your email!');
-    } else {
-      throw new Error('Failed to send OTP');
+      
+      // Auto-focus first OTP input
+      setTimeout(() => {
+        document.getElementById('email-otp-0')?.focus();
+      }, 100);
     }
   } catch (err) {
     console.error('Email OTP request error:', err);
-    setError(err.response?.data?.message || err.message || 'Failed to send OTP to email');
+    setError(
+      err.response?.data?.message || 
+      err.message || 
+      'Failed to send OTP. Please try again.'
+    );
   } finally {
     setLoading(false);
   }
 };
 
-// Add this handler for verifying Email OTP:
+
 const handleVerifyEmailOTP = async () => {
-  const otpCode = emailOtp.join('');
-  if (otpCode.length !== 6) {
+  const otpValue = emailOtp.join('');
+  
+  if (otpValue.length !== 6) {
     setError('Please enter complete 6-digit OTP');
     return;
   }
-  setError('');
+
   setLoading(true);
-  
+  setError('');
+
   try {
-    const response = await authAPI.verifyEmailOtp(emailForOtp, otpCode);
+    // USE MONGODB EMAIL OTP VERIFICATION
+    const response = await mongoAuthAPI.verifyEmailOtp(emailForOtp, otpValue);
     const data = response.data;
-    const roleMap = { 0: 'Customer', 1: 'Admin' };
-    const userRole = typeof data.role === 'number' ? roleMap[data.role] : data.role;
-    
-    if (userRole !== loginRole) {
-      throw new Error(`This account is registered as ${userRole}. Please select ${userRole} login.`);
+
+    if (!data.token) {
+      throw new Error('No token received');
     }
-    
+
+    // Extract user ID from token
     sessionStorage.setItem('token', data.token);
-    sessionStorage.setItem('user', JSON.stringify({ ...data, role: userRole }));
-    setUser({ 
-      email: data.email, 
-      role: userRole, 
-      name: data.fullName, 
-      mobile: data.mobile || '' 
+    const userIdFromToken = getUserIdFromToken();
+
+    const userData = {
+      ...data,
+      userId: userIdFromToken,
+      id: userIdFromToken
+    };
+
+    sessionStorage.setItem('user', JSON.stringify(userData));
+
+    setUser({
+      id: userIdFromToken,
+      userId: userIdFromToken,
+      email: data.email,
+      role: data.role,
+      name: data.fullName,
+      mobile: data.mobile
     });
-    setCurrentPage(userRole === 'Admin' ? 'admin' : 'products');
+
+    if (data.role === 'Admin') {
+      setActiveTab('overview');
+      setCurrentPage('admin');
+    } else {
+      setCurrentPage('products');
+    }
+
   } catch (err) {
-    setError(err.response?.data?.message || 'OTP verification failed');
+    console.error('Email OTP verification error:', err);
+    setError(
+      err.response?.data?.message || 
+      err.message || 
+      'Invalid OTP. Please try again.'
+    );
   } finally {
     setLoading(false);
   }
 };
+// ==========================================
+// SESSION RESTORATION (Updated)
+// ==========================================
+useEffect(() => {
+  const token = sessionStorage.getItem('token');
+  const savedUser = sessionStorage.getItem('user');
 
+  if (!token || !savedUser) return;
+
+  try {
+    const userData = JSON.parse(savedUser);
+
+    if (!userData.role || !userData.email) {
+      throw new Error('Invalid session');
+    }
+
+    // Extract user ID from token (works for both SQL and MongoDB)
+    const userIdFromToken = getUserIdFromToken();
+
+    setUser({
+      id: userIdFromToken || userData.id || userData.userId,
+      userId: userIdFromToken || userData.userId || userData.id,
+      email: userData.email,
+      role: userData.role,
+      name: userData.fullName || userData.name,
+      mobile: userData.mobile || ''
+    });
+
+    if (userData.role === 'Admin') {
+      setActiveTab('overview');
+      setCurrentPage('admin');
+    } else {
+      setCurrentPage('products');
+      loadProducts();
+    }
+
+  } catch {
+    sessionStorage.clear();
+    setUser(null);
+    setCurrentPage('home');
+  }
+}, []);
 //login
 // OTP Timer countdown moved out of conditional to satisfy Hooks rules
 useEffect(() => {
@@ -1472,81 +1602,103 @@ if (!user && currentPage === 'login') {
       setLoading(false);
     }
   };
-  const handleRequestOTP = async () => {
-    if (!mobileNumber || mobileNumber.length < 10) {
-      setError('Please enter a valid 10-digit mobile number');
-      return;
-    }
-    setError('');
-    setLoading(true);
+ // ==========================================
+// MOBILE OTP HANDLERS (MongoDB)
+// ==========================================
+const handleRequestOTP = async () => {
+  if (mobileNumber.length !== 10) {
+    setError('Please enter a valid 10-digit mobile number');
+    return;
+  }
 
-    try {
-      let response = null;
+  setLoading(true);
+  setError('');
 
-      // Try several common payload shapes to be tolerant of backend variations
-      const candidates = [
-        mobileNumber,
-        { mobile: mobileNumber },
-        { phone: mobileNumber },
-        { mobileNumber }
-      ];
-
-      for (const payload of candidates) {
-        try {
-          response = await authAPI.requestOTP(payload);
-          // success if HTTP 2xx
-          if (response && response.status >= 200 && response.status < 300) break;
-        } catch (innerErr) {
-          // continue to next payload shape
-          console.warn('OTP attempt failed for payload:', payload, innerErr);
-        }
-      }
-
-      if (!response || response.status >= 400) {
-        const msg = response?.data?.message || response?.data || 'OTP request failed';
-        throw new Error(msg);
-      }
-
+  try {
+    // USE MONGODB OTP
+    const response = await mongoAuthAPI.requestOtp(mobileNumber);
+    
+    if (response.data.success) {
       setOtpSent(true);
-      setOtpTimer(300);
+      setOtpTimer(300); // 5 minutes
       setCanResend(false);
-      alert('✅ OTP sent successfully!');
-    } catch (err) {
-      console.error('OTP request error:', err);
-      setError(err.response?.data?.message || err.message || 'Failed to send OTP');
-    } finally {
-      setLoading(false);
+      
+      // Auto-focus first OTP input
+      setTimeout(() => {
+        document.getElementById('otp-0')?.focus();
+      }, 100);
     }
-  };
+  } catch (err) {
+    console.error('OTP request error:', err);
+    setError(
+      err.response?.data?.message || 
+      err.message || 
+      'Failed to send OTP. Please try again.'
+    );
+  } finally {
+    setLoading(false);
+  }
+};
 
-  const handleVerifyOTP = async () => {
-    const otpCode = otp.join('');
-    if (otpCode.length !== 6) {
-      setError('Please enter complete 6-digit OTP');
-      return;
+const handleVerifyOTP = async () => {
+  const otpValue = otp.join('');
+  
+  if (otpValue.length !== 6) {
+    setError('Please enter complete 6-digit OTP');
+    return;
+  }
+
+  setLoading(true);
+  setError('');
+
+  try {
+    // USE MONGODB OTP VERIFICATION
+    const response = await mongoAuthAPI.verifyOtp(mobileNumber, otpValue);
+    const data = response.data;
+
+    if (!data.token) {
+      throw new Error('No token received');
     }
-    setError('');
-    setLoading(true);
-    try {
-      const response = await authAPI.verifyOTP(mobileNumber, otpCode);
-      const data = response.data;
-      const roleMap = { 0: 'Customer', 1: 'Admin' };
-      const userRole = typeof data.role === 'number' ? roleMap[data.role] : data.role;
-      
-      if (userRole !== loginRole) {
-        throw new Error(`This account is registered as ${userRole}. Please select ${userRole} login.`);
-      }
-      
-      sessionStorage.setItem('token', data.token);
-      sessionStorage.setItem('user', JSON.stringify({ ...data, role: userRole }));
-      setUser({ email: data.email, role: userRole, name: data.fullName, mobile: data.mobile || mobileNumber });
-      setCurrentPage(userRole === 'Admin' ? 'admin' : 'products');
-    } catch (err) {
-      setError(err.response?.data?.message || 'OTP verification failed');
-    } finally {
-      setLoading(false);
+
+    // Extract user ID from token
+    sessionStorage.setItem('token', data.token);
+    const userIdFromToken = getUserIdFromToken();
+
+    const userData = {
+      ...data,
+      userId: userIdFromToken,
+      id: userIdFromToken
+    };
+
+    sessionStorage.setItem('user', JSON.stringify(userData));
+
+    setUser({
+      id: userIdFromToken,
+      userId: userIdFromToken,
+      email: data.email,
+      role: data.role,
+      name: data.fullName,
+      mobile: data.mobile
+    });
+
+    if (data.role === 'Admin') {
+      setActiveTab('overview');
+      setCurrentPage('admin');
+    } else {
+      setCurrentPage('products');
     }
-  };
+
+  } catch (err) {
+    console.error('OTP verification error:', err);
+    setError(
+      err.response?.data?.message || 
+      err.message || 
+      'Invalid OTP. Please try again.'
+    );
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleOtpChange = (index, value) => {
     if (!/^\d*$/.test(value)) return;
@@ -1586,261 +1738,426 @@ if (!user && currentPage === 'login') {
         </div>
 
         {/* Card */}
-        <div className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl p-6 border border-white/20">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">Sign In</h2>
-              <p className="text-sm text-gray-500 mt-1">Secure access to your account</p>
-            </div>
-            <div className="text-sm text-gray-400">Need an account? <button onClick={() => setCurrentPage('register')} className="text-blue-600 font-semibold">Sign up</button></div>
-          </div>
-
-          {error && (
-            <div className="bg-red-50 border-l-4 border-red-500 text-red-700 px-4 py-3 rounded-lg mb-4">
-              <p className="text-sm">{error}</p>
-            </div>
-          )}
-
-          {/* Login Method Tabs */}
-          <div className="mb-5">
-            <div className="grid grid-cols-3 gap-2 bg-gray-100 rounded-xl p-1">
-              <button
-                onClick={() => { setLoginMethod('email'); setError(''); setOtpSent(false); setEmailOtpSent(false); }}
-                className={`py-2 rounded-lg font-semibold transition ${loginMethod === 'email' ? 'bg-white shadow text-blue-600' : 'text-gray-600'}`}
-                aria-pressed={loginMethod === 'email'}
-              >
-                <Mail className="inline w-4 h-4 mr-2" /> Password
-              </button>
-
-              <button
-                onClick={() => { setLoginMethod('mobile'); setError(''); setOtpSent(false); setEmailOtpSent(false); }}
-                className={`py-2 rounded-lg font-semibold transition ${loginMethod === 'mobile' ? 'bg-white shadow text-blue-600' : 'text-gray-600'}`}
-                aria-pressed={loginMethod === 'mobile'}
-              >
-                <Smartphone className="inline w-4 h-4 mr-2" /> Mobile OTP
-              </button>
-
-              <button
-                onClick={() => { setLoginMethod('emailOtp'); setError(''); setOtpSent(false); setEmailOtpSent(false); }}
-                className={`py-2 rounded-lg font-semibold transition ${loginMethod === 'emailOtp' ? 'bg-white shadow text-blue-600' : 'text-gray-600'}`}
-                aria-pressed={loginMethod === 'emailOtp'}
-              >
-                <Mail className="inline w-4 h-4 mr-2" /> Email OTP
-              </button>
-            </div>
-          </div>
-
-          {/* Role Selector */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Login As</label>
-            <select
-              value={loginRole}
-              onChange={(e) => setLoginRole(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-200"
-            >
-              <option value="Customer">Customer</option>
-              <option value="Admin">Admin</option>
-            </select>
-          </div>
-
-          {/* Email + Password */}
-          {loginMethod === 'email' && (
-            <form onSubmit={(e) => { e.preventDefault(); handleEmailLogin(); }} className="space-y-4">
+          <div className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl p-8 border border-white/20">
+            <div className="flex items-center justify-between mb-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-400 w-5 h-5" />
-                  <input
-                    type="email"
-                    value={loginData.email}
-                    onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
-                    className="w-full pl-11 pr-3 py-2 border rounded-lg bg-white"
-                    placeholder="you@example.com"
-                    required
-                  />
-                </div>
+                <h2 className="text-3xl font-bold text-gray-900">Sign In</h2>
+                <p className="text-sm text-gray-600 mt-2">Access your ShopAI account securely</p>
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-400 w-5 h-5" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={loginData.password}
-                    onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
-                    className="w-full pl-11 pr-11 py-2 border rounded-lg bg-white"
-                    placeholder="●●●●●●●●"
-                    required
-                  />
-                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
-                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <button type="submit" disabled={loading} className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-2 rounded-lg font-semibold disabled:opacity-50">
-                  {loading ? 'Signing in...' : 'Sign In'}
+              <div className="text-sm text-gray-600">
+                New here?{' '}
+                <button
+            onClick={() => setCurrentPage('register')}
+            className="text-blue-600 font-semibold hover:text-blue-700 transition-colors"
+                >
+            Create account
                 </button>
               </div>
-            </form>
-          )}
-
-          {/* Mobile OTP */}
-          {loginMethod === 'mobile' && (
-            <div className="space-y-4">
-              {!otpSent ? (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Mobile Number</label>
-                    <div className="relative">
-                      <Smartphone className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-400 w-5 h-5" />
-                      <input
-                        type="tel"
-                        value={mobileNumber}
-                        onChange={(e) => setMobileNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                        className="w-full pl-11 pr-3 py-2 border rounded-lg bg-white"
-                        placeholder="9876543210"
-                        maxLength={10}
-                        required
-                      />
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">We will send a 6-digit OTP to this number</p>
-                  </div>
-
-                  <button
-                    onClick={handleRequestOTP}
-                    disabled={loading || mobileNumber.length !== 10}
-                    className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-2 rounded-lg font-semibold disabled:opacity-50"
-                  >
-                    {loading ? 'Sending OTP...' : 'Send OTP'}
-                  </button>
-                </>
-              ) : (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Enter OTP</label>
-                    <p className="text-xs text-gray-500 mb-3">OTP sent to {mobileNumber} • {formatTime(otpTimer)} remaining</p>
-                    <div className="flex gap-2 justify-center">
-                      {otp.map((d, i) => (
-                        <input
-                          key={i}
-                          id={`otp-${i}`}
-                          type="text"
-                          inputMode="numeric"
-                          maxLength={1}
-                          value={d}
-                          onChange={(e) => handleOtpChange(i, e.target.value)}
-                          onKeyDown={(e) => handleOtpKeyDown(i, e)}
-                          className="w-12 h-12 text-center text-xl border rounded-lg"
-                        />
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <button onClick={handleVerifyOTP} disabled={loading} className="flex-1 bg-green-600 text-white py-2 rounded-lg font-semibold disabled:opacity-50">
-                      {loading ? 'Verifying...' : 'Verify & Login'}
-                    </button>
-                    <button
-                      onClick={() => { setOtpSent(false); setOtp(['', '', '', '', '', '']); setError(''); }}
-                      className="px-4 py-2 border rounded-lg text-sm"
-                    >
-                      Change
-                    </button>
-                  </div>
-
-                  <div className="text-sm text-center text-gray-500 mt-2">
-                    <button onClick={handleRequestOTP} disabled={!canResend || loading} className="text-blue-600 font-medium disabled:opacity-50">
-                      {canResend ? 'Resend OTP' : `Resend in ${formatTime(otpTimer)}`}
-                    </button>
-                  </div>
-                </>
-              )}
             </div>
-          )}
 
-          {/* Email OTP */}
-          {loginMethod === 'emailOtp' && (
-            <div className="space-y-4">
-              {!emailOtpSent ? (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-400 w-5 h-5" />
-                      <input
-                        type="email"
-                        value={emailForOtp}
-                        onChange={(e) => setEmailForOtp(e.target.value)}
-                        className="w-full pl-11 pr-3 py-2 border rounded-lg bg-white"
-                        placeholder="you@example.com"
-                        required
-                      />
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">We'll send a 6-digit code to your email</p>
-                  </div>
+            {error && (
+              <div className="bg-red-50 border-l-4 border-red-500 text-red-700 px-5 py-4 rounded-lg mb-6 flex items-start gap-3 animate-pulse">
+                <div className="w-1 h-1 bg-red-500 rounded-full mt-2.5"></div>
+                <p className="text-sm font-medium">{error}</p>
+              </div>
+            )}
 
-                  <button
-                    onClick={handleRequestEmailOTP}
-                    disabled={loading || !emailForOtp}
-                    className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-2 rounded-lg font-semibold disabled:opacity-50"
-                  >
-                    {loading ? 'Sending OTP...' : 'Send OTP to Email'}
-                  </button>
-                </>
-              ) : (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Enter Email OTP</label>
-                    <p className="text-xs text-gray-500 mb-3">OTP sent to {emailForOtp} • {formatTime(otpTimer)} remaining</p>
-                    <div className="flex gap-2 justify-center">
-                      {emailOtp.map((d, i) => (
-                        <input
-                          key={i}
-                          id={`email-otp-${i}`}
-                          type="text"
-                          inputMode="numeric"
-                          maxLength={1}
-                          value={d}
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            if (!/^\d*$/.test(v)) return;
-                            const copy = [...emailOtp];
-                            copy[i] = v;
-                            setEmailOtp(copy);
-                            if (v && i < 5) document.getElementById(`email-otp-${i+1}`)?.focus();
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Backspace' && !emailOtp[i] && i > 0) document.getElementById(`email-otp-${i-1}`)?.focus();
-                          }}
-                          className="w-12 h-12 text-center text-xl border rounded-lg"
-                        />
-                      ))}
-                    </div>
-                  </div>
+            {/* Login Method Tabs - Enhanced */}
+            <div className="mb-6">
+              <label className="block text-sm font-semibold text-gray-700 mb-3">Select Login Method</label>
+              <div className="grid grid-cols-3 gap-2 bg-gray-100 rounded-xl p-1.5">
+                <button
+            onClick={() => {
+              setLoginMethod('email');
+              setError('');
+              setOtpSent(false);
+              setEmailOtpSent(false);
+              setLoginData({ email: '', password: '' });
+            }}
+            className={`py-2.5 px-3 rounded-lg font-semibold transition-all duration-300 flex items-center justify-center gap-2 ${
+              loginMethod === 'email'
+                ? 'bg-white shadow-md text-blue-600 scale-105'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+            aria-pressed={loginMethod === 'email'}
+                >
+            <Lock className="w-4 h-4" />
+            <span className="hidden sm:inline">Password</span>
+                </button>
 
-                  <div className="flex gap-2">
-                    <button onClick={handleVerifyEmailOTP} disabled={loading} className="flex-1 bg-green-600 text-white py-2 rounded-lg font-semibold disabled:opacity-50">
-                      {loading ? 'Verifying...' : 'Verify & Login'}
-                    </button>
-                    <button onClick={() => { setEmailOtpSent(false); setEmailOtp(['', '', '', '', '', '']); setError(''); }} className="px-4 py-2 border rounded-lg text-sm">
-                      Change
-                    </button>
-                  </div>
+                <button
+            onClick={() => {
+              setLoginMethod('mobile');
+              setError('');
+              setOtpSent(false);
+              setEmailOtpSent(false);
+              setMobileNumber('');
+              setOtp(['', '', '', '', '', '']);
+            }}
+            className={`py-2.5 px-3 rounded-lg font-semibold transition-all duration-300 flex items-center justify-center gap-2 ${
+              loginMethod === 'mobile'
+                ? 'bg-white shadow-md text-blue-600 scale-105'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+            aria-pressed={loginMethod === 'mobile'}
+                >
+            <Smartphone className="w-4 h-4" />
+            <span className="hidden sm:inline">Mobile</span>
+                </button>
 
-                  <div className="text-sm text-center text-gray-500 mt-2">
-                    <button onClick={handleRequestEmailOTP} disabled={!canResend || loading} className="text-blue-600 font-medium disabled:opacity-50">
-                      {canResend ? 'Resend OTP' : `Resend in ${formatTime(otpTimer)}`}
-                    </button>
-                  </div>
-                </>
-              )}
+                <button
+            onClick={() => {
+              setLoginMethod('emailOtp');
+              setError('');
+              setOtpSent(false);
+              setEmailOtpSent(false);
+              setEmailForOtp('');
+              setEmailOtp(['', '', '', '', '', '']);
+            }}
+            className={`py-2.5 px-3 rounded-lg font-semibold transition-all duration-300 flex items-center justify-center gap-2 ${
+              loginMethod === 'emailOtp'
+                ? 'bg-white shadow-md text-blue-600 scale-105'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+            aria-pressed={loginMethod === 'emailOtp'}
+                >
+            <Mail className="w-4 h-4" />
+            <span className="hidden sm:inline">Email</span>
+                </button>
+              </div>
             </div>
-          )}
 
-          {/* Demo Credentials */}
+            {/* Role Selector - Enhanced */}
+            <div className="mb-6">
+              <label className="block text-sm font-semibold text-gray-700 mb-3">Login As</label>
+              <div className="relative">
+                <select
+            value={loginRole}
+            onChange={(e) => setLoginRole(e.target.value)}
+            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300 bg-white hover:bg-gray-50 cursor-pointer text-gray-700 font-medium appearance-none"
+                >
+            <option value="Customer">👤 Customer</option>
+            <option value="Admin">🏢 Admin</option>
+                </select>
+                <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+            </svg>
+                </div>
+              </div>
+            </div>
+
+            {/* EMAIL + PASSWORD LOGIN */}
+            {loginMethod === 'email' && (
+              <form
+                onSubmit={(e) => {
+            e.preventDefault();
+            handleLogin();
+                }}
+                className="space-y-5"
+              >
+                {/* Email Input */}
+                <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-3">Email Address</label>
+            <div className="relative group">
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-400 w-5 h-5 group-focus-within:text-blue-600 transition-colors" />
+              <input
+                type="email"
+                value={loginData.email}
+                onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
+                className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300 bg-gray-50 focus:bg-white placeholder-gray-400"
+                placeholder="you@example.com"
+                required
+              />
+            </div>
+                </div>
+
+                {/* Password Input */}
+                <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-3">Password</label>
+            <div className="relative group">
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-400 w-5 h-5 group-focus-within:text-blue-600 transition-colors" />
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={loginData.password}
+                onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
+                className="w-full pl-12 pr-12 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300 bg-gray-50 focus:bg-white placeholder-gray-400"
+                placeholder="••••••••"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-blue-600 transition-colors"
+              >
+                {showPassword ? (
+                  <EyeOff className="w-5 h-5" />
+                ) : (
+                  <Eye className="w-5 h-5" />
+                )}
+              </button>
+            </div>
+                </div>
+
+                {/* Sign In Button */}
+                <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-3 rounded-xl font-bold text-lg transition-all duration-300 transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl flex items-center justify-center gap-2 group"
+                >
+            {loading ? (
+              <>
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                Signing in...
+              </>
+            ) : (
+              <>
+                <span>Sign In</span>
+                <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" />
+                </svg>
+              </>
+            )}
+                </button>
+              </form>
+            )}
+
+            {/* MOBILE OTP LOGIN */}
+            {loginMethod === 'mobile' && (
+              <div className="space-y-5">
+                {!otpSent ? (
+            <>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-3">Mobile Number</label>
+                <div className="relative group">
+                  <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-400 w-5 h-5 group-focus-within:text-blue-600 transition-colors" />
+                  <input
+              type="tel"
+              value={mobileNumber}
+              onChange={(e) => {
+                const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                setMobileNumber(val);
+              }}
+              className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300 bg-gray-50 focus:bg-white placeholder-gray-400"
+              placeholder="9876543210"
+              maxLength={10}
+              required
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-2">📱 We'll send a 6-digit OTP to this number</p>
+              </div>
+
+              <button
+                onClick={handleRequestOTP}
+                disabled={loading || mobileNumber.length !== 10}
+                className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-3 rounded-xl font-bold text-lg transition-all duration-300 transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl flex items-center justify-center gap-2 group"
+              >
+                {loading ? (
+                  <>
+              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              Sending OTP...
+                  </>
+                ) : (
+                  <>
+              <span>Send OTP</span>
+              <KeyRound className="w-5 h-5 group-hover:rotate-12 transition-transform" />
+                  </>
+                )}
+              </button>
+            </>
+                ) : (
+            <>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Enter 6-Digit OTP</label>
+                <p className="text-xs text-gray-500 mb-4">
+                  ⏱️ Sent to {mobileNumber} • Expires in{' '}
+                  <span className="font-bold text-red-600">{formatTime(otpTimer)}</span>
+                </p>
+                <div className="flex gap-2 justify-center mb-4">
+                  {otp.map((digit, idx) => (
+              <input
+                key={idx}
+                id={`otp-${idx}`}
+                type="text"
+                inputMode="numeric"
+                maxLength={1}
+                value={digit}
+                onChange={(e) => handleOtpChange(idx, e.target.value)}
+                onKeyDown={(e) => handleOtpKeyDown(idx, e)}
+                className="w-12 h-12 text-center text-2xl font-bold border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300"
+              />
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={handleVerifyOTP}
+                  disabled={loading || otp.join('').length !== 6}
+                  className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white py-3 rounded-xl font-bold transition-all duration-300 transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl flex items-center justify-center gap-2 group"
+                >
+                  {loading ? (
+              <>
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                Verifying...
+              </>
+                  ) : (
+              <>
+                <span>Verify & Sign In</span>
+                <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" />
+                </svg>
+              </>
+                  )}
+                </button>
+                <button
+                  onClick={() => {
+              setOtpSent(false);
+              setOtp(['', '', '', '', '', '']);
+              setError('');
+                  }}
+                  className="px-6 py-3 border-2 border-gray-200 text-gray-700 rounded-xl font-semibold hover:border-blue-300 hover:bg-blue-50 transition-all"
+                >
+                  Change Number
+                </button>
+              </div>
+
+              <div className="text-sm text-center text-gray-500 mt-3">
+                <button
+                  onClick={handleRequestOTP}
+                  disabled={!canResend || loading}
+                  className="text-blue-600 hover:text-blue-700 font-semibold disabled:opacity-50 transition-colors"
+                >
+                  {canResend ? '🔄 Resend OTP' : `Resend in ${formatTime(otpTimer)}`}
+                </button>
+              </div>
+            </>
+                )}
+              </div>
+            )}
+
+            {/* EMAIL OTP LOGIN */}
+            {loginMethod === 'emailOtp' && (
+              <div className="space-y-5">
+                {!emailOtpSent ? (
+            <>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-3">Email Address</label>
+                <div className="relative group">
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-400 w-5 h-5 group-focus-within:text-blue-600 transition-colors" />
+                  <input
+              type="email"
+              value={emailForOtp}
+              onChange={(e) => setEmailForOtp(e.target.value)}
+              className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300 bg-gray-50 focus:bg-white placeholder-gray-400"
+              placeholder="you@example.com"
+              required
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-2">📧 We'll send a 6-digit code to your email</p>
+              </div>
+
+              <button
+                onClick={handleRequestEmailOTP}
+                disabled={loading || !emailForOtp.includes('@')}
+                className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-3 rounded-xl font-bold text-lg transition-all duration-300 transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl flex items-center justify-center gap-2 group"
+              >
+                {loading ? (
+                  <>
+              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              Sending OTP...
+                  </>
+                ) : (
+                  <>
+              <span>Send OTP to Email</span>
+              <KeyRound className="w-5 h-5 group-hover:rotate-12 transition-transform" />
+                  </>
+                )}
+              </button>
+            </>
+                ) : (
+            <>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Enter 6-Digit OTP</label>
+                <p className="text-xs text-gray-500 mb-4">
+                  ⏱️ Sent to {emailForOtp} • Expires in{' '}
+                  <span className="font-bold text-red-600">{formatTime(otpTimer)}</span>
+                </p>
+                <div className="flex gap-2 justify-center mb-4">
+                  {emailOtp.map((digit, idx) => (
+              <input
+                key={idx}
+                id={`email-otp-${idx}`}
+                type="text"
+                inputMode="numeric"
+                maxLength={1}
+                value={digit}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (!/^\d*$/.test(val)) return;
+                  const newOtp = [...emailOtp];
+                  newOtp[idx] = val;
+                  setEmailOtp(newOtp);
+                  if (val && idx < 5) {
+                    document.getElementById(`email-otp-${idx + 1}`)?.focus();
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Backspace' && !emailOtp[idx] && idx > 0) {
+                    document.getElementById(`email-otp-${idx - 1}`)?.focus();
+                  }
+                }}
+                className="w-12 h-12 text-center text-2xl font-bold border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300"
+              />
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={handleVerifyEmailOTP}
+                  disabled={loading || emailOtp.join('').length !== 6}
+                  className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white py-3 rounded-xl font-bold transition-all duration-300 transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl flex items-center justify-center gap-2 group"
+                >
+                  {loading ? (
+              <>
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                Verifying...
+              </>
+                  ) : (
+              <>
+                <span>Verify & Sign In</span>
+                <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" />
+                </svg>
+              </>
+                  )}
+                </button>
+                <button
+                  onClick={() => {
+              setEmailOtpSent(false);
+              setEmailOtp(['', '', '', '', '', '']);
+              setError('');
+                  }}
+                  className="px-6 py-3 border-2 border-gray-200 text-gray-700 rounded-xl font-semibold hover:border-blue-300 hover:bg-blue-50 transition-all"
+                >
+                  Change Email
+                </button>
+              </div>
+
+              <div className="text-sm text-center text-gray-500 mt-3">
+                <button
+                  onClick={handleRequestEmailOTP}
+                  disabled={!canResend || loading}
+                  className="text-blue-600 hover:text-blue-700 font-semibold disabled:opacity-50 transition-colors"
+                >
+                  {canResend ? '🔄 Resend OTP' : `Resend in ${formatTime(otpTimer)}`}
+                </button>
+              </div>
+            </>
+                )}
+              </div>
+            )}
           <div className="mt-6 bg-white/20 backdrop-blur-md rounded-lg p-4 border border-white/30">
             <p className="text-xs text-gray-700 mb-2">Demo credentials</p>
             <div className="flex gap-2">

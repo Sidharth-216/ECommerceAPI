@@ -231,7 +231,6 @@ namespace ECommerceAPI.API
     }
 }*/
 
-
 // ==================== Startup.cs ====================
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -269,16 +268,30 @@ namespace ECommerceAPI.API
 
         public void ConfigureServices(IServiceCollection services)
         {
-            // Database Configuration
+            services.AddControllers()
+                .AddJsonOptions(options =>
+                {
+                    options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+                });
+
+            // ========================= Database Configuration =========================
             services.AddDbContext<ApplicationDbContext>(options =>
                 options.UseSqlServer(
                     Configuration.GetConnectionString("DefaultConnection")));
+            // ==========================================================================
 
+            // ========================= JWT Configuration =========================
             // Register JwtHelper
             services.AddScoped<JwtHelper>();
 
             // JWT Authentication
-            var jwtKey = Configuration["Jwt:Key"];
+            var jwtKey = Configuration["Jwt:SecretKey"]; // Changed from "Jwt:Key" to "Jwt:SecretKey"
+
+            if (string.IsNullOrEmpty(jwtKey))
+            {
+                throw new InvalidOperationException(
+                    "JWT configuration is missing. Please add 'Jwt:SecretKey', 'Jwt:Issuer', and 'Jwt:Audience' to appsettings.json");
+            }
 
             services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 .AddJwtBearer(options =>
@@ -301,8 +314,9 @@ namespace ECommerceAPI.API
                         RoleClaimType = ClaimTypes.Role
                     };
                 });
+            // =====================================================================
 
-            // CORS Configuration
+            // ========================= CORS Configuration =========================
             services.AddCors(options =>
             {
                 options.AddPolicy("AllowReactApp",
@@ -318,6 +332,7 @@ namespace ECommerceAPI.API
                         .AllowAnyMethod()
                         .AllowAnyHeader());
             });
+            // ======================================================================
 
             // HTTP Client Factory
             services.AddHttpClient();
@@ -347,7 +362,6 @@ namespace ECommerceAPI.API
             if (string.IsNullOrWhiteSpace(mongoSettings.ProductsCollectionName))
                 throw new Exception("MongoDB ProductsCollectionName is missing in appsettings.json");
 
-            // ✅ NEW: Validate CartsCollectionName
             if (string.IsNullOrWhiteSpace(mongoSettings.CartsCollectionName))
                 throw new Exception("MongoDB CartsCollectionName is missing in appsettings.json");
 
@@ -366,41 +380,90 @@ namespace ECommerceAPI.API
             // =========================================================================
 
             // ========================= SQL Repositories =========================
+            // User Repository (SQL)
             services.AddScoped<IUserRepository, UserRepository>();
+            
+            // Product Repository (SQL)
             services.AddScoped<IProductRepository, ProductRepository>();
+            
+            // Cart Repository (SQL)
             services.AddScoped<ICartRepository, CartRepository>();
+            
+            // Order Repository (SQL)
             services.AddScoped<IOrderRepository, OrderRepository>();
+            
+            // Payment Repository (SQL)
             services.AddScoped<IPaymentRepository, PaymentRepository>();
+            
+            // Address Repository (SQL)
             services.AddScoped<IAddressRepository, AddressRepository>();
+            
+            // OTP Repository (SQL)
             services.AddScoped<IOtpRepository, OtpRepository>();
+            
+            // Email OTP Repository (SQL)
             services.AddScoped<IEmailOtpRepository, EmailOtpRepository>();
             // ====================================================================
 
             // ========================= MongoDB Repositories =========================
+            // Product Repository (MongoDB)
             services.AddScoped<IProductMongoRepository, ProductMongoRepository>();
-            services.AddScoped<ICartMongoRepository, CartMongoRepository>(); // ✅ NEW
-            // =======================================================================
+            
+            // Cart Repository (MongoDB)
+            services.AddScoped<ICartMongoRepository, CartMongoRepository>();
+            
+            // ✅ NEW: User Repository (MongoDB)
+            services.AddScoped<IMongoUserRepository, MongoUserRepository>();
+            
+            // ✅ NEW: OTP Repository (MongoDB)
+            services.AddScoped<IMongoOtpRepository, MongoOtpRepository>();
+            
+            // ✅ NEW: Email OTP Repository (MongoDB)
+            services.AddScoped<IMongoEmailOtpRepository, MongoEmailOtpRepository>();
+            // ========================================================================
+
+            // ========================= SQL Services =========================
+            // Auth Service (SQL)
+            services.AddScoped<IAuthService, AuthService>();
+            
+            // OTP Service (SQL)
+            services.AddScoped<IOtpService, OtpService>();
+            
+            // Email OTP Service (SQL)
+            services.AddScoped<IEmailOtpService, EmailOtpService>();
+            // ================================================================
+
+            // ========================= MongoDB Services =========================
+            // ✅ NEW: MongoDB OTP Service
+            services.AddScoped<IMongoOtpService, MongoOtpService>();
+            
+            // ✅ NEW: MongoDB Email OTP Service
+            services.AddScoped<IMongoEmailOtpService, MongoEmailOtpService>();
+            
+            // ✅ NEW: MongoDB Auth Service
+            services.AddScoped<MongoAuthService>();
+            
+            // ✅ NEW: User Migration Service
+            services.AddScoped<UserMigrationService>();
+            // ====================================================================
 
             // ========================= Hybrid Services =========================
             // Use hybrid product service (handles both SQL and MongoDB)
             services.AddScoped<IProductService, ProductServiceHybrid>();
             
-            // ✅ NEW: Use hybrid cart service (handles both SQL and MongoDB)
+            // Use hybrid cart service (handles both SQL and MongoDB)
             services.AddScoped<ICartService, CartServiceHybrid>();
-            // ==================================================================
+            // ===================================================================
 
             // ========================= Other Services =========================
-            services.AddScoped<IAuthService, AuthService>();
             services.AddScoped<IOrderService, OrderService>();
             services.AddScoped<IRecommendationService, RecommendationService>();
             services.AddScoped<IPaymentService, PaymentService>();
             services.AddScoped<IAdminService, AdminService>();
-            services.AddScoped<IOtpService, OtpService>();
-            services.AddScoped<IEmailOtpService, EmailOtpService>();
             services.AddScoped<IEmailService, EmailService>();
             // ==================================================================
 
-            // Razorpay Validation
+            // ========================= Razorpay Validation =========================
             var razorpayKeyId = Configuration["Razorpay:KeyId"];
             var razorpayKeySecret = Configuration["Razorpay:KeySecret"];
             if (string.IsNullOrEmpty(razorpayKeyId) || string.IsNullOrEmpty(razorpayKeySecret))
@@ -408,7 +471,9 @@ namespace ECommerceAPI.API
                 throw new InvalidOperationException(
                     "Razorpay configuration is missing. Please add 'Razorpay:KeyId' and 'Razorpay:KeySecret' to appsettings.json");
             }
+            // =======================================================================
 
+            // ========================= Controllers & Swagger =========================
             services.AddControllers();
             services.AddSwaggerGen(c =>
             {
@@ -416,7 +481,7 @@ namespace ECommerceAPI.API
                 {
                     Title = "E-Commerce API",
                     Version = "v1",
-                    Description = "E-Commerce API with Razorpay Payment Integration and MongoDB Hybrid Support"
+                    Description = "E-Commerce API with SQL + MongoDB Hybrid Support, Razorpay Integration, and MongoDB User Authentication"
                 });
 
                 c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
@@ -443,6 +508,7 @@ namespace ECommerceAPI.API
                     }
                 });
             });
+            // =========================================================================
         }
 
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
