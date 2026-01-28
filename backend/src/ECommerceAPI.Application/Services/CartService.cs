@@ -1,139 +1,118 @@
-using ECommerceAPI.Infrastructure.Repositories.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using ECommerceAPI.Application.DTOs.Cart;
 using ECommerceAPI.Application.Interfaces;
-using ECommerceAPI.Domain.Entities;
-using Microsoft.Extensions.Logging;
+using ECommerceAPI.Domain.Entities.Mongo;
+using ECommerceAPI.Infrastructure.Repositories.Interfaces;
 
 namespace ECommerceAPI.Application.Services
 {
-    /// <summary>
-    /// Cart Service - Manages shopping cart operations
-    /// Follows Single Responsibility Principle
-    /// </summary>
     public class CartService : ICartService
     {
-        private readonly ICartRepository _cartRepository;
-        private readonly IProductRepository _productRepository;
-        private readonly ICartRepository _mongoRepository;
-        private readonly IProductRepository _mongoProductRepository;
+        private readonly ICartMongoRepository _cartRepository;
+        private readonly IProductMongoRepository _productRepository;
         private readonly ILogger<CartService> _logger;
-        private readonly bool _useMongo = true;
 
         public CartService(
-            ICartRepository cartRepository,
-            IProductRepository productRepository,
-            ICartRepository mongoRepository,
-            IProductRepository mongoProductRepository,
+            ICartMongoRepository cartRepository,
+            IProductMongoRepository productRepository,
             ILogger<CartService> logger)
         {
             _cartRepository = cartRepository;
             _productRepository = productRepository;
-            _mongoRepository = mongoRepository;
-            _mongoProductRepository = mongoProductRepository;
             _logger = logger;
         }
 
-        public async Task<CartDto> GetCartAsync(int userId)
+        // ===================== MONGO METHODS =====================
+
+        public async Task<CartDto> GetCartByUserIdStringAsync(string userId)
         {
-            var cart = await _cartRepository.GetByUserIdAsync(userId);
-            
+            var cart = await _cartRepository.GetByUserIdStringAsync(userId);
+
             if (cart == null)
             {
-                // Create empty cart if doesn't exist
-                cart = new Cart { UserId = userId, CreatedAt = DateTime.UtcNow };
+                cart = new CartMongo
+                {
+                    UserId = userId,
+                    Items = new List<CartItemMongo>()
+                };
+
                 await _cartRepository.AddAsync(cart);
             }
 
-            return MapToDto(cart);
+            return MapMongoToDto(cart);
         }
 
-
-        public async Task<CartDto> AddToCartAsync(int userId, string productId, int quantity)
+        public async Task<CartDto> AddToCartByUserIdStringAsync(
+            string userId,
+            string productId,
+            int quantity)
         {
-            try
+            if (quantity <= 0) quantity = 1;
+
+            var product = await _productRepository.GetByIdAsync(productId);
+            if (product == null || !product.IsActive)
+                throw new KeyNotFoundException("Product not found");
+
+            var cart = await _cartRepository.GetByUserIdStringAsync(userId);
+
+            if (cart == null)
             {
-                if (quantity <= 0) quantity = 1;
-
-                // Only Mongo Cart is used now
-                if (!_useMongo)
-                    throw new InvalidOperationException("Mongo cart is disabled. Enable FeatureFlags:UseMongoForCarts = true");
-
-                // Validate product exists in Mongo
-                var product = await _mongoProductRepository.GetByIdAsync(int.Parse(productId));
-                if (product == null)
-                    throw new KeyNotFoundException("Product not found");
-
-                // Get cart
-                var cart = await _mongoRepository.GetByUserIdAsync(userId);
-
-                if (cart == null)
+                cart = new CartMongo
                 {
-                    cart = new Cart
-                    {
-                        UserId = userId,
-                        CartItems = new List<CartItem>(),
-                        CreatedAt = DateTime.UtcNow
-                    };
-                }
+                    UserId = userId,
+                    Items = new List<CartItemMongo>()
+                };
 
-                // Add / update item
-                var existingItem = cart.CartItems.FirstOrDefault(x => x.ProductId == int.Parse(productId));
-
-                if (existingItem != null)
-                {
-                    existingItem.Quantity += quantity;
-                }
-                else
-                {
-                    cart.CartItems.Add(new CartItem
-                    {
-                        ProductId = int.Parse(productId),
-                        Quantity = quantity
-                    });
-                }
-
-                cart.UpdatedAt = DateTime.UtcNow;
-
-                // Save to Mongo (create if new, update if exists)
-                if (cart.Id == 0)
-                    await _mongoRepository.AddAsync(cart);
-                else
-                    await _mongoRepository.UpdateAsync(cart);
-
-                return MapToDto(cart);
+                await _cartRepository.AddAsync(cart);
             }
-            catch (Exception ex)
+
+            var item = cart.Items.FirstOrDefault(i => i.ProductId == productId);
+
+            if (item != null)
             {
-                _logger.LogError(ex, $"Error in AddToCartAsync user={userId} productId={productId}");
-                throw;
+                item.Quantity += quantity;
             }
+            else
+            {
+                cart.Items.Add(new CartItemMongo
+                {
+                    ProductId = productId,
+                    ProductName = product.Name,
+                    Price = product.Price,
+                    Quantity = quantity,
+                    ImageUrl = product.ImageUrl
+                });
+            }
+
+            await _cartRepository.UpdateAsync(cart.Id, cart);
+
+            return MapMongoToDto(cart);
         }
 
-        public async Task<CartDto> UpdateQuantityAsync(int userId, string productId, int quantity)
+        public async Task<CartDto> UpdateQuantityByUserIdStringAsync(
+            string userId,
+            string productId,
+            int quantity)
         {
-            if (!_useMongo)
-                throw new InvalidOperationException("Mongo cart is disabled.");
-
-            var cart = await _mongoRepository.GetByUserIdAsync(userId);
+            var cart = await _cartRepository.GetByUserIdStringAsync(userId);
             if (cart == null)
                 throw new KeyNotFoundException("Cart not found");
 
-            var item = cart.CartItems.FirstOrDefault(x => x.ProductId == int.Parse(productId));
+            var item = cart.Items.FirstOrDefault(i => i.ProductId == productId);
             if (item == null)
                 throw new KeyNotFoundException("Item not found in cart");
 
             if (quantity <= 0)
             {
-                cart.CartItems.Remove(item);
+                cart.Items.Remove(item);
             }
             else
             {
-                // optional stock validation
-                var product = await _mongoProductRepository.GetByIdAsync(int.Parse(productId));
+                var product = await _productRepository.GetByIdAsync(productId);
                 if (product == null)
                     throw new KeyNotFoundException("Product not found");
 
@@ -143,80 +122,76 @@ namespace ECommerceAPI.Application.Services
                 item.Quantity = quantity;
             }
 
-            cart.UpdatedAt = DateTime.UtcNow;
-            await _mongoRepository.UpdateAsync(cart);
-
-            return MapToDto(cart);
+            await _cartRepository.UpdateAsync(cart.Id, cart);
+            return MapMongoToDto(cart);
         }
 
-
-        public async Task RemoveFromCartAsync(int userId, string productId)
+        public async Task RemoveFromCartByUserIdStringAsync(string userId, string productId)
         {
-            if (!_useMongo)
-                throw new InvalidOperationException("Mongo cart is disabled.");
+            var cart = await _cartRepository.GetByUserIdStringAsync(userId);
+            if (cart == null) return;
 
-            var cart = await _mongoRepository.GetByUserIdAsync(userId);
-            if (cart == null)
-                throw new KeyNotFoundException("Cart not found");
+            var item = cart.Items.FirstOrDefault(i => i.ProductId == productId);
+            if (item == null) return;
 
-            var item = cart.CartItems.FirstOrDefault(x => x.ProductId == int.Parse(productId));
-            if (item == null)
-                return;
-
-            cart.CartItems.Remove(item);
-            cart.UpdatedAt = DateTime.UtcNow;
-
-            await _mongoRepository.UpdateAsync(cart);
+            cart.Items.Remove(item);
+            await _cartRepository.UpdateAsync(cart.Id, cart);
         }
 
-        public async Task ClearCartAsync(int userId)
+        public async Task ClearCartByUserIdStringAsync(string userId)
         {
-            if (!_useMongo)
-                throw new InvalidOperationException("Mongo cart is disabled.");
+            var cart = await _cartRepository.GetByUserIdStringAsync(userId);
+            if (cart == null) return;
 
-            var cart = await _mongoRepository.GetByUserIdAsync(userId);
-            if (cart == null)
-                return;
-
-            cart.CartItems.Clear();
-            cart.UpdatedAt = DateTime.UtcNow;
-
-            await _mongoRepository.UpdateAsync(cart);
+            cart.Items.Clear();
+            await _cartRepository.UpdateAsync(cart.Id, cart);
         }
 
+        // ===================== LEGACY SQL METHODS (BLOCKED) =====================
 
-        private CartDto MapToDto(Cart cart)
-        {
-            return new CartDto
-            {
-                CartId = cart.Id.ToString(),
-                Items = cart.CartItems?.Select(ci => new CartItemDto
-                {
-                    ProductId = ci.ProductId,
-                    ProductName = ci.Product?.Name,
-                    Price = ci.Product?.Price ?? 0,
-                    Quantity = ci.Quantity,
-                    ImageUrl = ci.Product?.ImageUrl
-                }).ToList() ?? new List<CartItemDto>(),
-                TotalAmount = cart.CartItems?.Sum(ci => (ci.Product?.Price ?? 0) * ci.Quantity) ?? 0
-            };
-        }
+        public Task<CartDto> GetCartAsync(int userId)
+            => throw new NotSupportedException("SQL carts are no longer supported.");
 
-        private CartDto MapMongoToDto(Cart cart)
+        public Task<CartDto> AddToCartAsync(int userId, string productId, int quantity)
+            => throw new NotSupportedException("SQL carts are no longer supported.");
+
+        public Task<CartDto> UpdateQuantityAsync(int userId, string productId, int quantity)
+            => throw new NotSupportedException("SQL carts are no longer supported.");
+
+        public Task RemoveFromCartAsync(int userId, string productId)
+            => throw new NotSupportedException("SQL carts are no longer supported.");
+
+        public Task ClearCartAsync(int userId)
+            => throw new NotSupportedException("SQL carts are no longer supported.");
+
+        // ===================== MAPPING =====================
+
+        private CartDto MapMongoToDto(CartMongo cart)
         {
             return new CartDto
             {
-                CartId = cart.Id.ToString(),
-                Items = cart.CartItems?.Select(item => new CartItemDto
+                CartId = cart.SqlId?.ToString(),   // legacy (nullable)
+                MongoCartId = cart.Id,             // real Mongo ID
+
+                Items = cart.Items?.Select(i => new CartItemDto
                 {
-                    ProductId = item.ProductId,
-                    ProductName = item.Product?.Name,
-                    Price = item.Product?.Price ?? 0,
-                    Quantity = item.Quantity,
-                    ImageUrl = item.Product?.ImageUrl
+                    ProductId = 0,                     // legacy support
+                    ProductIdString = i.ProductId,     // Mongo ObjectId
+
+                    ProductName = i.ProductName,
+                    Price = i.Price,
+                    Quantity = i.Quantity,
+                    ImageUrl = i.ImageUrl,
+                    Brand = i.Brand,
+
+                    // ✅ DTO computes subtotal (NOT entity)
+                    Subtotal = i.Price * i.Quantity
                 }).ToList() ?? new List<CartItemDto>(),
-                TotalAmount = cart.CartItems?.Sum(item => (item.Product?.Price ?? 0) * item.Quantity) ?? 0
+
+                TotalItems = cart.Items?.Sum(i => i.Quantity) ?? 0,
+                TotalAmount = cart.Items?.Sum(i => i.Price * i.Quantity) ?? 0
             };
         }
+
     }
 }

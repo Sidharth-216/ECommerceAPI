@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 using ECommerceAPI.Domain.Entities.Mongo;
@@ -18,7 +19,8 @@ namespace ECommerceAPI.Infrastructure.Repositories.Implementations
             var client = new MongoClient(settings.Value.ConnectionString);
             var database = client.GetDatabase(settings.Value.DatabaseName);
 
-            _carts = database.GetCollection<CartMongo>("carts");
+            _carts = database.GetCollection<CartMongo>(
+                settings.Value.CartsCollectionName ?? "carts");
 
             CreateIndexes();
         }
@@ -48,10 +50,17 @@ namespace ECommerceAPI.Infrastructure.Repositories.Implementations
             });
         }
 
+        // ========== NEW METHOD - String UserId (MongoDB ObjectId) ==========
+        public async Task<CartMongo> GetByUserIdStringAsync(string userId)
+        {
+            return await _carts.Find(c => c.UserId == userId && c.IsActive == true)
+                .FirstOrDefaultAsync();
+        }
+
+        // ========== Legacy Method - int UserId (backward compatibility) ==========
         public async Task<CartMongo> GetByUserIdAsync(int userId)
         {
-            return await _carts.Find(c => c.UserId == userId.ToString() && c.IsActive == true)
-                .FirstOrDefaultAsync();
+            return await GetByUserIdStringAsync(userId.ToString());
         }
 
         public async Task<CartMongo> GetBySqlIdAsync(int sqlId)
@@ -96,11 +105,16 @@ namespace ECommerceAPI.Infrastructure.Repositories.Implementations
 
         public async Task DeleteByUserIdAsync(int userId)
         {
+            await DeleteByUserIdStringAsync(userId.ToString());
+        }
+
+        public async Task DeleteByUserIdStringAsync(string userId)
+        {
             var update = Builders<CartMongo>.Update
                 .Set(c => c.IsActive, false)
                 .Set(c => c.UpdatedAt, DateTime.UtcNow);
 
-            await _carts.UpdateManyAsync(c => c.UserId == userId.ToString(), update);
+            await _carts.UpdateManyAsync(c => c.UserId == userId, update);
         }
 
         public async Task<IEnumerable<CartMongo>> GetAllAsync()
@@ -110,7 +124,12 @@ namespace ECommerceAPI.Infrastructure.Repositories.Implementations
 
         public async Task<CartItemMongo?> GetCartItemAsync(int userId, string productId)
         {
-            var cart = await GetByUserIdAsync(userId);
+            return await GetCartItemByUserIdStringAsync(userId.ToString(), productId);
+        }
+
+        public async Task<CartItemMongo?> GetCartItemByUserIdStringAsync(string userId, string productId)
+        {
+            var cart = await GetByUserIdStringAsync(userId);
             return cart?.Items?.FirstOrDefault(i => i.ProductId == productId) ?? null;
         }
 

@@ -11,7 +11,7 @@ import {
   addressAPI,
   paymentAPI,
   mongoAuthAPI, 
-  getUserIdFromToken 
+  getUserIdFromToken ,
 } from './api'; // adjusted to use services/api which exports addressAPI and attaches JWT
 
 // Setup interceptors function (will be called in useEffect)
@@ -315,16 +315,25 @@ const loadUserData = async () => {
   }
 };
 
-  // Load cart from backend
-  const loadCart = async () => {
-    if (!user) return;
-    try {
-      const response = await cartAPI.view();
-      setCart(response.data.items || []);
-    } catch (err) {
-      console.error('Error loading cart:', err);
+// Load cart from backend
+const loadCart = async () => {
+  if (!user) return;
+  
+  try {
+    // Extract userId from JWT token (works for both SQL and MongoDB)
+    const userId = getUserIdFromToken();
+    
+    if (!userId) {
+      console.error('No user ID found in token');
+      return;
     }
-  };
+
+    const response = await cartAPI.view(userId);
+    setCart(response.data.items || []);
+  } catch (err) {
+    console.error('Error loading cart:', err);
+  }
+};
 
 // Load profile from backend (map backend Address entity to frontend shape; fallback to localStorage)
 const loadProfile = async () => {
@@ -921,13 +930,24 @@ const fetchCart = async () => {
 
   // Logged-in user - fetch from backend
   try {
-    const response = await cartAPI.view();
+    // Extract userId from JWT token
+    const userId = getUserIdFromToken();
+    
+    if (!userId) {
+      console.error('No user ID found in token');
+      setError('User session invalid. Please login again.');
+      return;
+    }
+
+    const response = await cartAPI.view(userId);
     const backendCart = response.data?.items || response.data || [];
     setCart(backendCart);
+    
     // Keep localStorage in sync for offline access
     localStorage.setItem('cart', JSON.stringify(backendCart));
   } catch (err) {
     console.error('Error fetching cart:', err);
+    
     // Fallback to localStorage if backend fails
     const storedCart = localStorage.getItem('cart');
     if (storedCart) {
@@ -940,131 +960,153 @@ const fetchCart = async () => {
   }
 };
 
-// ✅ FIXED: Fetch cart when user state changes
+// ✅ Fetch cart when user state changes
 useEffect(() => {
   fetchCart();
-}, [user]); // Re-fetch when user logs in/out
-// ✅ FIXED: Add to cart with proper backend sync and userId
+}, [user]);
+
+// ==============================
+// Add to Cart (MongoDB safe)
+// ==============================
 const addToCart = async (product) => {
-  // Normalize product fields to ensure all required fields are present
+  if (!product) return;
+
+  // Normalize product fields
   const normalizedProduct = {
-    productId: product.productId || product.id || product._id || product.mongoId || String(Date.now()),
-    productName: product.productName || product.name || 'Unknown Product',
+    // MUST use MongoDB _id as string
+    productId: product._id?.toString() || product.mongoId?.toString(),
+    productName: product.name || product.productName || 'Unknown Product',
     price: product.price || 0,
-    imageUrl: product.imageUrl || product.image || 'https://via.placeholder.com/300x300/e5e7eb/9ca3af?text=Product',
-    ...product
+    imageUrl: product.imageUrl || product.image || 'https://via.placeholder.com/300x300',
+    quantity: 1,
+    brand: product.brand || ''
   };
-  // Ensure product has valid structure for cart operations
+
   if (!normalizedProduct.productId) {
-    console.warn('Product missing ID, generating temporary ID:', normalizedProduct);
-    normalizedProduct.productId = String(Date.now() + Math.random());
+    console.error('Product missing _id:', product);
+    setError('Product ID not found. Cannot add to cart.');
+    return;
   }
-  if (!normalizedProduct.productId || !normalizedProduct.productName) {
-    setError('Product not found or missing required fields.');
+
+  if (!normalizedProduct.productName) {
+    setError('Product name missing. Cannot add to cart.');
     return;
   }
 
   if (user) {
-    // Logged-in user → backend cart
+    // Logged-in user → send to backend
     try {
-      // ✅ FIX: Extract userId from user object - check capital 'Id' FIRST
-      const userId = user.Id || user.id || user.userId;
-      
+      const userId = getUserIdFromToken();
       if (!userId) {
-        console.error('User object:', user);
         setError('User ID not found. Please login again.');
         return;
       }
 
-      // ✅ FIX: Call the correct API endpoint with userId
-      const response = await cartAPI.add(userId, { 
-        productId: parseInt(normalizedProduct.productId) || normalizedProduct.productId, 
-        quantity: 1 
+      console.log('Adding to cart:', {
+        userId,
+        productId: normalizedProduct.productId,
+        quantity: normalizedProduct.quantity
       });
 
-      // ✅ FIX: Handle response properly - backend returns CartDto
+      const response = await cartAPI.add(userId, {
+        productId: normalizedProduct.productId, // ✅ ensure Mongo ObjectId string
+        quantity: normalizedProduct.quantity
+      });
+
+      // Handle response safely
       const cartData = response.data;
-      const updatedCart = Array.isArray(cartData?.items) 
-        ? cartData.items 
-        : Array.isArray(cartData) 
-        ? cartData 
+      const updatedCart = Array.isArray(cartData?.items)
+        ? cartData.items
+        : Array.isArray(cartData)
+        ? cartData
         : [];
-      
+
       setCart(updatedCart);
       localStorage.setItem('cart', JSON.stringify(updatedCart));
-      setError(''); // Clear any previous errors
-      
-      // Optional: Show success message
+      setError(''); // clear any previous errors
+
       console.log('✅ Item added to cart successfully');
-      
+
     } catch (err) {
       console.error('Error adding to cart:', err);
-      
-      // Better error handling
+      console.error('Backend response:', err.response?.data);
+
       if (err.response?.status === 404) {
-        setError('Product not found or cart service unavailable.');
+        setError('Product not found in catalog.');
       } else if (err.response?.status === 400) {
-        setError(err.response?.data?.message || 'Invalid request. Please check product details.');
+        setError(err.response?.data?.message || 'Invalid request. Check product details.');
+      } else if (err.response?.status === 500) {
+        setError('Server error. Please try again later.');
       } else {
         setError(err.response?.data?.message || err.message || 'Failed to add item to cart.');
       }
     }
   } else {
-    // Guest user → localStorage cart
+    // Guest user → store locally
     const updatedCart = [...cart];
-    const existing = updatedCart.find(item => 
-      String(item.productId) === String(normalizedProduct.productId)
+    const existing = updatedCart.find(item =>
+      String(item.productId) === normalizedProduct.productId ||
+      String(item.productIdString) === normalizedProduct.productId
     );
-    
+
     if (existing) {
       existing.quantity += 1;
     } else {
-      updatedCart.push({
-        productId: normalizedProduct.productId,
-        productName: normalizedProduct.productName,
-        price: normalizedProduct.price,
-        quantity: 1,
-        imageUrl: normalizedProduct.imageUrl
-      });
+      updatedCart.push(normalizedProduct);
     }
-    
+
     setCart(updatedCart);
     localStorage.setItem('cart', JSON.stringify(updatedCart));
-    setError(''); // Clear error on successful add
+    setError('');
   }
 };
-// ✅ FIXED: Update cart quantity with backend sync
+
+
+// ==============================
+// Update Cart Quantity (Mongo-safe)
+// ==============================
 const updateCartQuantity = async (productId, quantity) => {
+  if (!productId) return;
+
   if (quantity <= 0) {
     await removeFromCart(productId);
     return;
   }
 
   if (user) {
-    // Logged-in user → update backend
     try {
-      await cartAPI.update(productId, quantity);
-      
-      // Update local state
+      const userId = getUserIdFromToken();
+      if (!userId) {
+        setError('User session invalid. Please login again.');
+        return;
+      }
+
+      console.log(`Updating quantity: userId=${userId}, productId=${productId}, quantity=${quantity}`);
+
+      await cartAPI.update(userId, String(productId), quantity);
+
       setCart(prev => {
         const updatedCart = prev.map(item =>
-          item.productId === productId
+          String(item.productId) === String(productId) || String(item.productIdString) === String(productId)
             ? { ...item, quantity }
             : item
         );
         localStorage.setItem('cart', JSON.stringify(updatedCart));
         return updatedCart;
       });
-      
+
+      setError('');
+      console.log('✅ Cart quantity updated successfully');
+
     } catch (err) {
-      console.error('Error updating cart:', err);
-      setError(err.response?.data?.message || 'Failed to update cart');
+      console.error('Error updating cart quantity:', err);
+      setError(err.response?.data?.message || 'Failed to update cart quantity');
     }
   } else {
-    // Guest user → update localStorage
+    // Guest user → localStorage
     setCart(prev => {
       const updatedCart = prev.map(item =>
-        item.productId === productId
+        String(item.productId) === String(productId) || String(item.productIdString) === String(productId)
           ? { ...item, quantity }
           : item
       );
@@ -1074,32 +1116,84 @@ const updateCartQuantity = async (productId, quantity) => {
   }
 };
 
-// ✅ FIXED: Remove from cart with backend sync
+// ==============================
+// Remove item from cart (Mongo-safe)
+// ==============================
 const removeFromCart = async (productId) => {
+  if (!productId) return;
+
   if (user) {
-    // Logged-in user → remove from backend
     try {
-      await cartAPI.remove(productId);
-      
+      const userId = getUserIdFromToken();
+      if (!userId) {
+        setError('User session invalid. Please login again.');
+        return;
+      }
+
+      console.log(`Removing item: userId=${userId}, productId=${productId}`);
+
+      await cartAPI.remove(userId, String(productId));
+
       setCart(prev => {
-        const updatedCart = prev.filter(item => item.productId !== productId);
+        const updatedCart = prev.filter(item =>
+          String(item.productId) !== String(productId) && String(item.productIdString) !== String(productId)
+        );
         localStorage.setItem('cart', JSON.stringify(updatedCart));
         return updatedCart;
       });
-      
+
+      setError('');
+      console.log('✅ Item removed from cart successfully');
+
     } catch (err) {
-      console.error('Error removing from cart:', err);
+      console.error('Error removing item from cart:', err);
       setError(err.response?.data?.message || 'Failed to remove item from cart');
     }
   } else {
-    // Guest user → remove from localStorage
+    // Guest user → localStorage
     setCart(prev => {
-      const updatedCart = prev.filter(item => item.productId !== productId);
+      const updatedCart = prev.filter(item =>
+        String(item.productId) !== String(productId) && String(item.productIdString) !== String(productId)
+      );
       localStorage.setItem('cart', JSON.stringify(updatedCart));
       return updatedCart;
     });
   }
 };
+
+// ==============================
+// Clear entire cart (Mongo-safe)
+// ==============================
+const clearCart = async () => {
+  if (user) {
+    try {
+      const userId = getUserIdFromToken();
+      if (!userId) {
+        setError('User session invalid. Please login again.');
+        return;
+      }
+
+      console.log(`Clearing cart: userId=${userId}`);
+
+      await cartAPI.clear(userId);
+
+      setCart([]);
+      localStorage.removeItem('cart');
+      setError('');
+      console.log('✅ Cart cleared successfully');
+
+    } catch (err) {
+      console.error('Error clearing cart:', err);
+      setError(err.response?.data?.message || 'Failed to clear cart');
+    }
+  } else {
+    // Guest user → localStorage
+    setCart([]);
+    localStorage.removeItem('cart');
+    setError('');
+  }
+};
+
 // ✅ OPTIONAL: Merge guest cart with backend cart on login
 const mergeGuestCartOnLogin = async () => {
   const guestCart = localStorage.getItem('cart');

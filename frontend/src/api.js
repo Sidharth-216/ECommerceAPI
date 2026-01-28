@@ -424,12 +424,10 @@ export const cartAPI = {
   },
   
   // Add item to cart
-  add: (userId, data) => {
+  add: (userId, productId, quantity = 1) => {
     if (!userId) throw new Error('User ID is required');
-    return api.post(`/cart/user/${userId}/items`, {
-      productId: data.productId,
-      quantity: data.quantity || 1
-    });
+    if (!productId) throw new Error('Product ID is required');
+    return api.post(`/cart/user/${userId}/items`, { productId, quantity });
   },
   
   // Update item quantity

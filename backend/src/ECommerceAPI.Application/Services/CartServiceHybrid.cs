@@ -45,17 +45,24 @@ namespace ECommerceAPI.Application.Services
             _logger.LogInformation($"CartServiceHybrid initialized: UseMongo={_useMongo}, DualWrite={_dualWrite}");
         }
 
-        public async Task<CartDto> GetCartAsync(int userId)
+        // ========================================================================
+        // NEW METHODS - String UserId (MongoDB ObjectId support)
+        // ========================================================================
+
+        public async Task<CartDto> GetCartByUserIdStringAsync(string userId)
         {
-            if (_useMongo)
+            // Try MongoDB first (handles both MongoDB ObjectId and SQL integer as string)
+            if (_useMongo || !int.TryParse(userId, out _))
             {
-                var mongoCart = await _mongoRepository.GetByUserIdAsync(userId)
-                                ?? await CreateEmptyCart(userId);
+                var mongoCart = await _mongoRepository.GetByUserIdStringAsync(userId)
+                                ?? await CreateEmptyMongoCart(userId);
                 return MapMongoToDto(mongoCart);
             }
 
-            var sqlCart = await _sqlRepository.GetByUserIdAsync(userId)
-                          ?? await CreateEmptySqlCart(userId);
+            // SQL mode
+            int sqlUserId = int.Parse(userId);
+            var sqlCart = await _sqlRepository.GetByUserIdAsync(sqlUserId)
+                          ?? await CreateEmptySqlCart(sqlUserId);
 
             if (_dualWrite)
                 await SyncCartToMongo(sqlCart);
@@ -63,17 +70,24 @@ namespace ECommerceAPI.Application.Services
             return MapSqlToDto(sqlCart);
         }
 
-        public async Task<CartDto> AddToCartAsync(int userId, string productId, int quantity)
+        public async Task<CartDto> AddToCartByUserIdStringAsync(string userId, string productId, int quantity)
         {
             if (quantity <= 0) quantity = 1;
 
-            if (_useMongo)
-            {
-                var product = await _mongoProductRepository.GetByIdAsync(productId)
-                              ?? throw new KeyNotFoundException("Product not found in MongoDB");
+            // Determine if userId is Mongo ObjectId or SQL int
+            bool isMongoUser = _useMongo || !int.TryParse(userId, out _);
 
-                var cart = await _mongoRepository.GetByUserIdAsync(userId)
-                          ?? new CartMongo { UserId = userId.ToString(), CreatedAt = DateTime.UtcNow };
+            if (isMongoUser)
+            {
+                var product = await _mongoProductRepository.GetByIdAsync(productId);
+                if (product == null)
+                    throw new KeyNotFoundException($"Product not found or inactive: {productId}");
+                
+                if (!product.IsActive)
+                    throw new InvalidOperationException($"Product is inactive: {productId}");
+
+                var cart = await _mongoRepository.GetByUserIdStringAsync(userId)
+                        ?? new CartMongo { UserId = userId, CreatedAt = DateTime.UtcNow, Items = new List<CartItemMongo>() };
 
                 var item = cart.Items.FirstOrDefault(i => i.ProductId == productId);
                 if (item != null)
@@ -105,18 +119,22 @@ namespace ECommerceAPI.Application.Services
                 return MapMongoToDto(cart);
             }
 
-            // SQL mode
-            if (!int.TryParse(productId, out int sqlProductId))
-                throw new InvalidOperationException("SQL cart expects numeric productId");
+            // SQL fallback
+            if (!int.TryParse(userId, out int sqlUserId))
+                throw new InvalidOperationException("SQL cart requires numeric userId");
 
-            var sqlCart = await _sqlRepository.GetByUserIdAsync(userId)
-                          ?? await CreateEmptySqlCart(userId);
+            if (!int.TryParse(productId, out int sqlProductId))
+                throw new InvalidOperationException("SQL cart requires numeric productId");
+
+            var sqlCart = await _sqlRepository.GetByUserIdAsync(sqlUserId)
+                        ?? await CreateEmptySqlCart(sqlUserId);
 
             var sqlProduct = await _sqlProductRepository.GetByIdAsync(sqlProductId)
-                             ?? throw new KeyNotFoundException("Product not found in SQL");
+                            ?? throw new KeyNotFoundException($"Product not found: {productId}");
 
             var existingItem = sqlCart.CartItems.FirstOrDefault(x => x.ProductId == sqlProductId);
-            if (existingItem != null) existingItem.Quantity += quantity;
+            if (existingItem != null) 
+                existingItem.Quantity += quantity;
             else
             {
                 sqlCart.CartItems.Add(new ECommerceAPI.Domain.Entities.CartItem
@@ -136,18 +154,21 @@ namespace ECommerceAPI.Application.Services
             return MapSqlToDto(sqlCart);
         }
 
-        public async Task<CartDto> UpdateQuantityAsync(int userId, string productId, int quantity)
+        public async Task<CartDto> UpdateQuantityByUserIdStringAsync(string userId, string productId, int quantity)
         {
-            if (_useMongo)
+            // Try MongoDB first
+            if (_useMongo || !int.TryParse(userId, out _))
             {
-                var cart = await _mongoRepository.GetByUserIdAsync(userId)
+                var cart = await _mongoRepository.GetByUserIdStringAsync(userId)
                            ?? throw new KeyNotFoundException("Cart not found");
 
                 var item = cart.Items.FirstOrDefault(i => i.ProductId == productId)
                            ?? throw new KeyNotFoundException("Item not found in cart");
 
-                if (quantity <= 0) cart.Items.Remove(item);
-                else item.Quantity = quantity;
+                if (quantity <= 0) 
+                    cart.Items.Remove(item);
+                else 
+                    item.Quantity = quantity;
 
                 cart.UpdatedAt = DateTime.UtcNow;
                 await _mongoRepository.UpdateAsync(cart.Id, cart);
@@ -156,17 +177,22 @@ namespace ECommerceAPI.Application.Services
             }
 
             // SQL mode
-            if (!int.TryParse(productId, out int sqlProductId))
-                throw new InvalidOperationException("SQL cart expects numeric productId");
+            if (!int.TryParse(userId, out int sqlUserId))
+                throw new InvalidOperationException("SQL cart requires numeric userId");
 
-            var sqlCart = await _sqlRepository.GetByUserIdAsync(userId)
+            if (!int.TryParse(productId, out int sqlProductId))
+                throw new InvalidOperationException("SQL cart requires numeric productId");
+
+            var sqlCart = await _sqlRepository.GetByUserIdAsync(sqlUserId)
                           ?? throw new KeyNotFoundException("Cart not found");
 
             var sqlItem = sqlCart.CartItems.FirstOrDefault(i => i.ProductId == sqlProductId)
                           ?? throw new KeyNotFoundException("Item not found in cart");
 
-            if (quantity <= 0) sqlCart.CartItems.Remove(sqlItem);
-            else sqlItem.Quantity = quantity;
+            if (quantity <= 0) 
+                sqlCart.CartItems.Remove(sqlItem);
+            else 
+                sqlItem.Quantity = quantity;
 
             sqlCart.UpdatedAt = DateTime.UtcNow;
             await _sqlRepository.UpdateAsync(sqlCart);
@@ -177,11 +203,12 @@ namespace ECommerceAPI.Application.Services
             return MapSqlToDto(sqlCart);
         }
 
-        public async Task RemoveFromCartAsync(int userId, string productId)
+        public async Task RemoveFromCartByUserIdStringAsync(string userId, string productId)
         {
-            if (_useMongo)
+            // Try MongoDB first
+            if (_useMongo || !int.TryParse(userId, out _))
             {
-                var cart = await _mongoRepository.GetByUserIdAsync(userId)
+                var cart = await _mongoRepository.GetByUserIdStringAsync(userId)
                            ?? throw new KeyNotFoundException("Cart not found");
 
                 var item = cart.Items.FirstOrDefault(i => i.ProductId == productId)
@@ -194,10 +221,13 @@ namespace ECommerceAPI.Application.Services
             }
 
             // SQL mode
-            if (!int.TryParse(productId, out int sqlProductId))
-                throw new InvalidOperationException("SQL cart expects numeric productId");
+            if (!int.TryParse(userId, out int sqlUserId))
+                throw new InvalidOperationException("SQL cart requires numeric userId");
 
-            var sqlCart = await _sqlRepository.GetByUserIdAsync(userId)
+            if (!int.TryParse(productId, out int sqlProductId))
+                throw new InvalidOperationException("SQL cart requires numeric productId");
+
+            var sqlCart = await _sqlRepository.GetByUserIdAsync(sqlUserId)
                           ?? throw new KeyNotFoundException("Cart not found");
 
             var sqlItem = sqlCart.CartItems.FirstOrDefault(i => i.ProductId == sqlProductId);
@@ -207,15 +237,17 @@ namespace ECommerceAPI.Application.Services
                 sqlCart.UpdatedAt = DateTime.UtcNow;
                 await _sqlRepository.UpdateAsync(sqlCart);
 
-                if (_dualWrite) await SyncCartToMongo(sqlCart);
+                if (_dualWrite) 
+                    await SyncCartToMongo(sqlCart);
             }
         }
 
-        public async Task ClearCartAsync(int userId)
+        public async Task ClearCartByUserIdStringAsync(string userId)
         {
-            if (_useMongo)
+            // Try MongoDB first
+            if (_useMongo || !int.TryParse(userId, out _))
             {
-                var cart = await _mongoRepository.GetByUserIdAsync(userId);
+                var cart = await _mongoRepository.GetByUserIdStringAsync(userId);
                 if (cart == null) return;
 
                 cart.Items.Clear();
@@ -224,23 +256,59 @@ namespace ECommerceAPI.Application.Services
                 return;
             }
 
-            var sqlCart = await _sqlRepository.GetByUserIdAsync(userId);
+            // SQL mode
+            if (!int.TryParse(userId, out int sqlUserId))
+                throw new InvalidOperationException("SQL cart requires numeric userId");
+
+            var sqlCart = await _sqlRepository.GetByUserIdAsync(sqlUserId);
             if (sqlCart == null) return;
 
             sqlCart.CartItems.Clear();
             sqlCart.UpdatedAt = DateTime.UtcNow;
             await _sqlRepository.UpdateAsync(sqlCart);
 
-            if (_dualWrite) await SyncCartToMongo(sqlCart);
+            if (_dualWrite) 
+                await SyncCartToMongo(sqlCart);
         }
 
-        // ---------------- Helper Methods ----------------
+        // ========================================================================
+        // LEGACY METHODS - int UserId (backward compatibility)
+        // ========================================================================
 
-        private async Task<CartMongo> CreateEmptyCart(int userId)
+        public async Task<CartDto> GetCartAsync(int userId)
+        {
+            return await GetCartByUserIdStringAsync(userId.ToString());
+        }
+
+        public async Task<CartDto> AddToCartAsync(int userId, string productId, int quantity)
+        {
+            return await AddToCartByUserIdStringAsync(userId.ToString(), productId, quantity);
+        }
+
+        public async Task<CartDto> UpdateQuantityAsync(int userId, string productId, int quantity)
+        {
+            return await UpdateQuantityByUserIdStringAsync(userId.ToString(), productId, quantity);
+        }
+
+        public async Task RemoveFromCartAsync(int userId, string productId)
+        {
+            await RemoveFromCartByUserIdStringAsync(userId.ToString(), productId);
+        }
+
+        public async Task ClearCartAsync(int userId)
+        {
+            await ClearCartByUserIdStringAsync(userId.ToString());
+        }
+
+        // ========================================================================
+        // HELPER METHODS
+        // ========================================================================
+
+        private async Task<CartMongo> CreateEmptyMongoCart(string userId)
         {
             var cart = new CartMongo
             {
-                UserId = userId.ToString(),
+                UserId = userId,
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -307,6 +375,7 @@ namespace ECommerceAPI.Application.Services
             var items = cart.Items?.Select(i => new CartItemDto
             {
                 ProductId = int.TryParse(i.ProductId, out int productId) ? productId : 0,
+                ProductIdString = i.ProductId, // NEW: Keep original string ID
                 ProductName = i.ProductName,
                 Price = i.Price,
                 Quantity = i.Quantity,
@@ -330,6 +399,7 @@ namespace ECommerceAPI.Application.Services
             var items = cart.CartItems?.Select(ci => new CartItemDto
             {
                 ProductId = ci.ProductId,
+                ProductIdString = ci.ProductId.ToString(),
                 ProductName = ci.Product?.Name ?? "",
                 Price = ci.Product?.Price ?? 0,
                 Quantity = ci.Quantity,
