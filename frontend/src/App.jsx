@@ -1097,11 +1097,19 @@ const normalizeProduct = (product) => {
   };
 };
 
+// ==========================================
+// UPDATED CART FUNCTIONS WITH BETTER LOGGING
+// ==========================================
 
-
-// ✅ UPDATED: Update cart quantity
+// ✅ UPDATED: Update cart quantity with proper logging
 const updateCartQuantity = async (productId, quantity) => {
+  console.group('🔄 Update Cart Quantity');
+  console.log('Product ID:', productId);
+  console.log('New Quantity:', quantity);
+  
   if (quantity <= 0) {
+    console.log('Quantity is 0 or less, removing item');
+    console.groupEnd();
     await removeFromCart(productId);
     return;
   }
@@ -1111,6 +1119,8 @@ const updateCartQuantity = async (productId, quantity) => {
       const userId = getUserIdFromToken();
       
       if (!userId) {
+        console.error('❌ No user ID found');
+        console.groupEnd();
         setError('User session invalid. Please login again.');
         return;
       }
@@ -1118,25 +1128,50 @@ const updateCartQuantity = async (productId, quantity) => {
       // Ensure productId is a string
       const productIdString = String(productId);
 
+      console.log('Making API call:', {
+        userId: userId,
+        productId: productIdString,
+        quantity: quantity
+      });
+
       await cartAPI.update(userId, productIdString, quantity);
       
+      console.log('✅ API call successful');
+      
+      // Update local state
       setCart(prev => {
         const updatedCart = prev.map(item => {
-          const itemId = String(item.productId || item.productIdString);
-          return itemId === productIdString
-            ? { ...item, quantity }
-            : item;
+          // Check both productId and productIdString
+          const itemId = String(item.productIdString || item.productId);
+          const matches = itemId === productIdString;
+          
+          console.log('Checking item:', {
+            itemId: itemId,
+            productIdString: productIdString,
+            matches: matches
+          });
+          
+          return matches ? { ...item, quantity } : item;
         });
+        
+        console.log('Updated cart:', updatedCart);
         localStorage.setItem('cart', JSON.stringify(updatedCart));
         return updatedCart;
       });
       
+      setError(''); // Clear any previous errors
+      console.log('✅ Cart updated successfully');
+      console.groupEnd();
+      
     } catch (err) {
-      console.error('Error updating cart:', err);
+      console.error('❌ Error updating cart:', err);
+      console.error('Error response:', err.response?.data);
+      console.groupEnd();
       setError(err.response?.data?.message || 'Failed to update cart');
     }
   } else {
     // Guest user
+    console.log('Guest user - updating localStorage');
     setCart(prev => {
       const updatedCart = prev.map(item =>
         String(item.productId) === String(productId)
@@ -1146,41 +1181,71 @@ const updateCartQuantity = async (productId, quantity) => {
       localStorage.setItem('cart', JSON.stringify(updatedCart));
       return updatedCart;
     });
+    console.log('✅ Guest cart updated');
+    console.groupEnd();
   }
 };
 
-
-
-// ✅ UPDATED: Remove from cart
+// ✅ UPDATED: Remove from cart with proper logging
 const removeFromCart = async (productId) => {
+  console.group('🗑️ Remove from Cart');
+  console.log('Product ID to remove:', productId);
+  
   if (user) {
     try {
       const userId = getUserIdFromToken();
       
       if (!userId) {
+        console.error('❌ No user ID found');
+        console.groupEnd();
         setError('User session invalid. Please login again.');
         return;
       }
 
       const productIdString = String(productId);
 
+      console.log('Making API call:', {
+        userId: userId,
+        productId: productIdString
+      });
+
       await cartAPI.remove(userId, productIdString);
       
+      console.log('✅ API call successful');
+      
+      // Update local state
       setCart(prev => {
         const updatedCart = prev.filter(item => {
-          const itemId = String(item.productId || item.productIdString);
-          return itemId !== productIdString;
+          const itemId = String(item.productIdString || item.productId);
+          const keep = itemId !== productIdString;
+          
+          console.log('Checking item:', {
+            itemId: itemId,
+            productIdString: productIdString,
+            keep: keep
+          });
+          
+          return keep;
         });
+        
+        console.log('Updated cart after removal:', updatedCart);
         localStorage.setItem('cart', JSON.stringify(updatedCart));
         return updatedCart;
       });
       
+      setError(''); // Clear any previous errors
+      console.log('✅ Item removed successfully');
+      console.groupEnd();
+      
     } catch (err) {
-      console.error('Error removing from cart:', err);
+      console.error('❌ Error removing from cart:', err);
+      console.error('Error response:', err.response?.data);
+      console.groupEnd();
       setError(err.response?.data?.message || 'Failed to remove item');
     }
   } else {
     // Guest user
+    console.log('Guest user - updating localStorage');
     setCart(prev => {
       const updatedCart = prev.filter(item => 
         String(item.productId) !== String(productId)
@@ -1188,8 +1253,33 @@ const removeFromCart = async (productId) => {
       localStorage.setItem('cart', JSON.stringify(updatedCart));
       return updatedCart;
     });
+    console.log('✅ Guest cart item removed');
+    console.groupEnd();
   }
 };
+
+// ✅ Debug helper - Check cart items structure
+const debugCartItems = () => {
+  console.group('🔍 Cart Items Debug');
+  console.log('Cart length:', cart.length);
+  cart.forEach((item, index) => {
+    console.log(`Item ${index}:`, {
+      productId: item.productId,
+      productIdString: item.productIdString,
+      productName: item.productName,
+      quantity: item.quantity,
+      price: item.price
+    });
+  });
+  console.groupEnd();
+};
+
+// ✅ Call this when cart page loads to see the structure
+useEffect(() => {
+  if (currentPage === 'cart' && cart.length > 0) {
+    debugCartItems();
+  }
+}, [currentPage, cart]);
 
 // ==========================================
 // DEBUG: Add this to check what's being sent

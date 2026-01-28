@@ -421,7 +421,9 @@ namespace ECommerceAPI.API
             // ✅ NEW: Email OTP Repository (MongoDB)
             services.AddScoped<IMongoEmailOtpRepository, MongoEmailOtpRepository>();
             // ========================================================================
-
+            // ========================= MongoDB REPOSITORIES (NEW) =========================
+            services.AddScoped<IAddressMongoRepository, AddressMongoRepository>();
+            // =======================
             // ========================= SQL Services =========================
             // Auth Service (SQL)
             services.AddScoped<IAuthService, AuthService>();
@@ -461,6 +463,7 @@ namespace ECommerceAPI.API
             services.AddScoped<IPaymentService, PaymentService>();
             services.AddScoped<IAdminService, AdminService>();
             services.AddScoped<IEmailService, EmailService>();
+            services.AddScoped<IAddressServiceHybrid, AddressServiceHybrid>();
             // ==================================================================
 
             // ========================= Razorpay Validation =========================
