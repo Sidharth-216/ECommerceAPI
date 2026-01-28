@@ -77,6 +77,13 @@ namespace ECommerceAPI.Infrastructure.Repositories.Implementations
 
         public async Task AddAsync(CartMongo cart)
         {
+            // ✅ CRITICAL: Do NOT set cart.Id here - let MongoDB auto-generate it
+            // If cart.Id is empty string, set to null so MongoDB generates new ObjectId
+            if (string.IsNullOrEmpty(cart.Id))
+            {
+                cart.Id = null; // ✅ Force MongoDB to generate new ObjectId
+            }
+            
             cart.CreatedAt = DateTime.UtcNow;
             cart.UpdatedAt = DateTime.UtcNow;
             cart.IsActive = true;

@@ -237,7 +237,7 @@ const handleSaveProfile = async () => {
     }, []);
 
 // Load products from backend
-const loadProducts = async () => {
+/*const loadProducts = async () => {
   try {
     const response = await productsAPI.getAll();
     console.log('Products API response:', response);
@@ -256,49 +256,21 @@ const loadProducts = async () => {
     setProducts(getSampleProducts());
   }
 };
-/*const loadProducts = async () => {
+*/
+
+
+// ✅ Use this when loading products
+const loadProducts = async () => {
   try {
-    setLoading(true);
     const response = await productsAPI.getAll();
-    console.log('Products API response:', response);
-
-    // Handle both array and object response formats
-    let productData = Array.isArray(response.data)
-      ? response.data
-      : response.data?.data || response.data?.products || [];
-
-    // Map fields so Mongo and SQL products work consistently
-    productData = productData.map(p => ({
-      id: p.id || p.mongoId || Date.now(), // fallback for Mongo products
-      name: p.name,
-      description: p.description || '',
-      price: p.price || 0,
-      brand: p.brand || 'Unknown',
-      imageUrl: p.imageUrl || p.image || 'https://via.placeholder.com/300x300/3b82f6/ffffff?text=Product',
-      stockQuantity: p.stockQuantity || 0,
-      specs: typeof p.specifications === 'string'
-        ? p.specifications
-        : p.specifications
-          ? JSON.stringify(p.specifications)
-          : p.specs || '',
-      rating: p.rating || 0,
-      reviewCount: p.reviewCount || 0,
-      category: p.categoryName || 'Product'
-    }));
-
-    if (productData.length > 0) {
-      setProducts(productData);
-    } else {
-      console.warn('No products received from API, using sample data');
-      setProducts(getSampleProducts());
-    }
+    const products = response.data.map(normalizeProduct);
+    setProducts(products);
+    console.log('Products loaded:', products.length);
   } catch (err) {
     console.error('Error loading products:', err);
-    setProducts(getSampleProducts());
-  } finally {
-    setLoading(false);
+    setError('Failed to load products');
   }
-};*/
+};
 
 
 // Load user data (profile, cart, products)
@@ -965,76 +937,123 @@ useEffect(() => {
   fetchCart();
 }, [user]);
 
-// ==============================
-// Add to Cart (MongoDB safe)
-// ==============================
+
+// ==========================================
+// FIXED: Properly extract MongoDB ObjectId from product
+// ==========================================
+
+// Helper function to extract MongoDB ObjectId
+const getMongoId = (obj) => {
+  if (!obj) return null;
+  
+  // If _id is an object with $oid property
+  if (obj._id && obj._id.$oid) {
+    return obj._id.$oid;
+  }
+  
+  // If _id is already a string
+  if (typeof obj._id === 'string') {
+    return obj._id;
+  }
+  
+  // Fallback to id property
+  if (typeof obj.id === 'string') {
+    return obj.id;
+  }
+  
+  // Last resort - check for mongoId
+  if (typeof obj.mongoId === 'string') {
+    return obj.mongoId;
+  }
+  
+  return null;
+};
+
+// ✅ FIXED: Add to cart with proper ObjectId extraction
 const addToCart = async (product) => {
-  if (!product) return;
-
-  // Normalize product fields
-  const normalizedProduct = {
-    // MUST use MongoDB _id as string
-    productId: product._id?.toString() || product.mongoId?.toString(),
-    productName: product.name || product.productName || 'Unknown Product',
-    price: product.price || 0,
-    imageUrl: product.imageUrl || product.image || 'https://via.placeholder.com/300x300',
-    quantity: 1,
-    brand: product.brand || ''
-  };
-
-  if (!normalizedProduct.productId) {
-    console.error('Product missing _id:', product);
-    setError('Product ID not found. Cannot add to cart.');
+  console.log('Raw product object:', product);
+  
+  // ✅ Extract MongoDB ObjectId correctly
+  const productId = getMongoId(product);
+  
+  console.log('Extracted product ID:', productId);
+  
+  if (!productId) {
+    console.error('Could not extract product ID from:', product);
+    setError('Product ID not found. Please try again.');
     return;
   }
 
+  // Normalize product fields
+  const normalizedProduct = {
+    productId: productId,
+    productName: product.name || product.productName || 'Unknown Product',
+    price: product.price || 0,
+    imageUrl: product.imageUrl || product.image || 'https://via.placeholder.com/300x300',
+    brand: product.brand || '',
+    ...product
+  };
+
   if (!normalizedProduct.productName) {
-    setError('Product name missing. Cannot add to cart.');
+    setError('Product information incomplete.');
     return;
   }
 
   if (user) {
-    // Logged-in user → send to backend
+    // Logged-in user → backend cart
     try {
+      // ✅ Extract userId from JWT token
       const userId = getUserIdFromToken();
+      
       if (!userId) {
+        console.error('User object:', user);
         setError('User ID not found. Please login again.');
         return;
       }
 
-      console.log('Adding to cart:', {
-        userId,
-        productId: normalizedProduct.productId,
-        quantity: normalizedProduct.quantity
+      console.log('Adding to cart with:', {
+        userId: userId,
+        productId: productId,
+        quantity: 1
       });
 
-      const response = await cartAPI.add(userId, {
-        productId: normalizedProduct.productId, // ✅ ensure Mongo ObjectId string
-        quantity: normalizedProduct.quantity
+      // ✅ Send request with proper IDs
+      const response = await cartAPI.add(userId, { 
+        productId: productId, // Already a string
+        quantity: 1 
       });
 
-      // Handle response safely
+      console.log('Cart API response:', response.data);
+
+      // ✅ Handle response
       const cartData = response.data;
-      const updatedCart = Array.isArray(cartData?.items)
-        ? cartData.items
-        : Array.isArray(cartData)
-        ? cartData
+      const updatedCart = Array.isArray(cartData?.items) 
+        ? cartData.items 
+        : Array.isArray(cartData) 
+        ? cartData 
         : [];
-
+      
       setCart(updatedCart);
       localStorage.setItem('cart', JSON.stringify(updatedCart));
-      setError(''); // clear any previous errors
-
+      setError('');
+      
       console.log('✅ Item added to cart successfully');
-
+      
     } catch (err) {
       console.error('Error adding to cart:', err);
-      console.error('Backend response:', err.response?.data);
-
+      console.error('Error response:', err.response?.data);
+      console.error('Error status:', err.response?.status);
+      
       if (err.response?.status === 404) {
         setError('Product not found in catalog.');
       } else if (err.response?.status === 400) {
-        setError(err.response?.data?.message || 'Invalid request. Check product details.');
+        const errorMsg = err.response?.data?.message || 'Invalid request. Check product details.';
+        setError(errorMsg);
+        console.error('Bad Request Details:', {
+          userId: getUserIdFromToken(),
+          productId: productId,
+          requestBody: { productId: productId, quantity: 1 }
+        });
       } else if (err.response?.status === 500) {
         setError('Server error. Please try again later.');
       } else {
@@ -1042,32 +1061,46 @@ const addToCart = async (product) => {
       }
     }
   } else {
-    // Guest user → store locally
+    // Guest user → localStorage cart
     const updatedCart = [...cart];
-    const existing = updatedCart.find(item =>
-      String(item.productId) === normalizedProduct.productId ||
-      String(item.productIdString) === normalizedProduct.productId
+    const existing = updatedCart.find(item => 
+      String(item.productId) === String(productId)
     );
-
+    
     if (existing) {
       existing.quantity += 1;
     } else {
-      updatedCart.push(normalizedProduct);
+      updatedCart.push({
+        productId: productId,
+        productName: normalizedProduct.productName,
+        price: normalizedProduct.price,
+        quantity: 1,
+        imageUrl: normalizedProduct.imageUrl,
+        brand: normalizedProduct.brand
+      });
     }
-
+    
     setCart(updatedCart);
     localStorage.setItem('cart', JSON.stringify(updatedCart));
     setError('');
+    console.log('✅ Item added to guest cart');
   }
 };
 
 
-// ==============================
-// Update Cart Quantity (Mongo-safe)
-// ==============================
-const updateCartQuantity = async (productId, quantity) => {
-  if (!productId) return;
+// ✅ When displaying products, normalize the _id field
+const normalizeProduct = (product) => {
+  return {
+    ...product,
+    id: getMongoId(product), // Extract proper ID
+    _id: getMongoId(product) // Keep as string
+  };
+};
 
+
+
+// ✅ UPDATED: Update cart quantity
+const updateCartQuantity = async (productId, quantity) => {
   if (quantity <= 0) {
     await removeFromCart(productId);
     return;
@@ -1076,37 +1109,37 @@ const updateCartQuantity = async (productId, quantity) => {
   if (user) {
     try {
       const userId = getUserIdFromToken();
+      
       if (!userId) {
         setError('User session invalid. Please login again.');
         return;
       }
 
-      console.log(`Updating quantity: userId=${userId}, productId=${productId}, quantity=${quantity}`);
+      // Ensure productId is a string
+      const productIdString = String(productId);
 
-      await cartAPI.update(userId, String(productId), quantity);
-
+      await cartAPI.update(userId, productIdString, quantity);
+      
       setCart(prev => {
-        const updatedCart = prev.map(item =>
-          String(item.productId) === String(productId) || String(item.productIdString) === String(productId)
+        const updatedCart = prev.map(item => {
+          const itemId = String(item.productId || item.productIdString);
+          return itemId === productIdString
             ? { ...item, quantity }
-            : item
-        );
+            : item;
+        });
         localStorage.setItem('cart', JSON.stringify(updatedCart));
         return updatedCart;
       });
-
-      setError('');
-      console.log('✅ Cart quantity updated successfully');
-
+      
     } catch (err) {
-      console.error('Error updating cart quantity:', err);
-      setError(err.response?.data?.message || 'Failed to update cart quantity');
+      console.error('Error updating cart:', err);
+      setError(err.response?.data?.message || 'Failed to update cart');
     }
   } else {
-    // Guest user → localStorage
+    // Guest user
     setCart(prev => {
       const updatedCart = prev.map(item =>
-        String(item.productId) === String(productId) || String(item.productIdString) === String(productId)
+        String(item.productId) === String(productId)
           ? { ...item, quantity }
           : item
       );
@@ -1116,44 +1149,41 @@ const updateCartQuantity = async (productId, quantity) => {
   }
 };
 
-// ==============================
-// Remove item from cart (Mongo-safe)
-// ==============================
-const removeFromCart = async (productId) => {
-  if (!productId) return;
 
+
+// ✅ UPDATED: Remove from cart
+const removeFromCart = async (productId) => {
   if (user) {
     try {
       const userId = getUserIdFromToken();
+      
       if (!userId) {
         setError('User session invalid. Please login again.');
         return;
       }
 
-      console.log(`Removing item: userId=${userId}, productId=${productId}`);
+      const productIdString = String(productId);
 
-      await cartAPI.remove(userId, String(productId));
-
+      await cartAPI.remove(userId, productIdString);
+      
       setCart(prev => {
-        const updatedCart = prev.filter(item =>
-          String(item.productId) !== String(productId) && String(item.productIdString) !== String(productId)
-        );
+        const updatedCart = prev.filter(item => {
+          const itemId = String(item.productId || item.productIdString);
+          return itemId !== productIdString;
+        });
         localStorage.setItem('cart', JSON.stringify(updatedCart));
         return updatedCart;
       });
-
-      setError('');
-      console.log('✅ Item removed from cart successfully');
-
+      
     } catch (err) {
-      console.error('Error removing item from cart:', err);
-      setError(err.response?.data?.message || 'Failed to remove item from cart');
+      console.error('Error removing from cart:', err);
+      setError(err.response?.data?.message || 'Failed to remove item');
     }
   } else {
-    // Guest user → localStorage
+    // Guest user
     setCart(prev => {
-      const updatedCart = prev.filter(item =>
-        String(item.productId) !== String(productId) && String(item.productIdString) !== String(productId)
+      const updatedCart = prev.filter(item => 
+        String(item.productId) !== String(productId)
       );
       localStorage.setItem('cart', JSON.stringify(updatedCart));
       return updatedCart;
@@ -1161,6 +1191,21 @@ const removeFromCart = async (productId) => {
   }
 };
 
+// ==========================================
+// DEBUG: Add this to check what's being sent
+// ==========================================
+const debugAddToCart = (product) => {
+  console.group('🔍 Add to Cart Debug Info');
+  console.log('1. Raw Product:', product);
+  console.log('2. Product _id:', product._id);
+  console.log('3. Product _id.$oid:', product._id?.$oid);
+  console.log('4. Extracted ID:', getMongoId(product));
+  console.log('5. User ID from token:', getUserIdFromToken());
+  console.groupEnd();
+  
+  // Then call actual add to cart
+  addToCart(product);
+};
 // ==============================
 // Clear entire cart (Mongo-safe)
 // ==============================

@@ -70,6 +70,7 @@ namespace ECommerceAPI.Application.Services
             return MapSqlToDto(sqlCart);
         }
 
+        // Also update the AddToCartByUserIdStringAsync method where cart is created
         public async Task<CartDto> AddToCartByUserIdStringAsync(string userId, string productId, int quantity)
         {
             if (quantity <= 0) quantity = 1;
@@ -86,8 +87,21 @@ namespace ECommerceAPI.Application.Services
                 if (!product.IsActive)
                     throw new InvalidOperationException($"Product is inactive: {productId}");
 
-                var cart = await _mongoRepository.GetByUserIdStringAsync(userId)
-                        ?? new CartMongo { UserId = userId, CreatedAt = DateTime.UtcNow, Items = new List<CartItemMongo>() };
+                var cart = await _mongoRepository.GetByUserIdStringAsync(userId);
+                
+                // ✅ FIXED: If cart doesn't exist, create new one WITHOUT setting Id
+                if (cart == null)
+                {
+                    cart = new CartMongo 
+                    { 
+                        // ✅ DO NOT set Id property
+                        UserId = userId, 
+                        Items = new List<CartItemMongo>(),
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow,
+                        IsActive = true
+                    };
+                }
 
                 var item = cart.Items.FirstOrDefault(i => i.ProductId == productId);
                 if (item != null)
@@ -111,6 +125,7 @@ namespace ECommerceAPI.Application.Services
 
                 cart.UpdatedAt = DateTime.UtcNow;
 
+                // ✅ FIXED: Check if Id is null or empty
                 if (string.IsNullOrEmpty(cart.Id))
                     await _mongoRepository.AddAsync(cart);
                 else
@@ -119,7 +134,7 @@ namespace ECommerceAPI.Application.Services
                 return MapMongoToDto(cart);
             }
 
-            // SQL fallback
+            // SQL fallback (unchanged)
             if (!int.TryParse(userId, out int sqlUserId))
                 throw new InvalidOperationException("SQL cart requires numeric userId");
 
@@ -301,15 +316,21 @@ namespace ECommerceAPI.Application.Services
         }
 
         // ========================================================================
-        // HELPER METHODS
+        // HELPER METHODS (UPDATED)
         // ========================================================================
 
         private async Task<CartMongo> CreateEmptyMongoCart(string userId)
         {
             var cart = new CartMongo
             {
+                // ✅ DO NOT set Id - let MongoDB auto-generate it
                 UserId = userId,
-                CreatedAt = DateTime.UtcNow
+                Items = new List<CartItemMongo>(), // ✅ Initialize empty list
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
+                IsActive = true,
+                TotalAmount = 0,
+                TotalItems = 0
             };
 
             await _mongoRepository.AddAsync(cart);

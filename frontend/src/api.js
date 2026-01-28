@@ -220,7 +220,6 @@ export const adminAPI = {
 
 export default api;
 */
-
 import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:5033/api';
@@ -415,36 +414,62 @@ export const productsAPI = {
   getById: (id) => api.get(`/products/${id}`)
 };
 
-// ===================== CART API =====================
+// ===================== CART API (FIXED) =====================
 export const cartAPI = {
   // Get user's cart
   view: (userId) => {
     if (!userId) throw new Error('User ID is required');
+    console.log('📋 Cart API - View:', `GET /cart/user/${userId}`);
     return api.get(`/cart/user/${userId}`);
   },
   
-  // Add item to cart
-  add: (userId, productId, quantity = 1) => {
+  // ✅ FIXED: Add item to cart - accepts data object
+  add: (userId, data) => {
     if (!userId) throw new Error('User ID is required');
-    if (!productId) throw new Error('Product ID is required');
-    return api.post(`/cart/user/${userId}/items`, { productId, quantity });
+    if (!data || !data.productId) throw new Error('Product ID is required');
+    
+    console.log('➕ Cart API - Add:', {
+      url: `/cart/user/${userId}/items`,
+      userId: userId,
+      productId: data.productId,
+      quantity: data.quantity || 1
+    });
+    
+    return api.post(`/cart/user/${userId}/items`, {
+      productId: data.productId,
+      quantity: data.quantity || 1
+    });
   },
   
   // Update item quantity
   update: (userId, productId, quantity) => {
     if (!userId) throw new Error('User ID is required');
+    if (!productId) throw new Error('Product ID is required');
+    
+    console.log('✏️ Cart API - Update:', {
+      url: `/cart/user/${userId}/items/${productId}`,
+      quantity: quantity
+    });
+    
     return api.put(`/cart/user/${userId}/items/${productId}`, { quantity });
   },
   
   // Remove item
   remove: (userId, productId) => {
     if (!userId) throw new Error('User ID is required');
+    if (!productId) throw new Error('Product ID is required');
+    
+    console.log('🗑️ Cart API - Remove:', `/cart/user/${userId}/items/${productId}`);
+    
     return api.delete(`/cart/user/${userId}/items/${productId}`);
   },
   
   // Clear cart
   clear: (userId) => {
     if (!userId) throw new Error('User ID is required');
+    
+    console.log('🧹 Cart API - Clear:', `/cart/user/${userId}`);
+    
     return api.delete(`/cart/user/${userId}`);
   }
 };
@@ -497,15 +522,46 @@ export const adminAPI = {
   deleteProduct: (id) => api.delete(`/products/${id}`)
 };
 
+// ===================== HELPER: Extract MongoDB ObjectId =====================
+export const getMongoId = (obj) => {
+  if (!obj) return null;
+  
+  // MongoDB format: { _id: { $oid: "..." } }
+  if (obj._id && obj._id.$oid) {
+    return obj._id.$oid;
+  }
+  
+  // Already a string
+  if (typeof obj._id === 'string') {
+    return obj._id;
+  }
+  
+  // Check id property
+  if (obj.id && obj.id.$oid) {
+    return obj.id.$oid;
+  }
+  
+  // Fallback to string id
+  if (typeof obj.id === 'string') {
+    return obj.id;
+  }
+  
+  // Last resort - mongoId
+  if (typeof obj.mongoId === 'string') {
+    return obj.mongoId;
+  }
+  
+  return null;
+};
+
 // ===================== HELPER: Detect User Type =====================
 export const getUserType = () => {
   const token = sessionStorage.getItem('token') || localStorage.getItem('token');
   if (!token) return null;
   
   try {
-    // Decode JWT token (without verification - just to read claims)
     const payload = JSON.parse(atob(token.split('.')[1]));
-    return payload.UserType || 'SQL'; // Default to SQL if not specified
+    return payload.UserType || 'SQL';
   } catch (error) {
     console.error('Error decoding token:', error);
     return 'SQL';
@@ -515,15 +571,24 @@ export const getUserType = () => {
 // ===================== HELPER: Get User ID from Token =====================
 export const getUserIdFromToken = () => {
   const token = sessionStorage.getItem('token') || localStorage.getItem('token');
-  if (!token) return null;
+  if (!token) {
+    console.warn('⚠️ No token found in storage');
+    return null;
+  }
   
   try {
     const payload = JSON.parse(atob(token.split('.')[1]));
-    // For MongoDB users, this will be ObjectId string
-    // For SQL users, this will be integer (as string)
-    return payload.nameid || payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier'];
+    
+    // Extract user ID from various possible claim names
+    const userId = payload.nameid || 
+                   payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier'] ||
+                   payload.sub ||
+                   payload.userId;
+    
+    console.log('✅ User ID from token:', userId);
+    return userId;
   } catch (error) {
-    console.error('Error extracting user ID from token:', error);
+    console.error('❌ Error extracting user ID from token:', error);
     return null;
   }
 };
