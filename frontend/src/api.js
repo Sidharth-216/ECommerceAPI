@@ -255,8 +255,14 @@ export const cartAPI = {
 
 // ===================== ORDERS API =====================
 export const ordersAPI = {
-  confirm: (shippingAddressId) =>
-    api.post('/order/confirm', { shippingAddressId }),
+  confirm: (shippingAddressId) => {
+    if (!shippingAddressId || shippingAddressId === '') {
+      console.error('❌ Shipping Address ID is required');
+      return Promise.reject(new Error('Shipping Address ID is required'));
+    }
+    console.log('📦 Orders API - Confirm:', { shippingAddressId });
+    return api.post('/order/confirm', { shippingAddressId });
+  },
   history: () => api.get('/order/history'),
   getById: (id) => api.get(`/order/${id}`)
 };
