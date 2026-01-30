@@ -36,10 +36,9 @@ api.interceptors.response.use(
   }
 );
 
-// ===================== AUTH API (SQL + MONGODB SUPPORT) =====================
+// ===================== AUTH API (SQL + MONGODB SUPPORT) - UPDATED =====================
 export const authAPI = {
   // ===== SQL AUTHENTICATION (EXISTING) =====
-  
   // Email/Password login (SQL)
   login: async (email, password) => {
     const response = await api.post('/auth/login', { email, password });
@@ -65,7 +64,7 @@ export const authAPI = {
     const response = await api.post('/auth/verify-otp', { mobile, otp });
     return response;
   },
-
+  
   // Email OTP authentication (SQL)
   requestEmailOtp: async (email) => {
     const response = await api.post('/auth/request-email-otp', { email });
@@ -78,7 +77,7 @@ export const authAPI = {
   }
 };
 
-// ===== MONGODB AUTHENTICATION (NEW) =====
+// ===== MONGODB AUTHENTICATION (NEW) - UPDATED WITH GENDER SUPPORT =====
 export const mongoAuthAPI = {
   // Email/Password login (MongoDB)
   login: async (email, password) => {
@@ -86,13 +85,14 @@ export const mongoAuthAPI = {
     return response;
   },
   
-  // Registration (MongoDB)
-  register: async (fullName, email, mobile, password) => {
+  // Registration (MongoDB) - UPDATED TO INCLUDE GENDER
+  register: async (fullName, email, mobile, password, gender) => {
     const response = await api.post('/mongo/auth/register', { 
       fullName, 
       email, 
       mobile, 
-      password 
+      password,
+      gender // Added gender parameter
     });
     return response;
   },
@@ -107,7 +107,7 @@ export const mongoAuthAPI = {
     const response = await api.post('/mongo/auth/verify-otp', { mobile, otp });
     return response;
   },
-
+  
   // Email OTP authentication (MongoDB)
   requestEmailOtp: async (email) => {
     const response = await api.post('/mongo/auth/request-email-otp', { email });
@@ -119,7 +119,6 @@ export const mongoAuthAPI = {
     return response;
   }
 };
-
 // ===================== MIGRATION API (NEW) =====================
 export const migrationAPI = {
   // Migrate all users from SQL to MongoDB

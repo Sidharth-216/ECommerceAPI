@@ -70,6 +70,7 @@ namespace ECommerceAPI.Application.Services
                 Email = user.Email,
                 FullName = user.FullName,
                 Role = user.Role.ToString(),
+                Gender=null,
                 Token = token,
                 Mobile = user.Mobile
             };

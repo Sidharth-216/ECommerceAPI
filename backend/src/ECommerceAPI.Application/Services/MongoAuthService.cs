@@ -50,6 +50,7 @@ namespace ECommerceAPI.Application.Services
                 PasswordHash = PasswordHelper.HashPassword(registerDto.Password),
                 FullName = registerDto.FullName,
                 Mobile = registerDto.Mobile,
+                Gender = registerDto.Gender, // ADD THIS LINE
                 Role = "Customer",
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow
@@ -210,6 +211,7 @@ namespace ECommerceAPI.Application.Services
                 Email = user.Email,
                 FullName = user.FullName,
                 Mobile = user.Mobile,
+                Gender=user.Gender,
                 Role = user.Role
             };
         }
@@ -221,6 +223,7 @@ namespace ECommerceAPI.Application.Services
 
             user.FullName = updateDto.FullName;
             user.Mobile = updateDto.Mobile;
+            user.Gender=updateDto.Gender;
 
             await _mongoUserRepository.UpdateAsync(user);
             return true;
@@ -258,9 +261,10 @@ namespace ECommerceAPI.Application.Services
                 MongoUserId = user.Id,
                 Email = user.Email,
                 FullName = user.FullName,
+                Mobile = user.Mobile,
+                Gender = user.Gender, // ADD THIS LINE
                 Role = user.Role,
-                Token = token,
-                Mobile = user.Mobile
+                Token = token
             };
         }
 

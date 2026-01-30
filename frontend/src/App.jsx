@@ -62,7 +62,7 @@ const CompleteIntegratedApp = () => {
   const [user, setUser] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
   const [loginData, setLoginData] = useState({ email: '', password: '' });
-  const [registerData, setRegisterData] = useState({ fullName: '', email: '', mobile: '', password: '', confirmPassword: '' });
+  const [registerData, setRegisterData] = useState({ fullName: '', email: '', mobile: '', password: '', confirmPassword: '' , gender: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
@@ -313,6 +313,8 @@ const loadProfile = async () => {
   try {
     // Prefer dedicated address API if available (it handles a local fallback)
     let addresses = [];
+    let profileData = {};
+    
     try {
       if (typeof addressAPI?.getAll === 'function') {
         const addrRes = await addressAPI.getAll();
@@ -323,6 +325,7 @@ const loadProfile = async () => {
         const data = response.data || {};
         const rawAddresses = data.addresses || data.addressList || [];
         addresses = Array.isArray(rawAddresses) ? rawAddresses : [];
+        profileData = data;
       }
     } catch (innerErr) {
       console.warn('Address fetch via addressAPI failed, trying authAPI profile', innerErr);
@@ -331,6 +334,7 @@ const loadProfile = async () => {
         const data = response.data || {};
         const rawAddresses = data.addresses || data.addressList || [];
         addresses = Array.isArray(rawAddresses) ? rawAddresses : [];
+        profileData = data;
       } catch (e) {
         addresses = [];
       }
@@ -368,13 +372,24 @@ const loadProfile = async () => {
       };
     });
 
+    // Extract gender from profile data
+    const gender = profileData.gender || profileData.Gender || user.gender || '';
+
     setProfileData(prev => ({
       ...prev,
-      fullName: prev.fullName || '',
-      email: prev.email || '',
-      mobile: (prev.mobile || '').toString().trim(),
+      fullName: profileData.fullName || profileData.FullName || prev.fullName || '',
+      email: profileData.email || profileData.Email || prev.email || '',
+      mobile: (profileData.mobile || profileData.Mobile || prev.mobile || '').toString().trim(),
+      gender: gender, // Added gender field
       addresses: addresses || []
     }));
+
+    // Update user state with gender
+    setUser(prev => ({
+      ...prev,
+      gender: gender
+    }));
+
   } catch (err) {
     console.error('Error loading profile:', err);
     // final fallback: empty addresses
@@ -386,7 +401,7 @@ const loadProfile = async () => {
 useEffect(() => {
   const loadCategories = async () => {
     try {
-      const res = await adminAPI.getCategories(); // you need to implement this in adminAPI
+      const res = await adminAPI.getCategories?.() || { data: [] };
       setCategories(res.data);
     } catch (err) {
       console.error('Failed to fetch categories', err);
@@ -568,9 +583,8 @@ useEffect(() => {
     }
   ];
 
-
 // ==========================================
-// LOGIN HANDLER (MongoDB)
+// LOGIN HANDLER (MongoDB) - UPDATED WITH GENDER SUPPORT
 // ==========================================
 const handleLogin = async () => {
   setError('');
@@ -627,7 +641,7 @@ const handleLogin = async () => {
       throw new Error('User ID not found. Please contact support.');
     }
 
-    // Persist session with all necessary user data
+    // Persist session with all necessary user data INCLUDING GENDER
     const userData = { 
       ...data, 
       role: userRole, 
@@ -639,13 +653,15 @@ const handleLogin = async () => {
     sessionStorage.setItem('token', data.token);
     sessionStorage.setItem('user', JSON.stringify(userData));
 
+    // Set user state INCLUDING GENDER
     setUser({
       id: userIdFromToken,
       userId: userIdFromToken,
       email: data.email || '',
       role: userRole,
       name: data.fullName || data.name || '',
-      mobile: data.mobile || ''
+      mobile: data.mobile || '',
+      gender: data.gender || '' // Added gender field
     });
 
     if (userRole === 'Admin') {
@@ -667,13 +683,51 @@ const handleLogin = async () => {
     setLoading(false);
   }
 };
-
-
 // ==========================================
-// REGISTER HANDLER (MongoDB)
+// SESSION RESTORE - UPDATED WITH GENDER SUPPORT
+// ==========================================
+// At the top of your component, after state declarations
+useEffect(() => {
+  const token = sessionStorage.getItem('token');
+  const savedUser = sessionStorage.getItem('user');
+
+  if (!token || !savedUser) return;
+
+  try {
+    const userData = JSON.parse(savedUser);
+
+    if (!userData.role || !userData.email) {
+      throw new Error('Invalid session');
+    }
+
+    // Restore user state INCLUDING GENDER
+    setUser({
+      email: userData.email,
+      role: userData.role,
+      name: userData.fullName || userData.name,
+      mobile: userData.mobile || '',
+      gender: userData.gender || '' // Added gender field
+    });
+
+    if (userData.role === 'Admin') {
+      setActiveTab('overview');
+      setCurrentPage('admin');
+    } else {
+      setCurrentPage('products');
+      loadProducts();
+    }
+
+  } catch {
+    sessionStorage.clear();
+    setUser(null);
+    setCurrentPage('home');
+  }
+}, []);
+// ==========================================
+// REGISTER HANDLER (MongoDB) - UPDATED WITH GENDER SUPPORT
 // ==========================================
 const handleRegister = async () => {
-  const { fullName, email, mobile, password, confirmPassword } = registerData;
+  const { fullName, email, mobile, password, confirmPassword, gender } = registerData;
   
   // Validation
   if (!fullName?.trim()) {
@@ -689,7 +743,6 @@ const handleRegister = async () => {
   if (!mobile?.trim()) {
     setError('Mobile number is required');
     return;
-    
   }
   
   if (!password) {
@@ -711,14 +764,15 @@ const handleRegister = async () => {
   setError('');
   
   try {
-    console.log('Attempting registration:', { fullName, email, mobile, role: loginRole });
+    console.log('Attempting registration:', { fullName, email, mobile, gender, role: loginRole });
     
-    // USE MONGODB AUTHENTICATION
+    // USE MONGODB AUTHENTICATION WITH GENDER
     const response = await mongoAuthAPI.register(
       fullName.trim(),
       email.trim(),
       mobile.trim(),
-      password
+      password,
+      gender // Added gender parameter
     );
     
     console.log('Registration response:', response.data);
@@ -757,21 +811,23 @@ const handleRegister = async () => {
     
     sessionStorage.setItem('user', JSON.stringify(userData));
     
-    // Set user state
+    // Set user state INCLUDING GENDER
     setUser({
       id: finalUserId,
       userId: finalUserId,
       email: data.email,
       role: data.role,
       name: data.fullName,
-      mobile: data.mobile || mobile
+      mobile: data.mobile || mobile,
+      gender: data.gender || gender // Added gender field
     });
     
-    // Set profile data
+    // Set profile data INCLUDING GENDER
     setProfileData({
       fullName: data.fullName || fullName,
       email: data.email || email,
       mobile: data.mobile || mobile,
+      gender: data.gender || gender, // Added gender field
       addresses: []
     });
     
@@ -2509,7 +2565,7 @@ const handleVerifyOTP = async () => {
                 </div>
               </div>
 
-              {/* Mobile */}
+ {/* Mobile */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-3">
                   Mobile Number
@@ -2523,6 +2579,31 @@ const handleVerifyOTP = async () => {
                     className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300 bg-gray-50 focus:bg-white placeholder-gray-400"
                     placeholder="+91 98765 43210"
                   />
+                </div>
+              </div>
+
+              {/* Gender - NEW FIELD */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  Gender <span className="text-gray-400 text-xs font-normal">(Optional)</span>
+                </label>
+                <div className="relative">
+                  <select
+                    value={registerData.gender}
+                    onChange={(e) => setRegisterData({ ...registerData, gender: e.target.value })}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300 bg-gray-50 hover:bg-white cursor-pointer text-gray-700 font-medium appearance-none"
+                  >
+                    <option value="">Select Gender (Optional)</option>
+                    <option value="Male">👨 Male</option>
+                    <option value="Female">👩 Female</option>
+                    <option value="Other">🧑 Other</option>
+                    <option value="PreferNotToSay">🤐 Prefer Not to Say</option>
+                  </select>
+                  <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+                    </svg>
+                  </div>
                 </div>
               </div>
 
@@ -2541,6 +2622,7 @@ const handleVerifyOTP = async () => {
                     placeholder="••••••••"
                   />
                   <button
+                    type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-blue-600 transition-colors"
                   >
@@ -2797,7 +2879,7 @@ const handleVerifyOTP = async () => {
                                 <span className="text-white text-sm font-bold">🎉 LIMITED TIME OFFER</span>
                               </div>
                               <h2 className="text-5xl font-extrabold text-white mb-4 leading-tight">
-                                Summer Sale 2024
+                                Summer Sale 2026
                               </h2>
                               <p className="text-white/90 text-lg mb-6 max-w-md">
                                 Get up to <span className="text-4xl font-bold">50% OFF</span> on all electronics and gadgets. Free shipping on orders above ₹999!
@@ -4090,54 +4172,184 @@ if (user && currentPage === 'profile') {
                   Personal Information
                 </h3>
               </div>
+                <div className="p-8">
+                  <div className="grid md:grid-cols-2 gap-6">
+                    {/* Full Name */}
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">Full Name</label>
+                      <input
+                        value={profileData.fullName || ''}
+                        onChange={e =>
+                          setProfileData({ ...profileData, fullName: e.target.value })
+                        }
+                        disabled={!editMode}
+                        className={`w-full px-4 py-3 border-2 rounded-xl transition-all duration-300 focus:outline-none ${
+                          editMode
+                            ? 'border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 bg-white'
+                            : 'border-gray-200 bg-gray-50 cursor-not-allowed'
+                        }`}
+                      />
+                    </div>
 
-              <div className="p-8">
-                <div className="grid md:grid-cols-2 gap-6">
-                  {/* Full Name */}
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">Full Name</label>
-                    <input
-                      value={profileData.fullName || ''}
-                      onChange={e =>
-                        setProfileData({ ...profileData, fullName: e.target.value })
-                      }
-                      disabled={!editMode}
-                      className={`w-full px-4 py-3 border-2 rounded-xl transition-all duration-300 focus:outline-none ${
-                        editMode
-                          ? 'border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 bg-white'
-                          : 'border-gray-200 bg-gray-50 cursor-not-allowed'
-                      }`}
-                    />
+                    {/* Email */}
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">Email Address</label>
+                      <input
+                        value={profileData.email || ''}
+                        disabled
+                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 cursor-not-allowed text-gray-600"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">✓ Email cannot be changed</p>
+                    </div>
+
+                    {/* Mobile */}
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">Mobile Number</label>
+                      <input
+                        type="tel"
+                        value={(profileData.mobile || '').toString()}
+                        onChange={e =>
+                          setProfileData({ ...profileData, mobile: e.target.value })
+                        }
+                        disabled={!editMode}
+                        className={`w-full px-4 py-3 border-2 rounded-xl transition-all duration-300 focus:outline-none ${
+                          editMode
+                            ? 'border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 bg-white'
+                            : 'border-gray-200 bg-gray-50 cursor-not-allowed'
+                        }`}
+                      />
+                    </div>
+
+                    {/* Gender - NEW FIELD */}
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">Gender</label>
+                      <select
+                        value={profileData.gender || ''}
+                        onChange={e =>
+                          setProfileData({ ...profileData, gender: e.target.value })
+                        }
+                        disabled={!editMode}
+                        className={`w-full px-4 py-3 border-2 rounded-xl transition-all duration-300 focus:outline-none appearance-none cursor-pointer ${
+                          editMode
+                            ? 'border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 bg-white'
+                            : 'border-gray-200 bg-gray-50 cursor-not-allowed'
+                        }`}
+                      >
+                        <option value="">Select Gender (Optional)</option>
+                        <option value="Male">👨 Male</option>
+                        <option value="Female">👩 Female</option>
+                        <option value="Other">🧑 Other</option>
+                        <option value="PreferNotToSay">🤐 Prefer Not to Say</option>
+                      </select>
+                      <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+                        </svg>
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Email */}
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">Email Address</label>
-                    <input
-                      value={profileData.email || ''}
-                      disabled
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 cursor-not-allowed text-gray-600"
-                    />
-                  </div>
+                  {/* Save Changes Button */}
+                  {editMode && (
+                    <div className="mt-8 flex gap-4 pt-6 border-t border-gray-200">
+                      <button
+                        onClick={async () => {
+                          try {
+                            setLoading(true);
+                            setError('');
 
-                  {/* Mobile */}
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">Mobile Number</label>
-                    <input
-                      type="tel"
-                      value={(profileData.mobile || '').toString()}
-                      onChange={e =>
-                        setProfileData({ ...profileData, mobile: e.target.value })
-                      }
-                      disabled={!editMode}
-                      className={`w-full px-4 py-3 border-2 rounded-xl transition-all duration-300 focus:outline-none ${
-                        editMode
-                          ? 'border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 bg-white'
-                          : 'border-gray-200 bg-gray-50 cursor-not-allowed'
-                      }`}
-                    />
-                  </div>
+                            const payload = {
+                              fullName: profileData.fullName,
+                              mobile: profileData.mobile,
+                              gender: profileData.gender
+                            };
+
+                            // Call backend API to update profile
+                            if (typeof authAPI.updateProfile === 'function') {
+                              await authAPI.updateProfile(payload);
+                            } else {
+                              console.warn('updateProfile method not available on authAPI');
+                            }
+
+                            // Update local state and session storage
+                            setUser(prev => ({
+                              ...prev,
+                              name: profileData.fullName,
+                              mobile: profileData.mobile,
+                              gender: profileData.gender
+                            }));
+
+                            const userData = JSON.parse(sessionStorage.getItem('user') || '{}');
+                            sessionStorage.setItem('user', JSON.stringify({
+                              ...userData,
+                              fullName: profileData.fullName,
+                              mobile: profileData.mobile,
+                              gender: profileData.gender
+                            }));
+
+                            setEditMode(false);
+                            alert('✅ Profile updated successfully!');
+                          } catch (err) {
+                            console.error('Profile update error:', err);
+                            setError(
+                              err.response?.data?.message ||
+                              err.message ||
+                              'Failed to update profile. Please try again.'
+                            );
+                          } finally {
+                            setLoading(false);
+                          }
+                        }}
+                        disabled={loading}
+                        className="flex-1 px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-xl font-bold transition-all duration-300 transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 group shadow-lg hover:shadow-xl"
+                      >
+                        {loading ? (
+                          <>
+                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                            Save Changes
+                          </>
+                        )}
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setEditMode(false);
+                          // Reload profile data to discard changes
+                          fetchProfile();
+                        }}
+                        className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 hover:border-red-300 hover:bg-red-50 rounded-xl font-bold transition-all duration-300 flex items-center justify-center gap-2 group"
+                      >
+                        <svg className="w-5 h-5 group-hover:rotate-180 transition-transform" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Display Info when not in edit mode */}
+                  {!editMode && profileData.gender && (
+                    <div className="mt-6 pt-6 border-t border-gray-200">
+                      <p className="text-sm text-gray-600 mb-2">
+                        <span className="font-semibold">Gender:</span> {
+                          profileData.gender === 'Male' ? '👨 Male' :
+                          profileData.gender === 'Female' ? '👩 Female' :
+                          profileData.gender === 'Other' ? '🧑 Other' :
+                          profileData.gender === 'PreferNotToSay' ? '🤐 Prefer Not to Say' :
+                          profileData.gender
+                        }
+                      </p>
+                    </div>
+                  )}
                 </div>
+              <div className="p-8">
               </div>
             </div>
 

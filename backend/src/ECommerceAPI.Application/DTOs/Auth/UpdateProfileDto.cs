@@ -4,5 +4,6 @@ namespace ECommerceAPI.Application.DTOs.Auth
     {
         public string FullName { get; set; }
         public string Mobile { get; set; }
+        public string Gender{get;set;}
     }
 }

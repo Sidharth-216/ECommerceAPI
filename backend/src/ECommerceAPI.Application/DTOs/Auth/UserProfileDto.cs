@@ -7,5 +7,6 @@ namespace ECommerceAPI.Application.DTOs.Auth
         public string FullName { get; set; }
         public string Mobile { get; set; }  // Make sure this exists
         public string Role { get; set; }
+        public string Gender{get;set;}
     }
 }

@@ -14,6 +14,8 @@ namespace ECommerceAPI.Application.DTOs.Auth
 
         [Required]
         public string Mobile { get; set; }
+        // Optional - user can skip during registration
+        public string Gender { get; set; }
     }
 
 }

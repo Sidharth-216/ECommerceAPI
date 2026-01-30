@@ -45,6 +45,9 @@ namespace ECommerceAPI.Domain.Entities.MongoDB
 
         [BsonElement("sqlUserId")]
         public int? SqlUserId { get; set; } // Reference to SQL User ID for migration
+        
+        [BsonElement("gender")]
+        public string Gender{get;set;}
 
         // Indexes will be created in repository
     }
