@@ -1,4 +1,3 @@
-
 import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:5033/api';
@@ -252,20 +251,92 @@ export const cartAPI = {
     return api.delete(`/cart/user/${userId}`);
   }
 };
-
-// ===================== ORDERS API =====================
+// ===================== UPDATED ORDERS API (MongoDB) =====================
 export const ordersAPI = {
+  /**
+   * Confirm order - Create order from cart (MongoDB)
+   * @param {string} shippingAddressId - MongoDB ObjectId (24 hex characters)
+   */
   confirm: (shippingAddressId) => {
-    if (!shippingAddressId || shippingAddressId === '') {
-      console.error('❌ Shipping Address ID is required');
-      return Promise.reject(new Error('Shipping Address ID is required'));
+    // Get user ID from token
+    const userId = getUserIdFromToken();
+    if (!userId) {
+      console.error('❌ Orders API - User ID not found in token');
+      return Promise.reject(new Error('User ID is required. Please login again.'));
     }
-    console.log('📦 Orders API - Confirm:', { shippingAddressId });
-    return api.post('/order/confirm', { shippingAddressId });
+
+    // Validate input
+    if (!shippingAddressId || typeof shippingAddressId !== 'string') {
+      console.error('❌ Orders API - Invalid Shipping Address ID:', shippingAddressId);
+      return Promise.reject(new Error('Shipping Address ID is required and must be a string'));
+    }
+
+    // Validate MongoDB ObjectId format (24 hex characters)
+    const mongoObjectIdRegex = /^[0-9a-f]{24}$/i;
+    if (!mongoObjectIdRegex.test(shippingAddressId)) {
+      console.error('❌ Orders API - Invalid MongoDB ObjectId format:', shippingAddressId);
+      console.error('Expected: 24 hex characters, Got:', shippingAddressId);
+      return Promise.reject(new Error('Invalid Shipping Address ID format. Must be a valid MongoDB ObjectId.'));
+    }
+
+    console.log('📦 Orders API - Confirm Order (MongoDB):', {
+      endpoint: '/api/mongo/order/confirm',
+      userId: userId,
+      shippingAddressId: shippingAddressId,
+      requestBody: { ShippingAddressId: shippingAddressId }
+    });
+
+    // Call MongoDB order endpoint with CreateOrderDto structure
+    return api.post('/mongo/order/confirm', {
+      ShippingAddressId: shippingAddressId
+    });
   },
-  history: () => api.get('/order/history'),
-  getById: (id) => api.get(`/order/${id}`)
+
+  /**
+   * Get order history for current user (MongoDB)
+   */
+  history: () => {
+    console.log('📜 Orders API - Get History (MongoDB): /api/mongo/order/history');
+    return api.get('/mongo/order/history');
+  },
+
+  /**
+   * Get order by MongoDB ObjectId
+   * @param {string} mongoId - MongoDB ObjectId
+   */
+  getById: (mongoId) => {
+    if (!mongoId) {
+      return Promise.reject(new Error('MongoDB Order ID is required'));
+    }
+    console.log('📋 Orders API - Get Order by ID (MongoDB):', mongoId);
+    return api.get(`/mongo/order/${mongoId}`);
+  },
+
+  /**
+   * Get order by Order Number
+   * @param {string} orderNumber - Order number (e.g., ORD-20250129-ABCD1234)
+   */
+  getByOrderNumber: (orderNumber) => {
+    if (!orderNumber) {
+      return Promise.reject(new Error('Order number is required'));
+    }
+    console.log('📋 Orders API - Get Order by Number (MongoDB):', orderNumber);
+    return api.get(`/mongo/order/order-number/${orderNumber}`);
+  },
+
+  /**
+   * Cancel order by MongoDB ObjectId
+   * @param {string} mongoId - MongoDB ObjectId
+   */
+  cancel: (mongoId) => {
+    if (!mongoId) {
+      return Promise.reject(new Error('MongoDB Order ID is required'));
+    }
+    console.log('❌ Orders API - Cancel Order (MongoDB):', mongoId);
+    return api.post(`/mongo/order/${mongoId}/cancel`);
+  }
 };
+
 
 // ===================== RECOMMENDATIONS API =====================
 export const recommendationsAPI = {
@@ -307,37 +378,68 @@ export const adminAPI = {
   deleteProduct: (id) => api.delete(`/products/${id}`)
 };
 
+// ===================== VALIDATION HELPER =====================
+/**
+ * Validate MongoDB ObjectId format
+ * @param {string} id - ID to validate
+ * @returns {boolean} True if valid MongoDB ObjectId
+ */
+export const isValidMongoId = (id) => {
+  if (!id || typeof id !== 'string') return false;
+  return /^[0-9a-f]{24}$/i.test(id);
+};
+
+
 // ===================== HELPER: Extract MongoDB ObjectId =====================
+/**
+ * Extract MongoDB ObjectId from various object formats
+ * @param {Object} obj - Object that may contain MongoDB ID
+ * @returns {string|null} MongoDB ObjectId string or null
+ */
 export const getMongoId = (obj) => {
   if (!obj) return null;
   
-  // MongoDB format: { _id: { $oid: "..." } }
-  if (obj._id && obj._id.$oid) {
-    return obj._id.$oid;
+  // Check _id field (most common)
+  if (obj._id) {
+    // MongoDB extended JSON format: { $oid: "..." }
+    if (typeof obj._id === 'object' && obj._id.$oid) {
+      return obj._id.$oid;
+    }
+    // String format
+    if (typeof obj._id === 'string' && /^[0-9a-f]{24}$/i.test(obj._id)) {
+      return obj._id;
+    }
   }
   
-  // Already a string
-  if (typeof obj._id === 'string') {
-    return obj._id;
+  // Check id field
+  if (obj.id) {
+    if (typeof obj.id === 'object' && obj.id.$oid) {
+      return obj.id.$oid;
+    }
+    if (typeof obj.id === 'string' && /^[0-9a-f]{24}$/i.test(obj.id)) {
+      return obj.id;
+    }
   }
   
-  // Check id property
-  if (obj.id && obj.id.$oid) {
-    return obj.id.$oid;
+  // Check Id field (PascalCase)
+  if (obj.Id) {
+    if (typeof obj.Id === 'object' && obj.Id.$oid) {
+      return obj.Id.$oid;
+    }
+    if (typeof obj.Id === 'string' && /^[0-9a-f]{24}$/i.test(obj.Id)) {
+      return obj.Id;
+    }
   }
   
-  // Fallback to string id
-  if (typeof obj.id === 'string') {
-    return obj.id;
-  }
-  
-  // Last resort - mongoId
-  if (typeof obj.mongoId === 'string') {
+  // Check mongoId field
+  if (obj.mongoId && typeof obj.mongoId === 'string' && /^[0-9a-f]{24}$/i.test(obj.mongoId)) {
     return obj.mongoId;
   }
   
+  console.warn('⚠️ Could not extract MongoDB ObjectId from object:', obj);
   return null;
 };
+
 
 // ===================== HELPER: Detect User Type =====================
 export const getUserType = () => {

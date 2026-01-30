@@ -56,7 +56,7 @@ namespace ECommerceAPI.Infrastructure.Repositories.Implementations
             return await _addresses.Find(a => a.Id == id).FirstOrDefaultAsync();
         }
 
-        public async Task<IEnumerable<AddressMongo>> GetByUserIdStringAsync(string userId)
+        public async Task<IEnumerable<AddressMongo>> GetByUserIdAsync(string userId)
         {
             return await _addresses
                 .Find(a => a.UserId == userId)
@@ -66,7 +66,7 @@ namespace ECommerceAPI.Infrastructure.Repositories.Implementations
 
         public async Task<IEnumerable<AddressMongo>> GetByUserIdAsync(int userId)
         {
-            return await GetByUserIdStringAsync(userId.ToString());
+            return await GetByUserIdAsync(userId.ToString());
         }
 
         public async Task<AddressMongo> AddAsync(AddressMongo address)
@@ -122,5 +122,10 @@ namespace ECommerceAPI.Infrastructure.Repositories.Implementations
 
             await _addresses.UpdateManyAsync(filter, update);
         }
+        public async Task<AddressMongo> GetBySqlIdAsync(int sqlId)
+        {
+            return await _addresses.Find(a => a.SqlId == sqlId).FirstOrDefaultAsync();
+        }
+
     }
 }

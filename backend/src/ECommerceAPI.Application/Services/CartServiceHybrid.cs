@@ -54,7 +54,7 @@ namespace ECommerceAPI.Application.Services
             // Try MongoDB first (handles both MongoDB ObjectId and SQL integer as string)
             if (_useMongo || !int.TryParse(userId, out _))
             {
-                var mongoCart = await _mongoRepository.GetByUserIdStringAsync(userId)
+                var mongoCart = await _mongoRepository.GetByUserIdAsync(userId)
                                 ?? await CreateEmptyMongoCart(userId);
                 return MapMongoToDto(mongoCart);
             }
@@ -87,7 +87,7 @@ namespace ECommerceAPI.Application.Services
                 if (!product.IsActive)
                     throw new InvalidOperationException($"Product is inactive: {productId}");
 
-                var cart = await _mongoRepository.GetByUserIdStringAsync(userId);
+                var cart = await _mongoRepository.GetByUserIdAsync(userId);
                 
                 // ✅ FIXED: If cart doesn't exist, create new one WITHOUT setting Id
                 if (cart == null)
@@ -174,7 +174,7 @@ namespace ECommerceAPI.Application.Services
             // Try MongoDB first
             if (_useMongo || !int.TryParse(userId, out _))
             {
-                var cart = await _mongoRepository.GetByUserIdStringAsync(userId)
+                var cart = await _mongoRepository.GetByUserIdAsync(userId)
                            ?? throw new KeyNotFoundException("Cart not found");
 
                 var item = cart.Items.FirstOrDefault(i => i.ProductId == productId)
@@ -223,7 +223,7 @@ namespace ECommerceAPI.Application.Services
             // Try MongoDB first
             if (_useMongo || !int.TryParse(userId, out _))
             {
-                var cart = await _mongoRepository.GetByUserIdStringAsync(userId)
+                var cart = await _mongoRepository.GetByUserIdAsync(userId)
                            ?? throw new KeyNotFoundException("Cart not found");
 
                 var item = cart.Items.FirstOrDefault(i => i.ProductId == productId)
@@ -262,7 +262,7 @@ namespace ECommerceAPI.Application.Services
             // Try MongoDB first
             if (_useMongo || !int.TryParse(userId, out _))
             {
-                var cart = await _mongoRepository.GetByUserIdStringAsync(userId);
+                var cart = await _mongoRepository.GetByUserIdAsync(userId);
                 if (cart == null) return;
 
                 cart.Items.Clear();

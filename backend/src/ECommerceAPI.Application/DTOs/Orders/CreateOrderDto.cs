@@ -1,4 +1,5 @@
- public class CreateOrderDto
+ /*public class CreateOrderDto
     {
-        public int ShippingAddressId { get; set; }
+        public string ShippingAddressId { get; set; } = string.Empty;
     }
+    */

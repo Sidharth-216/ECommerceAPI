@@ -53,7 +53,7 @@ namespace ECommerceAPI.Application.Services
                 OrderNumber = GenerateOrderNumber(),
                 TotalAmount = cart.CartItems.Sum(ci => ci.Product.Price * ci.Quantity),
                 Status = OrderStatus.Pending,
-                ShippingAddressId = createDto.ShippingAddressId,
+                ShippingAddressId = Convert.ToInt32(createDto.ShippingAddressId),
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -136,14 +136,14 @@ namespace ECommerceAPI.Application.Services
         {
             return new OrderDto
             {
-                Id = order.Id,
-                OrderNumber = order.OrderNumber,
+                Id = order.Id.ToString(),
+                OrderNumber = order.OrderNumber.ToString(),
                 TotalAmount = order.TotalAmount,
                 Status = order.Status.ToString(),
                 CreatedAt = order.CreatedAt,
                 Items = order.OrderItems?.Select(oi => new OrderItemDto
                 {
-                    ProductId = oi.ProductId,
+                    ProductId = oi.ProductId.ToString(),
                     ProductName = oi.Product?.Name,
                     Quantity = oi.Quantity,
                     Price = oi.Price

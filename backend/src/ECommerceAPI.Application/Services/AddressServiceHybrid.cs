@@ -73,7 +73,7 @@ namespace ECommerceAPI.Application.Services
 
         public async Task<List<AddressMongo>> GetAllByUserIdStringAsync(string userId)
         {
-            var addresses = await _mongoRepository.GetByUserIdStringAsync(userId);
+            var addresses = await _mongoRepository.GetByUserIdAsync(userId);
             return addresses.ToList();
         }
 

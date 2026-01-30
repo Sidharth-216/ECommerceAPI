@@ -8,7 +8,7 @@ namespace ECommerceAPI.Infrastructure.Repositories.Interfaces
     {
         // String UserId methods (MongoDB ObjectId)
         Task<AddressMongo> GetByIdAsync(string id);
-        Task<IEnumerable<AddressMongo>> GetByUserIdStringAsync(string userId);
+        Task<IEnumerable<AddressMongo>> GetByUserIdAsync(string userId);
         Task<AddressMongo> AddAsync(AddressMongo address);
         Task UpdateAsync(AddressMongo address);
         Task DeleteAsync(string id);
@@ -17,5 +17,8 @@ namespace ECommerceAPI.Infrastructure.Repositories.Interfaces
         
         // Legacy int UserId methods (backward compatibility)
         Task<IEnumerable<AddressMongo>> GetByUserIdAsync(int userId);
+        // Get address by old SQL ID (for migration/compatibility)
+        Task<AddressMongo> GetBySqlIdAsync(int sqlId);
+
     }
 }

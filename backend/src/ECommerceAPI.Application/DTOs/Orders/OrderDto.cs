@@ -5,7 +5,7 @@ namespace ECommerceAPI.Application.DTOs.Orders
 {
     public class OrderDto
     {
-        public int Id { get; set; }
+        public string Id { get; set; }   // ✅ string, not int
         public string OrderNumber { get; set; }
         public decimal TotalAmount { get; set; }
         public string Status { get; set; }
@@ -13,9 +13,10 @@ namespace ECommerceAPI.Application.DTOs.Orders
         public List<OrderItemDto> Items { get; set; }
     }
 
+
     public class OrderItemDto
     {
-        public int ProductId { get; set; }
+        public string ProductId { get; set; }   // ✅ string
         public string ProductName { get; set; }
         public int Quantity { get; set; }
         public decimal Price { get; set; }
@@ -23,6 +24,6 @@ namespace ECommerceAPI.Application.DTOs.Orders
 
     public class CreateOrderDto
     {
-        public int ShippingAddressId { get; set; }
+       public string ShippingAddressId { get; set; } = null!;
     }
 }

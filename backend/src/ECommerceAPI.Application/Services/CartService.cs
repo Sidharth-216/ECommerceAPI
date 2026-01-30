@@ -30,7 +30,7 @@ namespace ECommerceAPI.Application.Services
 
         public async Task<CartDto> GetCartByUserIdStringAsync(string userId)
         {
-            var cart = await _cartRepository.GetByUserIdStringAsync(userId);
+            var cart = await _cartRepository.GetByUserIdAsync(userId);
 
             if (cart == null)
             {
@@ -57,7 +57,7 @@ namespace ECommerceAPI.Application.Services
             if (product == null || !product.IsActive)
                 throw new KeyNotFoundException("Product not found");
 
-            var cart = await _cartRepository.GetByUserIdStringAsync(userId);
+            var cart = await _cartRepository.GetByUserIdAsync(userId);
 
             if (cart == null)
             {
@@ -98,7 +98,7 @@ namespace ECommerceAPI.Application.Services
             string productId,
             int quantity)
         {
-            var cart = await _cartRepository.GetByUserIdStringAsync(userId);
+            var cart = await _cartRepository.GetByUserIdAsync(userId);
             if (cart == null)
                 throw new KeyNotFoundException("Cart not found");
 
@@ -128,7 +128,7 @@ namespace ECommerceAPI.Application.Services
 
         public async Task RemoveFromCartByUserIdStringAsync(string userId, string productId)
         {
-            var cart = await _cartRepository.GetByUserIdStringAsync(userId);
+            var cart = await _cartRepository.GetByUserIdAsync(userId);
             if (cart == null) return;
 
             var item = cart.Items.FirstOrDefault(i => i.ProductId == productId);
@@ -140,7 +140,7 @@ namespace ECommerceAPI.Application.Services
 
         public async Task ClearCartByUserIdStringAsync(string userId)
         {
-            var cart = await _cartRepository.GetByUserIdStringAsync(userId);
+            var cart = await _cartRepository.GetByUserIdAsync(userId);
             if (cart == null) return;
 
             cart.Items.Clear();
