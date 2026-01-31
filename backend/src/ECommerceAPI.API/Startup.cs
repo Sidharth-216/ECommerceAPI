@@ -327,7 +327,6 @@ namespace ECommerceAPI.API
     }
 }
 */
-
 // ==================== Startup.cs ====================
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -483,6 +482,11 @@ namespace ECommerceAPI.API
             });
             // =========================================================================
 
+            // ========================= Email Settings Configuration =========================
+            // ✅ CRITICAL: Configure Email Settings for OTP emails
+            services.Configure<EmailSettings>(Configuration.GetSection("EmailSettings"));
+            // ================================================================================
+
             // ========================= SQL Repositories =========================
             // User Repository (SQL)
             services.AddScoped<IUserRepository, UserRepository>();
@@ -547,11 +551,11 @@ namespace ECommerceAPI.API
             // ================================================================
 
             // ========================= MongoDB Services =========================
-            // MongoDB OTP Service
-            services.AddScoped<IMongoOtpService, MongoOtpService>();
+            // ✅ MongoDB OTP Service - Use fully qualified namespace to avoid ambiguity
+            services.AddScoped<Application.Interfaces.IMongoOtpService, MongoOtpService>();
             
-            // MongoDB Email OTP Service
-            services.AddScoped<IMongoEmailOtpService, MongoEmailOtpService>();
+            // ✅ MongoDB Email OTP Service - Use fully qualified namespace to avoid ambiguity
+            services.AddScoped<Application.Interfaces.IMongoEmailOtpService, MongoEmailOtpService>();
             
             // MongoDB Auth Service
             services.AddScoped<MongoAuthService>();
@@ -580,6 +584,8 @@ namespace ECommerceAPI.API
             services.AddScoped<IRecommendationService, RecommendationService>();
             services.AddScoped<IPaymentService, PaymentService>();
             services.AddScoped<IAdminService, AdminService>();
+            
+            // ✅ Email Service - CRITICAL for sending OTP emails
             services.AddScoped<IEmailService, EmailService>();
             // ==================================================================
 

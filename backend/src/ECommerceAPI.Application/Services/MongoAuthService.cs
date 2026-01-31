@@ -5,6 +5,7 @@ using ECommerceAPI.Application.Interfaces;
 using ECommerceAPI.Application.Helpers;
 using ECommerceAPI.Domain.Entities.MongoDB;
 using ECommerceAPI.Infrastructure.Repositories.Interfaces;
+using ECommerceAPI.Application.Interfaces;
 
 namespace ECommerceAPI.Application.Services
 {

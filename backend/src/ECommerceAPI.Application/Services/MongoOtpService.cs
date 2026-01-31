@@ -3,19 +3,14 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using ECommerceAPI.Domain.Entities.MongoDB;
 using ECommerceAPI.Infrastructure.Repositories.Interfaces;
+using ECommerceAPI.Application.Interfaces; 
 
 namespace ECommerceAPI.Application.Services
 {
+    
     /// <summary>
     /// MongoDB OTP Service for Mobile OTP
     /// </summary>
-    public interface IMongoOtpService
-    {
-        Task<bool> GenerateAndSendOtpAsync(string mobile);
-        Task<bool> VerifyOtpAsync(string mobile, string otp);
-        Task<bool> IsOtpValidAsync(string mobile);
-    }
-
     public class MongoOtpService : IMongoOtpService
     {
         private readonly IMongoOtpRepository _otpRepository;
@@ -130,30 +125,27 @@ namespace ECommerceAPI.Application.Services
         }
     }
 
+
     /// <summary>
     /// MongoDB Email OTP Service
     /// </summary>
-    public interface IMongoEmailOtpService
-    {
-        Task<bool> GenerateAndSendOtpAsync(string email);
-        Task<bool> VerifyOtpAsync(string email, string otp);
-        Task<bool> IsOtpValidAsync(string email);
-    }
-
     public class MongoEmailOtpService : IMongoEmailOtpService
     {
         private readonly IMongoEmailOtpRepository _emailOtpRepository;
         private readonly ILogger<MongoEmailOtpService> _logger;
+        private readonly IEmailService _emailService; 
         private const int OTP_LENGTH = 6;
         private const int OTP_VALIDITY_MINUTES = 5;
         private const int MAX_ATTEMPTS = 3;
 
         public MongoEmailOtpService(
             IMongoEmailOtpRepository emailOtpRepository,
-            ILogger<MongoEmailOtpService> logger)
+            ILogger<MongoEmailOtpService> logger,
+            IEmailService emailService) 
         {
             _emailOtpRepository = emailOtpRepository;
             _logger = logger;
+            _emailService = emailService;
         }
 
         public async Task<bool> GenerateAndSendOtpAsync(string email)
@@ -177,14 +169,25 @@ namespace ECommerceAPI.Application.Services
 
                 await _emailOtpRepository.AddAsync(emailOtp);
 
+                var emailSent = await _emailService.SendOtpEmailAsync(
+                    email, 
+                    otpCode, 
+                    OTP_VALIDITY_MINUTES);
+
+                if (!emailSent)
+                {
+                    _logger.LogWarning($"Failed to send OTP email to {email}, but OTP was saved");
+                }
+
                 _logger.LogInformation($"Email OTP for {email}: {otpCode}");
 
                 Console.WriteLine($"═══════════════════════════════════");
                 Console.WriteLine($"📧 MongoDB Email OTP for {email}: {otpCode}");
                 Console.WriteLine($"⏰ Valid until: {emailOtp.ExpiresAt:HH:mm:ss}");
+                Console.WriteLine($"📨 Email Sent: {(emailSent ? "✅ YES" : "❌ NO")}"); 
                 Console.WriteLine($"═══════════════════════════════════");
 
-                return true;
+                return emailSent; // Return email sending status
             }
             catch (Exception ex)
             {

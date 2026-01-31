@@ -2,107 +2,105 @@ using System;
 using System.Net;
 using System.Net.Mail;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using ECommerceAPI.Application.Interfaces;
+using ECommerceAPI.Infrastructure.Configuration;
 
 namespace ECommerceAPI.Infrastructure.Services
 {
     /// <summary>
     /// Email Service Implementation using SMTP
-    /// Configure SMTP settings in appsettings.json
     /// </summary>
     public class EmailService : IEmailService
     {
-        private readonly IConfiguration _configuration;
-        private readonly string _smtpHost;
-        private readonly int _smtpPort;
-        private readonly string _smtpUsername;
-        private readonly string _smtpPassword;
-        private readonly string _fromEmail;
-        private readonly string _fromName;
-        private readonly bool _enableSsl;
+        private readonly EmailSettings _emailSettings;
+        private readonly ILogger<EmailService> _logger;
 
-        public EmailService(IConfiguration configuration)
+        public EmailService(
+            IOptions<EmailSettings> emailSettings,
+            ILogger<EmailService> logger)
         {
-            _configuration = configuration;
-            
-            // Load SMTP configuration from appsettings.json
-            _smtpHost = _configuration["EmailSettings:SmtpHost"] ?? "smtp.gmail.com";
-            _smtpPort = int.Parse(_configuration["EmailSettings:SmtpPort"] ?? "587");
-            _smtpUsername = _configuration["EmailSettings:SmtpUsername"] ?? "";
-            _smtpPassword = _configuration["EmailSettings:SmtpPassword"] ?? "";
-            _fromEmail = _configuration["EmailSettings:FromEmail"] ?? "";
-            _fromName = _configuration["EmailSettings:FromName"] ?? "ShopAI";
-            _enableSsl = bool.Parse(_configuration["EmailSettings:EnableSsl"] ?? "true");
+            _emailSettings = emailSettings.Value;
+            _logger = logger;
         }
 
         public async Task<bool> SendEmailAsync(string toEmail, string subject, string body)
         {
             try
             {
-                using (var client = new SmtpClient(_smtpHost, _smtpPort))
+                using var smtpClient = new SmtpClient(_emailSettings.SmtpHost)
                 {
-                    client.Credentials = new NetworkCredential(_smtpUsername, _smtpPassword);
-                    client.EnableSsl = _enableSsl;
+                    Port = int.Parse(_emailSettings.SmtpPort),
+                    Credentials = new NetworkCredential(
+                        _emailSettings.SmtpUsername,
+                        _emailSettings.SmtpPassword),
+                    EnableSsl = bool.Parse(_emailSettings.EnableSsl)
+                };
 
-                    var mailMessage = new MailMessage
-                    {
-                        From = new MailAddress(_fromEmail, _fromName),
-                        Subject = subject,
-                        Body = body,
-                        IsBodyHtml = true
-                    };
+                var mailMessage = new MailMessage
+                {
+                    From = new MailAddress(_emailSettings.FromEmail, _emailSettings.FromName),
+                    Subject = subject,
+                    Body = body,
+                    IsBodyHtml = true
+                };
+                mailMessage.To.Add(toEmail);
 
-                    mailMessage.To.Add(toEmail);
-
-                    await client.SendMailAsync(mailMessage);
-                    return true;
-                }
+                await smtpClient.SendMailAsync(mailMessage);
+                _logger.LogInformation($"Email sent successfully to {toEmail}");
+                return true;
             }
             catch (Exception ex)
             {
-                // Log error (inject ILogger if needed)
-                Console.WriteLine($"Error sending email: {ex.Message}");
+                _logger.LogError(ex, $"Failed to send email to {toEmail}");
                 return false;
             }
         }
 
-        public async Task<bool> SendEmailWithAttachmentAsync(
-            string toEmail, 
-            string subject, 
-            string body, 
-            string attachmentPath)
+        public async Task<bool> SendOtpEmailAsync(string toEmail, string otpCode, int validityMinutes)
         {
             try
             {
-                using (var client = new SmtpClient(_smtpHost, _smtpPort))
-                {
-                    client.Credentials = new NetworkCredential(_smtpUsername, _smtpPassword);
-                    client.EnableSsl = _enableSsl;
+                var subject = "Your OTP Code - ShopAI";
+                var body = $@"
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+        .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+        .otp-box {{ background-color: #f4f4f4; padding: 20px; text-align: center; border-radius: 5px; margin: 20px 0; }}
+        .otp-code {{ font-size: 32px; font-weight: bold; color: #007bff; letter-spacing: 5px; }}
+        .warning {{ color: #dc3545; font-size: 14px; margin-top: 20px; }}
+    </style>
+</head>
+<body>
+    <div class='container'>
+        <h2>Your OTP Code</h2>
+        <p>Hello,</p>
+        <p>You have requested an OTP for login. Please use the following code:</p>
+        
+        <div class='otp-box'>
+            <div class='otp-code'>{otpCode}</div>
+        </div>
+        
+        <p><strong>This code is valid for {validityMinutes} minutes.</strong></p>
+        
+        <div class='warning'>
+            <p>⚠️ If you didn't request this code, please ignore this email and ensure your account is secure.</p>
+        </div>
+        
+        <p>Thank you,<br>ShopAI Team</p>
+    </div>
+</body>
+</html>";
 
-                    var mailMessage = new MailMessage
-                    {
-                        From = new MailAddress(_fromEmail, _fromName),
-                        Subject = subject,
-                        Body = body,
-                        IsBodyHtml = true
-                    };
-
-                    mailMessage.To.Add(toEmail);
-
-                    if (!string.IsNullOrEmpty(attachmentPath) && System.IO.File.Exists(attachmentPath))
-                    {
-                        var attachment = new Attachment(attachmentPath);
-                        mailMessage.Attachments.Add(attachment);
-                    }
-
-                    await client.SendMailAsync(mailMessage);
-                    return true;
-                }
+                return await SendEmailAsync(toEmail, subject, body);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error sending email with attachment: {ex.Message}");
+                _logger.LogError(ex, $"Failed to send OTP email to {toEmail}");
                 return false;
             }
         }

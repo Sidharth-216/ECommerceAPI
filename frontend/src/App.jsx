@@ -2474,278 +2474,389 @@ const handleVerifyOTP = async () => {
 }
 
 
-  // Register Page
+  // Register Page - Professional & Clean Design
   if (!user && currentPage === 'register') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-600 via-blue-400 to-purple-500 flex items-center justify-center p-4 relative overflow-hidden">
-        {/* Background decorative elements */}
-        <div className="absolute top-0 left-0 w-96 h-96 bg-white/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
-        <div className="absolute bottom-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl translate-x-1/2 translate-y-1/2"></div>
-
-        <div className="max-w-md w-full relative z-10">
-          {/* Header Section */}
-          <div className="text-center mb-10">
-            <div className="inline-flex items-center gap-2 mb-4 bg-white/20 backdrop-blur-md px-6 py-3 rounded-full border border-white/30">
-              <ShoppingBag className="w-8 h-8 text-white" />
-              <h1 className="text-2xl font-bold text-white">ShopAI</h1>
+      <div className="min-h-screen bg-white">
+        {/* Header */}
+        <header className="border-b border-gray-200 sticky top-0 z-40 bg-white">
+          <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+            <button 
+              onClick={() => setCurrentPage('home')}
+              className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+            >
+              <div className="bg-blue-600 text-white font-bold px-2 py-1 rounded text-sm">
+                Shop
+              </div>
+              <span className="text-xl font-bold text-gray-900">AI</span>
+            </button>
+            <div className="text-sm text-gray-600">
+              Already have an account?{' '}
+              <button
+                onClick={() => setCurrentPage('login')}
+                className="text-blue-600 font-semibold hover:text-blue-700"
+              >
+                Sign in
+              </button>
             </div>
-            <p className="text-white/90 text-lg font-medium">Join our shopping community</p>
-            <p className="text-white/70 text-sm mt-2">Create your account to explore amazing deals</p>
           </div>
+        </header>
 
-          {/* Main Card */}
-          <div className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl p-8 border border-white/20">
-            <div className="mb-8">
-              <h2 className="text-3xl font-bold text-gray-900 mb-1">Sign Up</h2>
-              <div className="h-1 w-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full"></div>
-            </div>
-
-            {/* Error Alert */}
-            {error && (
-              <div className="bg-red-50 border-l-4 border-red-500 text-red-700 px-4 py-4 rounded-lg mb-6 flex items-start gap-3 animate-pulse">
-                <div className="w-1 h-1 bg-red-500 rounded-full mt-2"></div>
-                <p className="text-sm font-medium">{error}</p>
-              </div>
-            )}
-
-            <div className="space-y-5">
-              {/* Register As */}
+        <main className="max-w-6xl mx-auto px-6 py-12">
+          <div className="grid lg:grid-cols-2 gap-16 items-start">
+            {/* Left Column - Benefits */}
+            <section className="space-y-8 hidden lg:block">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-3">
-                  Register As
-                </label>
-                <div className="relative">
-                  <select
-                    value={loginRole}
-                    onChange={(e) => setLoginRole(e.target.value)}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300 bg-gray-50 hover:bg-white cursor-pointer text-gray-700 font-medium appearance-none"
-                  >
-                    <option value="Customer">👤 Customer</option>
-                    <option value="Admin">🏢 Admin</option>
-                  </select>
-                  <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
-                    </svg>
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">Create account</h1>
+                <p className="text-gray-600">Join millions of shoppers and enjoy exclusive deals</p>
+              </div>
+
+              <div className="space-y-6">
+                <div className="flex gap-4">
+                  <div className="text-2xl">🚚</div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900 mb-1">Fast & Free Shipping</h3>
+                    <p className="text-sm text-gray-600">Get your orders delivered quickly at no extra cost</p>
+                  </div>
+                </div>
+
+                <div className="flex gap-4">
+                  <div className="text-2xl">🔒</div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900 mb-1">Secure Payments</h3>
+                    <p className="text-sm text-gray-600">Your payment information is encrypted and safe</p>
+                  </div>
+                </div>
+
+                <div className="flex gap-4">
+                  <div className="text-2xl">↩️</div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900 mb-1">Easy Returns</h3>
+                    <p className="text-sm text-gray-600">Return or exchange items within 7 days hassle-free</p>
+                  </div>
+                </div>
+
+                <div className="flex gap-4">
+                  <div className="text-2xl">💳</div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900 mb-1">Flexible Payment Options</h3>
+                    <p className="text-sm text-gray-600">Pay with cards, UPI, wallets, or cash on delivery</p>
+                  </div>
+                </div>
+
+                <div className="flex gap-4">
+                  <div className="text-2xl">⭐</div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900 mb-1">Trusted Reviews</h3>
+                    <p className="text-sm text-gray-600">Read verified reviews from real buyers like you</p>
                   </div>
                 </div>
               </div>
 
-              {/* Full Name */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-3">
-                  Full Name
-                </label>
-                <div className="relative group">
-                  <User className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-400 w-5 h-5 group-focus-within:text-blue-600 transition-colors" />
-                  <input
-                    type="text"
-                    value={registerData.fullName}
-                    onChange={(e) => setRegisterData({ ...registerData, fullName: e.target.value })}
-                    className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300 bg-gray-50 focus:bg-white placeholder-gray-400"
-                    placeholder="John Doe"
-                  />
+              {/* Stats */}
+              <div className="grid grid-cols-3 gap-4 pt-6 border-t border-gray-200">
+                <div>
+                  <p className="text-2xl font-bold text-gray-900">10M+</p>
+                  <p className="text-xs text-gray-600 mt-1">Happy Customers</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-gray-900">50K+</p>
+                  <p className="text-xs text-gray-600 mt-1">Sellers</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-gray-900">1M+</p>
+                  <p className="text-xs text-gray-600 mt-1">Products</p>
                 </div>
               </div>
+            </section>
 
-              {/* Email */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-3">
-                  Email Address
-                </label>
-                <div className="relative group">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-400 w-5 h-5 group-focus-within:text-blue-600 transition-colors" />
-                  <input
-                    type="email"
-                    value={registerData.email}
-                    onChange={(e) => setRegisterData({ ...registerData, email: e.target.value })}
-                    className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300 bg-gray-50 focus:bg-white placeholder-gray-400"
-                    placeholder="you@example.com"
-                  />
-                </div>
-              </div>
-
- {/* Mobile */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-3">
-                  Mobile Number
-                </label>
-                <div className="relative group">
-                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-400 w-5 h-5 group-focus-within:text-blue-600 transition-colors" />
-                  <input
-                    type="tel"
-                    value={registerData.mobile}
-                    onChange={(e) => setRegisterData({ ...registerData, mobile: e.target.value })}
-                    className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300 bg-gray-50 focus:bg-white placeholder-gray-400"
-                    placeholder="+91 98765 43210"
-                  />
-                </div>
-              </div>
-
-              {/* Gender - NEW FIELD */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-3">
-                  Gender <span className="text-gray-400 text-xs font-normal">(Optional)</span>
-                </label>
-                <div className="relative">
-                  <select
-                    value={registerData.gender}
-                    onChange={(e) => setRegisterData({ ...registerData, gender: e.target.value })}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300 bg-gray-50 hover:bg-white cursor-pointer text-gray-700 font-medium appearance-none"
-                  >
-                    <option value="">Select Gender (Optional)</option>
-                    <option value="Male">👨 Male</option>
-                    <option value="Female">👩 Female</option>
-                    <option value="Other">🧑 Other</option>
-                    <option value="PreferNotToSay">🤐 Prefer Not to Say</option>
-                  </select>
-                  <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
-                    </svg>
+            {/* Right Column - Form */}
+            <section className="max-w-md w-full mx-auto lg:mx-0">
+              <div className="bg-white">
+                {/* Error Alert */}
+                {error && (
+                  <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg mb-6 text-sm">
+                    {error}
                   </div>
-                </div>
-              </div>
+                )}
 
-              {/* Password */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-3">
-                  Password
-                </label>
-                <div className="relative group">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-400 w-5 h-5 group-focus-within:text-blue-600 transition-colors" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={registerData.password}
-                    onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
-                    className="w-full pl-12 pr-12 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300 bg-gray-50 focus:bg-white placeholder-gray-400"
-                    placeholder="••••••••"
-                  />
+                <form onSubmit={(e) => { e.preventDefault(); handleRegister(); }} className="space-y-5">
+                  {/* Register As */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">
+                      Register as
+                    </label>
+                    <select
+                      value={loginRole}
+                      onChange={(e) => setLoginRole(e.target.value)}
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="Customer">Customer</option>
+                      <option value="Admin">Admin (Seller)</option>
+                    </select>
+                  </div>
+
+                  {/* Full Name */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">
+                      Full name
+                    </label>
+                    <input
+                      type="text"
+                      value={registerData.fullName}
+                      onChange={(e) => setRegisterData({ ...registerData, fullName: e.target.value })}
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="John Doe"
+                      required
+                    />
+                  </div>
+
+                  {/* Email */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">
+                      Email address
+                    </label>
+                    <input
+                      type="email"
+                      value={registerData.email}
+                      onChange={(e) => setRegisterData({ ...registerData, email: e.target.value })}
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="you@example.com"
+                      required
+                    />
+                    <p className="text-xs text-gray-500 mt-1">We'll send you a confirmation link</p>
+                  </div>
+
+                  {/* Mobile */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">
+                      Mobile number
+                    </label>
+                    <div className="flex gap-2">
+                      <select className="w-16 px-2 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option>+91</option>
+                      </select>
+                      <input
+                        type="tel"
+                        value={registerData.mobile}
+                        onChange={(e) => setRegisterData({ ...registerData, mobile: e.target.value })}
+                        className="flex-1 px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="9876543210"
+                        maxLength={10}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {/* Gender */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">
+                      Gender <span className="text-gray-400 font-normal">(Optional)</span>
+                    </label>
+                    <select
+                      value={registerData.gender}
+                      onChange={(e) => setRegisterData({ ...registerData, gender: e.target.value })}
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">Prefer not to say</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+
+                  {/* Password */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">
+                      Password
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        value={registerData.password}
+                        onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
+                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="At least 8 characters"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        {showPassword ? (
+                          <EyeOff className="w-4 h-4" />
+                        ) : (
+                          <Eye className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
+                    <ul className="text-xs text-gray-600 mt-2 space-y-1">
+                      <li>✓ At least 8 characters</li>
+                      <li>✓ Mix of uppercase and lowercase letters</li>
+                      <li>✓ At least one number</li>
+                    </ul>
+                  </div>
+
+                  {/* Confirm Password */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">
+                      Confirm password
+                    </label>
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={registerData.confirmPassword}
+                      onChange={(e) => setRegisterData({ ...registerData, confirmPassword: e.target.value })}
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Re-enter your password"
+                      required
+                    />
+                  </div>
+
+                  {/* Terms & Conditions */}
+                  <div className="flex items-start gap-3 py-2">
+                    <input
+                      type="checkbox"
+                      id="terms"
+                      className="w-4 h-4 border border-gray-300 rounded mt-0.5 accent-blue-600 cursor-pointer"
+                      required
+                    />
+                    <label htmlFor="terms" className="text-xs text-gray-600 cursor-pointer">
+                      I agree to the{' '}
+                      <button type="button" className="text-blue-600 hover:underline font-medium">
+                        Terms of Use
+                      </button>
+                      {' '}and{' '}
+                      <button type="button" className="text-blue-600 hover:underline font-medium">
+                        Privacy Policy
+                      </button>
+                    </label>
+                  </div>
+
+                  {/* Submit Button */}
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white py-2.5 rounded-lg font-semibold text-sm transition-colors mt-6"
+                  >
+                    {loading ? (
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Creating account...
+                      </div>
+                    ) : (
+                      'Create account'
+                    )}
+                  </button>
+                </form>
+
+                {/* Divider */}
+                <div className="flex items-center gap-3 my-6">
+                  <div className="flex-1 h-px bg-gray-200"></div>
+                  <span className="text-xs text-gray-500">or</span>
+                  <div className="flex-1 h-px bg-gray-200"></div>
+                </div>
+
+                {/* Social Sign Up */}
+                <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-blue-600 transition-colors"
+                    className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-900 hover:bg-gray-50 transition-colors"
                   >
-                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    Continue with Google
+                  </button>
+                  <button
+                    type="button"
+                    className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-900 hover:bg-gray-50 transition-colors"
+                  >
+                    Continue with Apple
                   </button>
                 </div>
-                <p className="text-xs text-gray-500 mt-2">At least 6 characters recommended</p>
-              </div>
 
-              {/* Confirm Password */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-3">
-                  Confirm Password
-                </label>
-                <div className="relative group">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-400 w-5 h-5 group-focus-within:text-blue-600 transition-colors" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={registerData.confirmPassword}
-                    onChange={(e) => setRegisterData({ ...registerData, confirmPassword: e.target.value })}
-                    onKeyDown={(e) => e.key === 'Enter' && handleRegister()}
-                    className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300 bg-gray-50 focus:bg-white placeholder-gray-400"
-                    placeholder="••••••••"
-                  />
+                {/* Footer */}
+                <div className="mt-8 pt-6 border-t border-gray-200">
+                  <p className="text-xs text-gray-600 text-center">
+                    By creating an account, you accept our Terms & Privacy Policy
+                  </p>
                 </div>
               </div>
+            </section>
+          </div>
+        </main>
 
-              {/* Terms & Conditions */}
-              <div className="flex items-center gap-3 pt-2">
-                <input
-                  type="checkbox"
-                  id="terms"
-                  className="w-5 h-5 border-2 border-gray-300 rounded-lg cursor-pointer accent-blue-600"
-                />
-                <label htmlFor="terms" className="text-sm text-gray-600 cursor-pointer">
-                  I agree to the <span className="text-blue-600 font-semibold hover:underline">Terms & Conditions</span>
-                </label>
+        {/* Mobile Benefits Section */}
+        <section className="lg:hidden bg-gray-50 mt-12 py-8 px-6">
+          <h2 className="font-bold text-gray-900 mb-6">Why shop with us?</h2>
+          <div className="space-y-4">
+            <div className="flex gap-3">
+              <span className="text-lg">✓</span>
+              <div>
+                <p className="text-sm font-medium text-gray-900">Free shipping on all orders</p>
               </div>
-
-              {/* Submit Button */}
-              <button
-                onClick={handleRegister}
-                disabled={loading}
-                className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-3 rounded-xl font-bold text-lg transition-all duration-300 transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl flex items-center justify-center gap-2 group"
-              >
-                {loading ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    Creating Account...
-                  </>
-                ) : (
-                  <>
-                    <span>Create Account</span>
-                    <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" />
-                    </svg>
-                  </>
-                )}
-              </button>
             </div>
-
-            {/* Sign In Link */}
-            <div className="mt-8 text-center">
-              <p className="text-gray-600 text-sm">
-                Already have an account?{' '}
-                <button
-                  onClick={() => setCurrentPage('login')}
-                  className="text-blue-600 hover:text-blue-700 font-bold transition-colors hover:underline"
-                >
-                  Sign In
-                </button>
-              </p>
+            <div className="flex gap-3">
+              <span className="text-lg">✓</span>
+              <div>
+                <p className="text-sm font-medium text-gray-900">7 days easy returns</p>
+              </div>
             </div>
-
-            {/* Divider */}
-            <div className="flex items-center gap-4 my-8">
-              <div className="flex-1 h-px bg-gray-200"></div>
-              <span className="text-gray-400 text-sm font-medium">Or continue as</span>
-              <div className="flex-1 h-px bg-gray-200"></div>
+            <div className="flex gap-3">
+              <span className="text-lg">✓</span>
+              <div>
+                <p className="text-sm font-medium text-gray-900">Secure checkout</p>
+              </div>
             </div>
-
-            {/* Social Login Buttons */}
-            <div className="grid grid-cols-2 gap-3">
-              <button className="py-3 px-4 border-2 border-gray-200 rounded-xl hover:border-blue-300 hover:bg-blue-50 transition-all duration-300 flex items-center justify-center gap-2 group">
-                <span className="text-xl">📧</span>
-                <span className="text-sm font-medium text-gray-600 group-hover:text-blue-600 transition-colors">Google</span>
-              </button>
-              <button className="py-3 px-4 border-2 border-gray-200 rounded-xl hover:border-blue-300 hover:bg-blue-50 transition-all duration-300 flex items-center justify-center gap-2 group">
-                <span className="text-xl">🔵</span>
-                <span className="text-sm font-medium text-gray-600 group-hover:text-blue-600 transition-colors">Apple</span>
-              </button>
+            <div className="flex gap-3">
+              <span className="text-lg">✓</span>
+              <div>
+                <p className="text-sm font-medium text-gray-900">24/7 customer support</p>
+              </div>
             </div>
           </div>
+        </section>
 
-          {/* Back to Home */}
-          <div className="text-center mt-8">
-            <button
-              onClick={() => setCurrentPage('home')}
-              className="text-white/80 hover:text-white transition-colors font-medium flex items-center justify-center gap-2 mx-auto group"
-            >
-              <svg className="w-5 h-5 group-hover:-translate-x-1 transition-transform" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" />
-              </svg>
-              Back to Home
-            </button>
+        {/* Footer */}
+        <footer className="border-t border-gray-200 mt-12 py-8 px-6 bg-white">
+          <div className="max-w-6xl mx-auto">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 mb-8">
+              <div>
+                <p className="text-xs font-semibold text-gray-900 uppercase tracking-wide mb-4">About</p>
+                <ul className="space-y-2 text-sm text-gray-600">
+                  <li><button className="hover:text-blue-600">About Us</button></li>
+                  <li><button className="hover:text-blue-600">Careers</button></li>
+                  <li><button className="hover:text-blue-600">Blog</button></li>
+                </ul>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-gray-900 uppercase tracking-wide mb-4">Help</p>
+                <ul className="space-y-2 text-sm text-gray-600">
+                  <li><button className="hover:text-blue-600">Contact Us</button></li>
+                  <li><button className="hover:text-blue-600">Track Order</button></li>
+                  <li><button className="hover:text-blue-600">Returns</button></li>
+                </ul>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-gray-900 uppercase tracking-wide mb-4">Policies</p>
+                <ul className="space-y-2 text-sm text-gray-600">
+                  <li><button className="hover:text-blue-600">Privacy Policy</button></li>
+                  <li><button className="hover:text-blue-600">Terms of Use</button></li>
+                  <li><button className="hover:text-blue-600">Cookies</button></li>
+                </ul>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-gray-900 uppercase tracking-wide mb-4">Follow Us</p>
+                <ul className="space-y-2 text-sm text-gray-600">
+                  <li><button className="hover:text-blue-600">Twitter</button></li>
+                  <li><button className="hover:text-blue-600">Facebook</button></li>
+                  <li><button className="hover:text-blue-600">Instagram</button></li>
+                </ul>
+              </div>
+            </div>
+            <div className="pt-6 border-t border-gray-200 text-xs text-gray-600 text-center">
+              <p>© 2024 ShopAI. All rights reserved.</p>
+            </div>
           </div>
-
-          {/* Trust Badges */}
-          <div className="mt-8 grid grid-cols-3 gap-3 text-center">
-            <div className="bg-white/20 backdrop-blur-md rounded-xl p-3 border border-white/30">
-              <div className="text-lg mb-1">🔒</div>
-              <p className="text-white/80 text-xs font-semibold">Secure</p>
-            </div>
-            <div className="bg-white/20 backdrop-blur-md rounded-xl p-3 border border-white/30">
-              <div className="text-lg mb-1">✅</div>
-              <p className="text-white/80 text-xs font-semibold">Verified</p>
-            </div>
-            <div className="bg-white/20 backdrop-blur-md rounded-xl p-3 border border-white/30">
-              <div className="text-lg mb-1">⚡</div>
-              <p className="text-white/80 text-xs font-semibold">Fast</p>
-            </div>
-          </div>
-        </div>
+        </footer>
       </div>
     );
   }

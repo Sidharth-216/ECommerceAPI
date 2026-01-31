@@ -1,3 +1,4 @@
+
 using System.Threading.Tasks;
 
 namespace ECommerceAPI.Application.Interfaces
@@ -18,8 +19,8 @@ namespace ECommerceAPI.Application.Interfaces
         Task<bool> SendEmailAsync(string toEmail, string subject, string body);
 
         /// <summary>
-        /// Send email with attachments
+        /// Send OTP email specifically
         /// </summary>
-        Task<bool> SendEmailWithAttachmentAsync(string toEmail, string subject, string body, string attachmentPath);
+        Task<bool> SendOtpEmailAsync(string toEmail, string otpCode, int validityMinutes);
     }
 }
