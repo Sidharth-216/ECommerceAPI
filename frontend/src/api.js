@@ -136,17 +136,37 @@ export const migrationAPI = {
 
 // ===================== PAYMENT API =====================
 export const paymentAPI = {
-  initiate: (orderId, paymentMethod) => 
-    api.post('/payment/initiate', { orderId, paymentMethod }),
-  verify: (razorpayOrderId, razorpayPaymentId, razorpaySignature, orderId) => 
-    api.post('/payment/verify', { 
+  // Initiate payment for MongoDB order
+  initiate: (orderId, paymentMethod) => {
+    if (!orderId) {
+      return Promise.reject(new Error('Order ID is required'));
+    }
+    console.log('💳 Payment API - Initiate:', { orderId, paymentMethod });
+    return api.post('/mongo/payment/initiate', { orderId, paymentMethod });
+  },
+  
+  // Verify Razorpay payment
+  verify: (razorpayOrderId, razorpayPaymentId, razorpaySignature, orderId) => {
+    if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
+      return Promise.reject(new Error('Payment verification details are required'));
+    }
+    console.log('✅ Payment API - Verify:', { orderId });
+    return api.post('/mongo/payment/verify', { 
       razorpayOrderId, 
       razorpayPaymentId, 
       razorpaySignature, 
       orderId 
-    }),
-  getStatus: (orderId) => 
-    api.get(`/payment/status/${orderId}`)
+    });
+  },
+  
+  // Get payment status for order
+  getStatus: (orderId) => {
+    if (!orderId) {
+      return Promise.reject(new Error('Order ID is required'));
+    }
+    console.log('📊 Payment API - Get Status:', orderId);
+    return api.get(`/mongo/payment/status/${orderId}`);
+  }
 };
 
 // ===================== ADDRESS API =====================

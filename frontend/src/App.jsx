@@ -67,6 +67,8 @@ const CompleteIntegratedApp = () => {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   const [searchQuery, setSearchQuery] = useState('');
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   
   // Shopping state
   const [products, setProducts] = useState([]);
@@ -82,7 +84,7 @@ const CompleteIntegratedApp = () => {
   const [addresses, setAddresses] = useState([]);
   const [loginRole, setLoginRole] = useState('Customer');
   const [editingId, setEditingId] = useState(null);
-  
+
   // Admin Dashboard hooks - moved to top level
   const [adminStats, setAdminStats] = useState([]);
   const [adminCustomers, setAdminCustomers] = useState([]);
@@ -1241,6 +1243,30 @@ const updateCartQuantity = async (productId, quantity) => {
     console.groupEnd();
   }
 };
+useEffect(() => {
+  if (!searchQuery.trim()) {
+    setSuggestions([]);
+    setShowSuggestions(false);
+    return;
+  }
+
+  const q = searchQuery.toLowerCase();
+
+  const matched = (products || [])
+    .filter(p => {
+      if (!p) return false;
+      return (
+        (p.name && typeof p.name === 'string' && p.name.toLowerCase().includes(q)) ||
+        (p.brand && typeof p.brand === 'string' && p.brand.toLowerCase().includes(q)) ||
+        (p.category && typeof p.category === 'string' && p.category.toLowerCase().includes(q)) ||
+        (p.categoryName && typeof p.categoryName === 'string' && p.categoryName.toLowerCase().includes(q))
+      );
+    })
+    .slice(0, 8);
+
+  setSuggestions(matched);
+  setShowSuggestions(true);
+}, [searchQuery, products]);
 
 // ✅ UPDATED: Remove from cart with proper logging
 const removeFromCart = async (productId) => {
@@ -2917,16 +2943,58 @@ const handleVerifyOTP = async () => {
                             </div>
                           </div>
 
-                          <div className="hidden sm:flex items-center gap-3 bg-gradient-to-r from-gray-50 to-gray-100 rounded-full px-4 py-2.5 border border-gray-200 shadow-sm flex-1 max-w-md group hover:shadow-md transition-shadow">
-                            <Search className="w-5 h-5 text-gray-400 group-hover:text-blue-500 transition-colors" />
-                            <input
-                              aria-label="Search products"
-                              value={searchQuery}
-                              onChange={(e) => setSearchQuery(e.target.value)}
-                              placeholder="Search products, brands, categories..."
-                              className="bg-transparent outline-none text-sm w-full placeholder-gray-400"
-                            />
+                          <div className="relative hidden sm:flex flex-1 max-w-md">
+                            <div className="flex items-center gap-3 bg-gradient-to-r from-gray-50 to-gray-100 rounded-full px-4 py-2.5 border border-gray-200 w-full">
+                              <Search className="w-5 h-5 text-gray-400" />
+                              <input
+                                value={searchQuery}
+                                onChange={(e) => {
+                                  setSearchQuery(e.target.value);
+                                  setShowSuggestions(true);
+                                }}
+                                onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                                onFocus={() => setShowSuggestions(true)}
+                                placeholder="Search products, brands, categories..."
+                                className="bg-transparent outline-none text-sm w-full"
+                              />
+                            </div>
+
+                            {/* Suggestions Dropdown */}
+                            {showSuggestions && searchQuery.trim() && suggestions.length > 0 && (
+                              <div className="absolute top-full mt-2 w-full bg-white rounded-xl shadow-2xl border border-gray-200 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                                <div className="p-2 bg-gray-50 border-b border-gray-100">
+                                  <p className="text-xs font-semibold text-gray-600 px-2">
+                                    {suggestions.length} Result{suggestions.length !== 1 ? 's' : ''} Found
+                                  </p>
+                                </div>
+                                <div className="max-h-96 overflow-y-auto">
+                                  {suggestions.map((item, idx) => (
+                                    <div
+                                      key={item.id || idx}
+                                      onMouseDown={() => {
+                                        setSearchQuery(item.name);
+                                        setShowSuggestions(false);
+                                      }}
+                                      className="px-4 py-3 cursor-pointer hover:bg-blue-50 transition-colors flex justify-between items-center border-b border-gray-100 last:border-b-0"
+                                    >
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold text-gray-900 truncate">
+                                          {item.name}
+                                        </p>
+                                        <p className="text-xs text-gray-500 truncate">
+                                          {item.brand || item.category || 'Product'}
+                                        </p>
+                                      </div>
+                                      <span className="text-xs text-blue-600 font-bold ml-2 flex-shrink-0">
+                                        ₹{item.price?.toLocaleString() || '0'}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
+
 
                           <div className="flex items-center gap-2 sm:gap-3">
                             <button 

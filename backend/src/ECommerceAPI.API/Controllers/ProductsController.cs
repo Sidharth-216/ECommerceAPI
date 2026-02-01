@@ -115,5 +115,18 @@ namespace ECommerceAPI.API.Controllers
             
             return NoContent();
         }
+        /// <summary>
+        /// Auto-suggest products (Amazon / Flipkart style)
+        /// </summary>
+
+        [HttpGet("suggest")]
+        public async Task<ActionResult<IEnumerable<ProductSuggestionDto>>> Suggest(
+            [FromQuery] string q)
+        {
+            var result = await _productService.GetSuggestionsAsync(q);
+            return Ok(result);
+        }
+
+
     }
 }

@@ -14,5 +14,7 @@ namespace ECommerceAPI.Infrastructure.Repositories.Interfaces
         Task<ProductMongo> AddAsync(ProductMongo product);
         Task<bool> UpdateAsync(string id, ProductMongo product);
         Task<bool> DeleteAsync(string id);
+        Task<IEnumerable<ProductMongo>> GetSuggestionsAsync(string query);
+
     }
 }

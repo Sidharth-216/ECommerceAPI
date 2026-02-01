@@ -103,6 +103,12 @@ namespace ECommerceAPI.Application.Services
             return product != null && product.StockQuantity >= quantity;
         }
 
+        public async Task<IEnumerable<ProductSuggestionDto>> GetSuggestionsAsync(string query)
+        {
+            var products = await _productRepository.SearchAsync(query, null, null, null, null);
+            return products.Select(p => new ProductSuggestionDto { Id = p.Id.ToString(), Name = p.Name }).Distinct();
+        }
+
         private ProductDto MapToDto(Product product)
         {
             return new ProductDto

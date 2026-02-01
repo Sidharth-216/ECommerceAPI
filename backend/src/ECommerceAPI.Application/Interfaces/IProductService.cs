@@ -17,5 +17,7 @@ namespace ECommerceAPI.Application.Interfaces
         Task<ProductDto> UpdateProductAsync(int id, ProductCreateDto updateDto);
         Task<bool> DeleteProductAsync(int id);
         Task<bool> CheckStockAvailabilityAsync(int productId, int quantity);
+        Task<IEnumerable<ProductSuggestionDto>> GetSuggestionsAsync(string query);
+
     }
 }

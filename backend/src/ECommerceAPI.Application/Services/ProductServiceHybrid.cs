@@ -395,5 +395,25 @@ namespace ECommerceAPI.Application.Services
                 return new MongoDB.Bson.BsonDocument { { "raw", specs } };
             }
         }
+        public async Task<IEnumerable<ProductSuggestionDto>> GetSuggestionsAsync(string query)
+        {
+            if (string.IsNullOrWhiteSpace(query))
+                return Enumerable.Empty<ProductSuggestionDto>();
+
+            query = query.Trim();
+
+            // 🔥 Autosuggest should ALWAYS use Mongo (fast, text-based)
+            var products = await _mongoRepository.GetSuggestionsAsync(query);
+
+            return products.Select(p => new ProductSuggestionDto
+            {
+                Id = p.Id,
+                Name = p.Name,
+                Brand = p.Brand,
+                Category = p.Category?.Name,
+                Price = p.Price
+            });
+        }
+
     }
 }

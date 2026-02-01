@@ -1,4 +1,5 @@
 using MongoDB.Driver;
+using MongoDB.Bson;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
@@ -138,6 +139,22 @@ namespace ECommerceAPI.Infrastructure.Repositories.Implementations
                 update);
             
             return result.ModifiedCount > 0;
+        }
+        public async Task<IEnumerable<ProductMongo>> GetSuggestionsAsync(string query)
+        {
+            var filter = Builders<ProductMongo>.Filter.And(
+                    Builders<ProductMongo>.Filter.Eq(p => p.IsActive, true),
+                    Builders<ProductMongo>.Filter.Or(
+                        Builders<ProductMongo>.Filter.Regex(p => p.Name, new BsonRegularExpression(query, "i")),
+                        Builders<ProductMongo>.Filter.Regex(p => p.Brand, new BsonRegularExpression(query, "i")),
+                        Builders<ProductMongo>.Filter.Regex("category.name", new BsonRegularExpression(query, "i"))
+                    )
+                );
+
+            return await _products
+                .Find(filter)
+                .Limit(8)
+                .ToListAsync();
         }
     }
 }
