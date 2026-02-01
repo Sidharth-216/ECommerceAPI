@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { ordersAPI, adminAPI } from './api';
+import { ordersAPI, adminAPI } from '../../api';
 import {
 Package,
 Search,
-Filter,
 Download,
 Eye,
 Check,
@@ -11,13 +10,11 @@ X,
 Clock,
 Truck,
 MapPin,
-CreditCard,
 Calendar,
-ChevronDown,
 AlertCircle
 } from 'lucide-react';
 
-const OrdersTab = ({ orders = [], loading, setLoading, setError, setCurrentPage }) => {
+const OrdersTab = ({ orders = [], loading, setLoading, setError }) => {
 const [filteredOrders, setFilteredOrders] = useState(orders);
 const [searchQuery, setSearchQuery] = useState('');
 const [statusFilter, setStatusFilter] = useState('All');
