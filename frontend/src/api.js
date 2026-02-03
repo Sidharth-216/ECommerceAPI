@@ -368,9 +368,9 @@ export const inventoryAPI = {
   checkAvailability: (productId, quantity) => 
     api.get('/inventory/check', { params: { productId, quantity } })
 };
-
-// ===================== ADMIN API =====================
+// ===================== ADMIN API (UPDATED FOR MONGODB) =====================
 export const adminAPI = {
+  // Original SQL endpoints (keep for backward compatibility)
   fetchUserDetails: (userId) => api.get(`/admin/users/${userId}`).then(r => r.data),
   getStockAnalysis: () => api.get('/admin/inventory/analysis'),
   getLowStockProducts: () => api.get('/admin/inventory/low-stock'),
@@ -396,7 +396,154 @@ export const adminAPI = {
   updateProduct: (id, data) => api.put(`/products/${id}`, data),
   deleteProduct: (id) => api.delete(`/products/${id}`)
 };
-
+// ===================== MONGODB ADMIN API (COMPLETE) =====================
+export const mongoAdminAPI = {
+  // ===== USER MANAGEMENT =====
+  
+  /**
+   * Get all users from MongoDB
+   * GET /api/mongo/admin/users
+   */
+  getUsers: () => {
+    console.log('👥 MongoDB Admin API - Get All Users');
+    return api.get('/mongo/admin/users');
+  },
+  
+  /**
+   * Get user by MongoDB ID
+   * GET /api/mongo/admin/users/{mongoId}
+   */
+  getUserById: (mongoId) => {
+    if (!mongoId || !isValidMongoId(mongoId)) {
+      return Promise.reject(new Error('Valid MongoDB User ID is required'));
+    }
+    console.log('👤 MongoDB Admin API - Get User:', mongoId);
+    return api.get(`/mongo/admin/users/${mongoId}`);
+  },
+  
+  // ===== ORDER MANAGEMENT =====
+  
+  /**
+   * Get all orders from MongoDB
+   * GET /api/mongo/admin/orders
+   */
+  getOrders: () => {
+    console.log('📦 MongoDB Admin API - Get All Orders');
+    return api.get('/mongo/admin/orders');
+  },
+  
+  /**
+   * Get order statistics
+   * GET /api/mongo/admin/order-stats
+   */
+  getOrderStats: () => {
+    console.log('📊 MongoDB Admin API - Get Order Stats');
+    return api.get('/mongo/admin/order-stats');
+  },
+  
+  // ===== SALES & REVENUE REPORTS =====
+  
+  /**
+   * Get sales report
+   * GET /api/mongo/admin/sales-report
+   */
+  getSalesReport: (startDate, endDate) => {
+    console.log('📊 MongoDB Admin API - Get Sales Report:', { startDate, endDate });
+    return api.get('/mongo/admin/sales-report', { 
+      params: { startDate, endDate } 
+    });
+  },
+  
+  /**
+   * Get revenue analytics
+   * GET /api/mongo/admin/revenue
+   */
+  getRevenue: (startDate, endDate) => {
+    console.log('💰 MongoDB Admin API - Get Revenue:', { startDate, endDate });
+    return api.get('/mongo/admin/revenue', { 
+      params: { startDate, endDate } 
+    });
+  },
+  
+  /**
+   * Get sales by category
+   * GET /api/mongo/admin/sales-by-category
+   */
+  getSalesByCategory: (startDate, endDate) => {
+    console.log('📊 MongoDB Admin API - Get Sales By Category:', { startDate, endDate });
+    return api.get('/mongo/admin/sales-by-category', { 
+      params: { startDate, endDate } 
+    });
+  },
+  
+  /**
+   * Get sales by product
+   * GET /api/mongo/admin/sales-by-product
+   */
+  getSalesByProduct: (startDate, endDate) => {
+    console.log('📦 MongoDB Admin API - Get Sales By Product:', { startDate, endDate });
+    return api.get('/mongo/admin/sales-by-product', { 
+      params: { startDate, endDate } 
+    });
+  },
+  
+  /**
+   * Get top selling products
+   * GET /api/mongo/admin/top-products
+   */
+  getTopProducts: (limit = 10) => {
+    console.log('🏆 MongoDB Admin API - Get Top Products:', { limit });
+    return api.get('/mongo/admin/top-products', { 
+      params: { limit } 
+    });
+  },
+  
+  // ===== STOCK & INVENTORY =====
+  
+  /**
+   * Get stock analysis
+   * GET /api/mongo/admin/stock-analysis
+   */
+  getStockAnalysis: () => {
+    console.log('📈 MongoDB Admin API - Get Stock Analysis');
+    return api.get('/mongo/admin/stock-analysis');
+  },
+  
+  // ===== CUSTOMER ANALYTICS =====
+  
+  /**
+   * Get customer insights
+   * GET /api/mongo/admin/customer-insights
+   */
+  getCustomerInsights: () => {
+    console.log('👥 MongoDB Admin API - Get Customer Insights');
+    return api.get('/mongo/admin/customer-insights');
+  },
+  
+  // ===== METRICS & ANALYTICS =====
+  
+  /**
+   * Get daily metrics
+   * GET /api/mongo/admin/daily-metrics
+   */
+  getDailyMetrics: (startDate, endDate) => {
+    console.log('📅 MongoDB Admin API - Get Daily Metrics:', { startDate, endDate });
+    return api.get('/mongo/admin/daily-metrics', { 
+      params: { startDate, endDate } 
+    });
+  },
+  
+  // ===== DASHBOARD =====
+  
+  /**
+   * Get admin dashboard summary
+   * GET /api/mongo/admin/dashboard
+   */
+  getDashboard: () => {
+    console.log('🎯 MongoDB Admin API - Get Dashboard');
+    return api.get('/mongo/admin/dashboard');
+  }
+}
 // ===================== VALIDATION HELPER =====================
 /**
  * Validate MongoDB ObjectId format

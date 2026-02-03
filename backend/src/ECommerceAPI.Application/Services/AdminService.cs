@@ -71,9 +71,9 @@ namespace ECommerceAPI.Application.Services
 
             var lowStockItems = productList
                 .Where(p => p.StockQuantity < 10)
-                .Select(p => new ProductStockInfo
+                .Select(p => new LowStockProductDto
                 {
-                    ProductId = p.Id,
+                    ProductId = p.Id.ToString(),
                     ProductName = p.Name,
                     CurrentStock = p.StockQuantity
                 })
