@@ -396,8 +396,8 @@ export const adminAPI = {
   updateProduct: (id, data) => api.put(`/products/${id}`, data),
   deleteProduct: (id) => api.delete(`/products/${id}`)
 };
-// ===================== MONGODB ADMIN API (COMPLETE) =====================
-export const mongoAdminAPI = {
+// ===== COMPLETE MONGODB ADMIN API (Updated Version) =====
+export const mongoAdminAPIComplete = {
   // ===== USER MANAGEMENT =====
   
   /**
@@ -421,6 +421,18 @@ export const mongoAdminAPI = {
     return api.get(`/mongo/admin/users/${mongoId}`);
   },
   
+  /**
+   * Delete user by MongoDB ID
+   * DELETE /api/mongo/admin/users/{mongoId}
+   */
+  deleteUser: (mongoId) => {
+    if (!mongoId || !isValidMongoId(mongoId)) {
+      return Promise.reject(new Error('Valid MongoDB User ID is required'));
+    }
+    console.log('🗑️ MongoDB Admin API - Delete User:', mongoId);
+    return api.delete(`/mongo/admin/users/${mongoId}`);
+  },
+  
   // ===== ORDER MANAGEMENT =====
   
   /**
@@ -439,6 +451,18 @@ export const mongoAdminAPI = {
   getOrderStats: () => {
     console.log('📊 MongoDB Admin API - Get Order Stats');
     return api.get('/mongo/admin/order-stats');
+  },
+
+  /**
+   * Update order status
+   * PUT /api/mongo/admin/orders/{orderId}/status
+   */
+  updateOrderStatus: (orderId, statusData) => {
+    if (!orderId) {
+      return Promise.reject(new Error('Order ID is required'));
+    }
+    console.log('✏️ MongoDB Admin API - Update Order Status:', { orderId, statusData });
+    return api.put(`/mongo/admin/orders/${orderId}/status`, statusData);
   },
   
   // ===== SALES & REVENUE REPORTS =====
@@ -508,6 +532,48 @@ export const mongoAdminAPI = {
     console.log('📈 MongoDB Admin API - Get Stock Analysis');
     return api.get('/mongo/admin/stock-analysis');
   },
+
+  /**
+   * Get all products (uses existing products endpoint)
+   * GET /api/products
+   */
+  getProducts: () => {
+    console.log('📦 MongoDB Admin API - Get All Products');
+    return api.get('/products');
+  },
+
+  /**
+   * Add new product
+   * POST /api/products
+   */
+  addProduct: (productData) => {
+    console.log('➕ MongoDB Admin API - Add Product:', productData);
+    return api.post('/products', productData);
+  },
+
+  /**
+   * Update product
+   * PUT /api/products/{id}
+   */
+  updateProduct: (productId, productData) => {
+    if (!productId) {
+      return Promise.reject(new Error('Product ID is required'));
+    }
+    console.log('✏️ MongoDB Admin API - Update Product:', { productId, productData });
+    return api.put(`/products/${productId}`, productData);
+  },
+
+  /**
+   * Delete product
+   * DELETE /api/products/{id}
+   */
+  deleteProduct: (productId) => {
+    if (!productId) {
+      return Promise.reject(new Error('Product ID is required'));
+    }
+    console.log('🗑️ MongoDB Admin API - Delete Product:', productId);
+    return api.delete(`/products/${productId}`);
+  },
   
   // ===== CUSTOMER ANALYTICS =====
   
@@ -543,7 +609,8 @@ export const mongoAdminAPI = {
     console.log('🎯 MongoDB Admin API - Get Dashboard');
     return api.get('/mongo/admin/dashboard');
   }
-}
+};
+
 // ===================== VALIDATION HELPER =====================
 /**
  * Validate MongoDB ObjectId format
