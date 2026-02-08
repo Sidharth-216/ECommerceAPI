@@ -247,7 +247,7 @@ Status: ${customer.isActive ? 'Active' : 'Inactive'}
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {filteredCustomers.map((customer) => (
-                  <tr key={customer.id || customer.userId} className="hover:bg-blue-50 transition-colors">
+                  <tr key={customer._id || customer.id} className="hover:bg-blue-50 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold">
@@ -258,7 +258,7 @@ Status: ${customer.isActive ? 'Active' : 'Inactive'}
                             {customer.fullName || customer.name || 'Unnamed Customer'}
                           </div>
                           <div className="text-xs text-gray-500">
-                            ID: {customer.id || customer.userId || 'N/A'}
+                            ID: {customer._id || customer.id || 'N/A'}
                           </div>
                         </div>
                       </div>
@@ -318,7 +318,7 @@ Status: ${customer.isActive ? 'Active' : 'Inactive'}
                         </button>
                         <button
                           onClick={() => deleteCustomer(
-                            customer.id || customer.userId,
+                            customer._id || customer.id,
                             customer.fullName || customer.name || 'Customer'
                           )}
                           disabled={loading}

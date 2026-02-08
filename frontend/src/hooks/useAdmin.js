@@ -24,20 +24,12 @@ export const useAdmin = () => {
     try {
       console.log('🚀 [useAdmin] Fetching admin data from MongoDB...');
 
-      const [customersRes, ordersRes, productsRes] = await Promise.all([
-        mongoAdminAPI.getUsers().catch((err) => {
-          console.error('❌ Failed to fetch users:', err);
-          return { data: [] };
-        }),
-        mongoAdminAPI.getOrders().catch((err) => {
-          console.error('❌ Failed to fetch orders:', err);
-          return { data: [] };
-        }),
-        mongoAdminAPI.getProducts?.().catch((err) => {
-          console.error('❌ Failed to fetch products:', err);
-          return { data: [] };
-        }) || { data: [] }
-      ]);
+    const [customersRes, ordersRes, productsRes] = await Promise.all([
+      mongoAdminAPI.getUsers(),
+      mongoAdminAPI.getOrders(),
+      mongoAdminAPI.getProducts()
+    ]);
+
 
       console.log('📦 Raw API Responses:', {
         customers: customersRes,
@@ -368,5 +360,4 @@ export const useAdmin = () => {
     setSalesReport
   };
 };
-
 export default useAdmin;

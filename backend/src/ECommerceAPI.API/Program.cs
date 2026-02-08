@@ -90,7 +90,7 @@ namespace ECommerceAPI.API
 {
     public class Program
     {
-        public static void Main(string[] args)
+        public static async Task Main(string[] args)
         {
             // 🔥 IMPORTANT: Disable default inbound claim mapping
             JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
@@ -130,28 +130,30 @@ namespace ECommerceAPI.API
                     
                     Console.WriteLine("✅ MongoDB Atlas Connected Successfully!");
                     Console.WriteLine($"   Ping Response: {result.ToJson()}");
+                    await MongoAdminSeeder.SeedAdminAsync(mongoClient.GetDatabase("admin"));
+                    await MongoAdminSeeder.SeedAdminAsync(mongoClient.GetDatabase("ECommerceDB"));
+
+                    // =====================================================
+                    // Test MongoDB Order Repository (Optional)
+                    // =====================================================
+                    try
+                    {
+                        var mongoOrderRepo = services.GetService<ECommerceAPI.Infrastructure.Repositories.Interfaces.IMongoOrderRepository>();
+                        if (mongoOrderRepo != null)
+                        {
+                            Console.WriteLine("✅ MongoDB Order Repository Initialized Successfully!");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogWarning(ex, "⚠️ MongoDB Order Repository initialization warning");
+                    }
                 }
                 catch (Exception ex)
                 {
                     logger.LogError(ex, "❌ MongoDB Connection Failed!");
                     Console.WriteLine("❌ MongoDB Connection Failed: " + ex.Message);
                     Console.WriteLine("   Please check your MongoDB connection string in appsettings.json");
-                }
-
-                // =====================================================
-                // Test MongoDB Order Repository (Optional)
-                // =====================================================
-                try
-                {
-                    var mongoOrderRepo = services.GetService<ECommerceAPI.Infrastructure.Repositories.Interfaces.IMongoOrderRepository>();
-                    if (mongoOrderRepo != null)
-                    {
-                        Console.WriteLine("✅ MongoDB Order Repository Initialized Successfully!");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    logger.LogWarning(ex, "⚠️ MongoDB Order Repository initialization warning");
                 }
             }
 

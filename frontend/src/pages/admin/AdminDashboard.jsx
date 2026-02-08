@@ -22,45 +22,45 @@ const AdminDashboard = (props) => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
-      {/* Header */}
-      <header className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white shadow-2xl sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="bg-white/10 backdrop-blur-md p-3 rounded-xl border border-white/20">
-              <ShoppingBag className="w-8 h-8" />
+      /* Header */
+        <header className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white shadow-2xl sticky top-0 z-50">
+          <div className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+          <div className="bg-white/10 backdrop-blur-md p-3 rounded-xl border border-white/20">
+            <ShoppingBag className="w-8 h-8" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold">ShopAI Admin Console</h1>
+            <p className="text-sm text-blue-100">Manage products, customers, orders & analytics</p>
+          </div>
             </div>
-            <div>
-              <h1 className="text-2xl font-bold">ShopAI Admin Console</h1>
-              <p className="text-sm text-blue-100">Manage products, customers, orders & analytics</p>
-            </div>
+
+            <div className="flex items-center gap-4">
+          <div className="text-right hidden md:block">
+            <p className="text-sm font-semibold">{user?.fullName || user?.name || 'Admin User'}</p>
+            <p className="text-xs text-blue-100">{user?.role || 'Administrator'}</p>
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className="text-right hidden md:block">
-              <p className="text-sm font-semibold">{user?.name || 'Admin User'}</p>
-              <p className="text-xs text-blue-100">{user?.role || 'Administrator'}</p>
+          <button
+            onClick={() => setCurrentPage('products')}
+            className="hidden sm:flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-md px-4 py-2.5 rounded-xl text-sm font-semibold transition-all border border-white/20"
+          >
+            <Package className="w-4 h-4" />
+            View Store
+          </button>
+
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-2 bg-white text-red-600 hover:bg-red-50 px-4 py-2.5 rounded-xl text-sm font-bold transition-all shadow-lg hover:shadow-xl"
+          >
+            <LogOut className="w-4 h-4" />
+            <span className="hidden sm:inline">Logout</span>
+          </button>
             </div>
-
-            <button
-              onClick={() => setCurrentPage('products')}
-              className="hidden sm:flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-md px-4 py-2.5 rounded-xl text-sm font-semibold transition-all border border-white/20"
-            >
-              <Package className="w-4 h-4" />
-              View Store
-            </button>
-
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-2 bg-white text-red-600 hover:bg-red-50 px-4 py-2.5 rounded-xl text-sm font-bold transition-all shadow-lg hover:shadow-xl"
-            >
-              <LogOut className="w-4 h-4" />
-              <span className="hidden sm:inline">Logout</span>
-            </button>
           </div>
-        </div>
-      </header>
+        </header>
 
-      {/* Tabs Navigation */}
+        {/* Tabs Navigation */}
       <div className="bg-white border-b border-gray-200 sticky top-[88px] z-40 shadow-sm">
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex gap-2 overflow-x-auto scrollbar-hide">
