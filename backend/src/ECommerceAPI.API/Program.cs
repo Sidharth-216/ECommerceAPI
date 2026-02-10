@@ -130,7 +130,6 @@ namespace ECommerceAPI.API
                     
                     Console.WriteLine("✅ MongoDB Atlas Connected Successfully!");
                     Console.WriteLine($"   Ping Response: {result.ToJson()}");
-                    await MongoAdminSeeder.SeedAdminAsync(mongoClient.GetDatabase("admin"));
                     await MongoAdminSeeder.SeedAdminAsync(mongoClient.GetDatabase("ECommerceDB"));
 
                     // =====================================================
