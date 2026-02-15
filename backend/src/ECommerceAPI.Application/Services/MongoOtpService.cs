@@ -3,11 +3,10 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using ECommerceAPI.Domain.Entities.MongoDB;
 using ECommerceAPI.Infrastructure.Repositories.Interfaces;
-using ECommerceAPI.Application.Interfaces; 
+using ECommerceAPI.Application.Interfaces;
 
 namespace ECommerceAPI.Application.Services
 {
-    
     /// <summary>
     /// MongoDB OTP Service for Mobile OTP
     /// </summary>
@@ -15,6 +14,7 @@ namespace ECommerceAPI.Application.Services
     {
         private readonly IMongoOtpRepository _otpRepository;
         private readonly ILogger<MongoOtpService> _logger;
+
         private const int OTP_LENGTH = 6;
         private const int OTP_VALIDITY_MINUTES = 5;
         private const int MAX_ATTEMPTS = 3;
@@ -31,8 +31,7 @@ namespace ECommerceAPI.Application.Services
             {
                 await _otpRepository.InvalidateExistingOtpsAsync(mobile);
 
-                var random = new Random();
-                var otpCode = random.Next(100000, 999999).ToString();
+                var otpCode = new Random().Next(100000, 999999).ToString();
 
                 var otp = new MongoOtp
                 {
@@ -48,10 +47,7 @@ namespace ECommerceAPI.Application.Services
 
                 _logger.LogInformation($"OTP for {mobile}: {otpCode} (Valid for {OTP_VALIDITY_MINUTES} minutes)");
 
-                Console.WriteLine($"═══════════════════════════════════");
-                Console.WriteLine($"📱 MongoDB OTP for {mobile}: {otpCode}");
-                Console.WriteLine($"⏰ Valid until: {otp.ExpiresAt:HH:mm:ss}");
-                Console.WriteLine($"═══════════════════════════════════");
+                Console.WriteLine($"📱 OTP for {mobile}: {otpCode} | Valid until: {otp.ExpiresAt:HH:mm:ss}");
 
                 return true;
             }
@@ -67,37 +63,16 @@ namespace ECommerceAPI.Application.Services
             try
             {
                 var otpRecord = await _otpRepository.GetLatestValidOtpAsync(mobile);
-
-                if (otpRecord == null)
+                if (otpRecord == null || otpRecord.IsUsed || DateTime.UtcNow > otpRecord.ExpiresAt || otpRecord.AttemptCount >= MAX_ATTEMPTS)
                 {
-                    _logger.LogWarning($"No valid OTP found for {mobile}");
-                    return false;
-                }
-
-                if (DateTime.UtcNow > otpRecord.ExpiresAt)
-                {
-                    _logger.LogWarning($"OTP expired for {mobile}");
-                    return false;
-                }
-
-                if (otpRecord.IsUsed)
-                {
-                    _logger.LogWarning($"OTP already used for {mobile}");
-                    return false;
-                }
-
-                if (otpRecord.AttemptCount >= MAX_ATTEMPTS)
-                {
-                    _logger.LogWarning($"Max OTP attempts exceeded for {mobile}");
-                    await _otpRepository.InvalidateOtpAsync(otpRecord.Id);
+                    _logger.LogWarning($"OTP verification failed for {mobile}");
                     return false;
                 }
 
                 otpRecord.AttemptCount++;
-                await _otpRepository.UpdateAsync(otpRecord);
-
                 if (otpRecord.OtpCode != otp)
                 {
+                    await _otpRepository.UpdateAsync(otpRecord);
                     _logger.LogWarning($"Invalid OTP for {mobile}");
                     return false;
                 }
@@ -119,135 +94,7 @@ namespace ECommerceAPI.Application.Services
         public async Task<bool> IsOtpValidAsync(string mobile)
         {
             var otpRecord = await _otpRepository.GetLatestValidOtpAsync(mobile);
-            return otpRecord != null &&
-                   !otpRecord.IsUsed &&
-                   DateTime.UtcNow <= otpRecord.ExpiresAt;
-        }
-    }
-
-
-    /// <summary>
-    /// MongoDB Email OTP Service
-    /// </summary>
-    public class MongoEmailOtpService : IMongoEmailOtpService
-    {
-        private readonly IMongoEmailOtpRepository _emailOtpRepository;
-        private readonly ILogger<MongoEmailOtpService> _logger;
-        private readonly IEmailService _emailService; 
-        private const int OTP_LENGTH = 6;
-        private const int OTP_VALIDITY_MINUTES = 5;
-        private const int MAX_ATTEMPTS = 3;
-
-        public MongoEmailOtpService(
-            IMongoEmailOtpRepository emailOtpRepository,
-            ILogger<MongoEmailOtpService> logger,
-            IEmailService emailService) 
-        {
-            _emailOtpRepository = emailOtpRepository;
-            _logger = logger;
-            _emailService = emailService;
-        }
-
-        public async Task<bool> GenerateAndSendOtpAsync(string email)
-        {
-            try
-            {
-                await _emailOtpRepository.InvalidateAllForEmailAsync(email);
-
-                var random = new Random();
-                var otpCode = random.Next(100000, 999999).ToString();
-
-                var emailOtp = new MongoEmailOtp
-                {
-                    Email = email,
-                    OtpCode = otpCode,
-                    CreatedAt = DateTime.UtcNow,
-                    ExpiresAt = DateTime.UtcNow.AddMinutes(OTP_VALIDITY_MINUTES),
-                    IsUsed = false,
-                    AttemptCount = 0
-                };
-
-                await _emailOtpRepository.AddAsync(emailOtp);
-
-                var emailSent = await _emailService.SendOtpEmailAsync(
-                    email, 
-                    otpCode, 
-                    OTP_VALIDITY_MINUTES);
-
-                if (!emailSent)
-                {
-                    _logger.LogWarning($"Failed to send OTP email to {email}, but OTP was saved");
-                }
-
-                _logger.LogInformation($"Email OTP for {email}: {otpCode}");
-
-                Console.WriteLine($"═══════════════════════════════════");
-                Console.WriteLine($"📧 MongoDB Email OTP for {email}: {otpCode}");
-                Console.WriteLine($"⏰ Valid until: {emailOtp.ExpiresAt:HH:mm:ss}");
-                Console.WriteLine($"📨 Email Sent: {(emailSent ? "✅ YES" : "❌ NO")}"); 
-                Console.WriteLine($"═══════════════════════════════════");
-
-                return emailSent; // Return email sending status
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Failed to generate email OTP for {email}");
-                return false;
-            }
-        }
-
-        public async Task<bool> VerifyOtpAsync(string email, string otp)
-        {
-            try
-            {
-                var otpRecord = await _emailOtpRepository.GetLatestValidOtpAsync(email);
-
-                if (otpRecord == null)
-                {
-                    _logger.LogWarning($"No valid email OTP found for {email}");
-                    return false;
-                }
-
-                if (!otpRecord.IsValid())
-                {
-                    _logger.LogWarning($"Email OTP expired or already used for {email}");
-                    return false;
-                }
-
-                if (otpRecord.AttemptCount >= MAX_ATTEMPTS)
-                {
-                    _logger.LogWarning($"Max email OTP attempts exceeded for {email}");
-                    otpRecord.MarkAsUsed();
-                    await _emailOtpRepository.UpdateAsync(otpRecord);
-                    return false;
-                }
-
-                otpRecord.AttemptCount++;
-                await _emailOtpRepository.UpdateAsync(otpRecord);
-
-                if (otpRecord.OtpCode != otp)
-                {
-                    _logger.LogWarning($"Invalid email OTP for {email}");
-                    return false;
-                }
-
-                otpRecord.MarkAsUsed();
-                await _emailOtpRepository.UpdateAsync(otpRecord);
-
-                _logger.LogInformation($"Email OTP verified successfully for {email}");
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Failed to verify email OTP for {email}");
-                return false;
-            }
-        }
-
-        public async Task<bool> IsOtpValidAsync(string email)
-        {
-            var otpRecord = await _emailOtpRepository.GetLatestValidOtpAsync(email);
-            return otpRecord?.IsValid() ?? false;
+            return otpRecord != null && !otpRecord.IsUsed && DateTime.UtcNow <= otpRecord.ExpiresAt;
         }
     }
 }

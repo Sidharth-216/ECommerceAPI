@@ -80,7 +80,6 @@ namespace ECommerceAPI.API
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using ECommerceAPI.Infrastructure.Data;
 using System;
 using System.IdentityModel.Tokens.Jwt;
 using MongoDB.Driver;
@@ -104,21 +103,6 @@ namespace ECommerceAPI.API
                 var logger = services.GetRequiredService<ILogger<Program>>();
 
                 // =====================================================
-                // SQL Server Connection Test & Seeding
-                // =====================================================
-                try
-                {
-                    var context = services.GetRequiredService<ApplicationDbContext>();
-                    DbSeeder.SeedData(context);
-                    Console.WriteLine("✅ SQL Server Connected & Data Seeded Successfully!");
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex, "❌ SQL Server Connection/Seeding Failed!");
-                    Console.WriteLine("❌ SQL Server Error: " + ex.Message);
-                }
-
-                // =====================================================
                 // MongoDB Atlas Connection Test (PING)
                 // =====================================================
                 try
@@ -130,23 +114,6 @@ namespace ECommerceAPI.API
                     
                     Console.WriteLine("✅ MongoDB Atlas Connected Successfully!");
                     Console.WriteLine($"   Ping Response: {result.ToJson()}");
-                    await MongoAdminSeeder.SeedAdminAsync(mongoClient.GetDatabase("ECommerceDB"));
-
-                    // =====================================================
-                    // Test MongoDB Order Repository (Optional)
-                    // =====================================================
-                    try
-                    {
-                        var mongoOrderRepo = services.GetService<ECommerceAPI.Infrastructure.Repositories.Interfaces.IMongoOrderRepository>();
-                        if (mongoOrderRepo != null)
-                        {
-                            Console.WriteLine("✅ MongoDB Order Repository Initialized Successfully!");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        logger.LogWarning(ex, "⚠️ MongoDB Order Repository initialization warning");
-                    }
                 }
                 catch (Exception ex)
                 {
@@ -158,7 +125,6 @@ namespace ECommerceAPI.API
 
             Console.WriteLine("\n🚀 Application Started Successfully!");
             Console.WriteLine("📍 Available Endpoints:");
-            Console.WriteLine("   - SQL Orders:    POST /api/order/confirm");
             Console.WriteLine("   - MongoDB Orders: POST /api/mongo/order/confirm");
             Console.WriteLine("   - Swagger:       /swagger\n");
 

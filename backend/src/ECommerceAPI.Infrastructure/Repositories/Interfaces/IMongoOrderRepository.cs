@@ -5,7 +5,7 @@ using ECommerceAPI.Domain.Entities.MongoDB;
 namespace ECommerceAPI.Infrastructure.Repositories.Interfaces
 {
     /// <summary>
-    /// MongoDB Order Repository Interface
+    /// MongoDB Order Repository Interface - FIXED (removed duplicate UpdateAsync)
     /// </summary>
     public interface IMongoOrderRepository
     {
@@ -30,9 +30,9 @@ namespace ECommerceAPI.Infrastructure.Repositories.Interfaces
         Task<MongoOrder> AddAsync(MongoOrder order);
 
         /// <summary>
-        /// Update an existing order
+        /// Update an existing order - Returns bool for success/failure
         /// </summary>
-        Task UpdateAsync(MongoOrder order);
+        Task<bool> UpdateAsync(MongoOrder order);
 
         /// <summary>
         /// Get all orders

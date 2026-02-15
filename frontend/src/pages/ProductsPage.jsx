@@ -30,7 +30,7 @@ const ProductsPage = ({
 			(typeof product.name === 'string' && product.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
 			(typeof product.brand === 'string' && product.brand.toLowerCase().includes(searchQuery.toLowerCase())) ||
 			(typeof product.category === 'string' && product.category.toLowerCase().includes(searchQuery.toLowerCase())) ||
-			(typeof product.categoryId === 'string' && product.categoryId.toLowerCase().includes(searchQuery.toLowerCase())) ||
+			(typeof product.categoryName === 'string' && product.categoryName.toLowerCase().includes(searchQuery.toLowerCase())) ||
 			(typeof product.description === 'string' && product.description.toLowerCase().includes(searchQuery.toLowerCase()))
 		)
 	);
@@ -40,7 +40,18 @@ const ProductsPage = ({
 		? filteredProducts.slice(0, 8)
 		: [];
 
-	const uniqueCategories = Array.from(new Set((products || []).map(p => p.categoryName || p.category || 'Uncategorized'))).slice(0, 20);
+	// Extract unique categories as strings only
+	const uniqueCategories = Array.from(
+		new Set(
+			(products || [])
+				.map(p => {
+					const cat = p.categoryName || p.category || 'Uncategorized';
+					// Ensure we're returning a string, not an object
+					return typeof cat === 'string' ? cat : String(cat);
+				})
+				.filter(Boolean) // Remove any null/undefined values
+		)
+	).slice(0, 20);
 
 	const handleSort = (value) => {
 		// Sorting handled at parent level if needed

@@ -36,7 +36,7 @@ api.interceptors.response.use(
   }
 );
 
-// ===================== AUTH API (SQL + MONGODB SUPPORT) - UPDATED =====================
+// ===================== AUTH API (SQL + MONGODB SUPPORT) =====================
 export const authAPI = {
   // ===== SQL AUTHENTICATION (EXISTING) =====
   // Email/Password login (SQL)
@@ -77,7 +77,7 @@ export const authAPI = {
   }
 };
 
-// ===== MONGODB AUTHENTICATION (NEW) - UPDATED WITH GENDER SUPPORT =====
+// ===== MONGODB AUTHENTICATION (NEW) =====
 export const mongoAuthAPI = {
   // Email/Password login (MongoDB)
   login: async (email, password) => {
@@ -85,14 +85,14 @@ export const mongoAuthAPI = {
     return response;
   },
   
-  // Registration (MongoDB) - UPDATED TO INCLUDE GENDER
+  // Registration (MongoDB)
   register: async (fullName, email, mobile, password, gender) => {
     const response = await api.post('/mongo/auth/register', { 
       fullName, 
       email, 
       mobile, 
       password,
-      gender // Added gender parameter
+      gender
     });
     return response;
   },
@@ -119,7 +119,8 @@ export const mongoAuthAPI = {
     return response;
   }
 };
-// ===================== MIGRATION API (NEW) =====================
+
+// ===================== MIGRATION API =====================
 export const migrationAPI = {
   // Migrate all users from SQL to MongoDB
   migrateUsers: async () => {
@@ -169,21 +170,65 @@ export const paymentAPI = {
   }
 };
 
-// ===================== ADDRESS API =====================
+// ===================== ADDRESS API (MONGODB) - FIXED ROUTES =====================
 export const addressAPI = {
-  getAll: () => api.get('/user/addresses'),
+  // Get all addresses for current user (uses token authentication)
+  getAll: () => {
+    console.log('📍 Address API - Get All (MongoDB): GET /api/MongoAddress');
+    return api.get('/MongoAddress');
+  },
+  
+  // Add new address
   add: async (address) => {
-    const response = await api.post('/user/addresses', address);
-    return response.data;
-  },
+  console.log('➕ Address API - Add (MongoDB): POST /api/MongoAddress', address);
+  
+  // DO NOT attach userId here
+  const response = await api.post('/MongoAddress', address);
+  return response.data;
+},
+  
+  // Update existing address
   update: async (id, address) => {
-    const response = await api.put(`/user/addresses/${id}`, address);
+    if (!id) {
+      throw new Error('Address ID is required');
+    }
+    console.log('✏️ Address API - Update (MongoDB): PUT /api/MongoAddress/' + id, address);
+    const response = await api.put(`/MongoAddress/${id}`, address);
     return response.data;
   },
+  
+  // Delete address
   remove: async (id) => {
-    const response = await api.delete(`/user/addresses/${id}`);
+    if (!id) {
+      throw new Error('Address ID is required');
+    }
+    console.log('🗑️ Address API - Delete (MongoDB): DELETE /api/MongoAddress/' + id);
+    const response = await api.delete(`/MongoAddress/${id}`);
     return response.data;
   },
+  
+  // Get default address
+  getDefault: async (userId) => {
+    if (!userId) {
+      const userData = JSON.parse(sessionStorage.getItem('user') || '{}');
+      userId = userData.id || userData.userId || userData.Id;
+    }
+    console.log('⭐ Address API - Get Default: GET /api/MongoAddress/default/' + userId);
+    return api.get(`/MongoAddress/default/${userId}`);
+  },
+  
+  // Unset default addresses
+  unsetDefaults: async (userId, exceptId = null) => {
+    if (!userId) {
+      const userData = JSON.parse(sessionStorage.getItem('user') || '{}');
+      userId = userData.id || userData.userId || userData.Id;
+    }
+    console.log('🔄 Address API - Unset Defaults: PUT /api/MongoAddress/' + userId + '/unset-default');
+    const params = exceptId ? { exceptId } : {};
+    return api.put(`/MongoAddress/${userId}/unset-default`, {}, { params });
+  },
+  
+  // Save all addresses (batch operation)
   saveAll: async (addresses) => {
     const results = [];
     for (const addr of addresses) {
@@ -204,35 +249,54 @@ export const addressAPI = {
   }
 };
 
-// ===================== PRODUCTS API =====================
+// ===================== PRODUCTS API (MONGODB) =====================
 export const productsAPI = {
-  getAll: () => api.get('/products'),
-  search: (query) => api.get('/products/search', { params: { query: query || '' } }),
-  getById: (id) => api.get(`/products/${id}`)
+  // Get all products
+  getAll: () => {
+    console.log('📦 Products API - Get All (MongoDB)');
+    return api.get('/mongo/products');
+  },
+
+  // Search products
+  search: (query) => {
+    console.log('🔍 Products API - Search (MongoDB):', query);
+    return api.get('/mongo/products/search', {
+      params: { query: query || '' }
+    });
+  },
+
+  // Get product by ID
+  getById: (id) => {
+    if (!id) {
+      return Promise.reject(new Error('Product ID is required'));
+    }
+    console.log('📦 Products API - Get By ID (MongoDB):', id);
+    return api.get(`/mongo/products/${id}`);
+  }
 };
 
-// ===================== CART API (FIXED) =====================
+// ===================== CART API (MONGODB) =====================
 export const cartAPI = {
   // Get user's cart
   view: (userId) => {
     if (!userId) throw new Error('User ID is required');
-    console.log('📋 Cart API - View:', `GET /cart/user/${userId}`);
-    return api.get(`/cart/user/${userId}`);
+    console.log('📋 Cart API - View (MongoDB):', `GET /mongo/cart/user/${userId}`);
+    return api.get(`/mongo/cart/user/${userId}`);
   },
   
-  // ✅ FIXED: Add item to cart - accepts data object
+  // Add item to cart
   add: (userId, data) => {
     if (!userId) throw new Error('User ID is required');
     if (!data || !data.productId) throw new Error('Product ID is required');
     
-    console.log('➕ Cart API - Add:', {
-      url: `/cart/user/${userId}/items`,
+    console.log('➕ Cart API - Add (MongoDB):', {
+      url: `/mongo/cart/user/${userId}/items`,
       userId: userId,
       productId: data.productId,
       quantity: data.quantity || 1
     });
     
-    return api.post(`/cart/user/${userId}/items`, {
+    return api.post(`/mongo/cart/user/${userId}/items`, {
       productId: data.productId,
       quantity: data.quantity || 1
     });
@@ -243,234 +307,164 @@ export const cartAPI = {
     if (!userId) throw new Error('User ID is required');
     if (!productId) throw new Error('Product ID is required');
     
-    console.log('✏️ Cart API - Update:', {
-      url: `/cart/user/${userId}/items/${productId}`,
+    console.log('✏️ Cart API - Update (MongoDB):', {
+      url: `/mongo/cart/user/${userId}/items/${productId}`,
       quantity: quantity
     });
     
-    return api.put(`/cart/user/${userId}/items/${productId}`, { quantity });
+    return api.put(`/mongo/cart/user/${userId}/items/${productId}`, { quantity });
   },
   
-  // Remove item
+  // Remove item from cart
   remove: (userId, productId) => {
     if (!userId) throw new Error('User ID is required');
     if (!productId) throw new Error('Product ID is required');
     
-    console.log('🗑️ Cart API - Remove:', `/cart/user/${userId}/items/${productId}`);
+    console.log('🗑️ Cart API - Remove (MongoDB):', `/mongo/cart/user/${userId}/items/${productId}`);
     
-    return api.delete(`/cart/user/${userId}/items/${productId}`);
+    return api.delete(`/mongo/cart/user/${userId}/items/${productId}`);
   },
   
-  // Clear cart
+  // Clear entire cart
   clear: (userId) => {
     if (!userId) throw new Error('User ID is required');
     
-    console.log('🧹 Cart API - Clear:', `/cart/user/${userId}`);
+    console.log('🧹 Cart API - Clear (MongoDB):', `/mongo/cart/user/${userId}`);
     
-    return api.delete(`/cart/user/${userId}`);
+    return api.delete(`/mongo/cart/user/${userId}`);
   }
 };
-// ===================== UPDATED ORDERS API (MongoDB) =====================
+
+// ===================== ORDERS API (MONGODB) =====================
 export const ordersAPI = {
-  /**
-   * Confirm order - Create order from cart (MongoDB)
-   * @param {string} shippingAddressId - MongoDB ObjectId (24 hex characters)
-   */
+  // Confirm order - Create order from cart
   confirm: (shippingAddressId) => {
-    // Get user ID from token
-    const userId = getUserIdFromToken();
-    if (!userId) {
-      console.error('❌ Orders API - User ID not found in token');
-      return Promise.reject(new Error('User ID is required. Please login again.'));
+    if (!shippingAddressId) {
+      return Promise.reject(new Error('Shipping address ID is required'));
     }
-
-    // Validate input
-    if (!shippingAddressId || typeof shippingAddressId !== 'string') {
-      console.error('❌ Orders API - Invalid Shipping Address ID:', shippingAddressId);
-      return Promise.reject(new Error('Shipping Address ID is required and must be a string'));
-    }
-
-    // Validate MongoDB ObjectId format (24 hex characters)
-    const mongoObjectIdRegex = /^[0-9a-f]{24}$/i;
-    if (!mongoObjectIdRegex.test(shippingAddressId)) {
-      console.error('❌ Orders API - Invalid MongoDB ObjectId format:', shippingAddressId);
-      console.error('Expected: 24 hex characters, Got:', shippingAddressId);
-      return Promise.reject(new Error('Invalid Shipping Address ID format. Must be a valid MongoDB ObjectId.'));
-    }
-
-    console.log('📦 Orders API - Confirm Order (MongoDB):', {
-      endpoint: '/api/mongo/order/confirm',
-      userId: userId,
-      shippingAddressId: shippingAddressId,
-      requestBody: { ShippingAddressId: shippingAddressId }
-    });
-
-    // Call MongoDB order endpoint with CreateOrderDto structure
-    return api.post('/mongo/order/confirm', {
-      ShippingAddressId: shippingAddressId
-    });
+    console.log('🚀 Orders API - Confirm (MongoDB):', { shippingAddressId });
+    return api.post('/mongo/order/confirm', { shippingAddressId });
   },
-
-  /**
-   * Get order history for current user (MongoDB)
-   */
+  
+  // Get order history
   history: () => {
-    console.log('📜 Orders API - Get History (MongoDB): /api/mongo/order/history');
+    console.log('📜 Orders API - Get History (MongoDB)');
     return api.get('/mongo/order/history');
   },
-
-  /**
-   * Get order by MongoDB ObjectId
-   * @param {string} mongoId - MongoDB ObjectId
-   */
-  getById: (mongoId) => {
-    if (!mongoId) {
-      return Promise.reject(new Error('MongoDB Order ID is required'));
+  
+  // Get specific order by ID
+  getById: (orderId) => {
+    if (!orderId) {
+      return Promise.reject(new Error('Order ID is required'));
     }
-    console.log('📋 Orders API - Get Order by ID (MongoDB):', mongoId);
-    return api.get(`/mongo/order/${mongoId}`);
+    console.log('📦 Orders API - Get By ID (MongoDB):', orderId);
+    return api.get(`/mongo/order/${orderId}`);
   },
-
-  /**
-   * Get order by Order Number
-   * @param {string} orderNumber - Order number (e.g., ORD-20250129-ABCD1234)
-   */
+  
+  // Get order by order number
   getByOrderNumber: (orderNumber) => {
     if (!orderNumber) {
       return Promise.reject(new Error('Order number is required'));
     }
-    console.log('📋 Orders API - Get Order by Number (MongoDB):', orderNumber);
+    console.log('📦 Orders API - Get By Order Number (MongoDB):', orderNumber);
     return api.get(`/mongo/order/order-number/${orderNumber}`);
   },
-
-  /**
-   * Cancel order by MongoDB ObjectId
-   * @param {string} mongoId - MongoDB ObjectId
-   */
-  cancel: (mongoId) => {
-    if (!mongoId) {
-      return Promise.reject(new Error('MongoDB Order ID is required'));
+  
+  // Cancel order
+  cancel: (orderId) => {
+    if (!orderId) {
+      return Promise.reject(new Error('Order ID is required'));
     }
-    console.log('❌ Orders API - Cancel Order (MongoDB):', mongoId);
-    return api.post(`/mongo/order/${mongoId}/cancel`);
+    console.log('❌ Orders API - Cancel (MongoDB):', orderId);
+    return api.post(`/mongo/order/${orderId}/cancel`);
   }
 };
 
-
-// ===================== RECOMMENDATIONS API =====================
+// ===================== RECOMMENDATIONS API (MONGODB) =====================
 export const recommendationsAPI = {
-  rank: (productIds, criteria) => api.post('/recommendations/rank', { productIds, criteria })
+  // Get personalized recommendations for user
+  getForUser: (userId) => {
+    if (!userId) {
+      return Promise.reject(new Error('User ID is required'));
+    }
+    console.log('🎯 Recommendations API - Get For User:', userId);
+    return api.get('/mongo/recommendations/user', { params: { userId } });
+  },
+  
+  // Get trending products
+  getTrending: (limit = 10) => {
+    console.log('🔥 Recommendations API - Get Trending:', { limit });
+    return api.get('/mongo/recommendations/trending', { params: { limit } });
+  },
+  
+  // Get recommended products based on product
+  getRelated: (productId, limit = 5) => {
+    if (!productId) {
+      return Promise.reject(new Error('Product ID is required'));
+    }
+    console.log('🔗 Recommendations API - Get Related:', { productId, limit });
+    return api.get(`/mongo/recommendations/related/${productId}`, { params: { limit } });
+  },
+  
+  // Get popular products in category
+  getPopularByCategory: (categoryId, limit = 10) => {
+    if (!categoryId) {
+      return Promise.reject(new Error('Category ID is required'));
+    }
+    console.log('⭐ Recommendations API - Get Popular By Category:', { categoryId, limit });
+    return api.get(`/mongo/recommendations/category/${categoryId}`, { params: { limit } });
+  }
 };
 
-// ===================== INVENTORY API =====================
-export const inventoryAPI = {
-  getStock: (productId) => api.get(`/inventory/stock/${productId}`),
-  checkAvailability: (productId, quantity) => 
-    api.get('/inventory/check', { params: { productId, quantity } })
-};
-// ===================== ADMIN API (UPDATED FOR MONGODB) =====================
+// ===================== ADMIN API (MONGODB) - COMPLETE FIX =====================
 export const adminAPI = {
-  // Original SQL endpoints (keep for backward compatibility)
-  fetchUserDetails: (userId) => api.get(`/admin/users/${userId}`).then(r => r.data),
-  getStockAnalysis: () => api.get('/admin/inventory/analysis'),
-  getLowStockProducts: () => api.get('/admin/inventory/low-stock'),
-  getStockByCategory: (category) => api.get(`/admin/inventory/category/${category}`),
-  updateStock: (productId, quantity) => api.put(`/admin/inventory/update`, { productId, quantity }),
-  getSalesReport: (startDate, endDate) => 
-    api.get('/admin/reports/sales', { params: { start: startDate, end: endDate } }),
-  getSalesbyCategory: (startDate, endDate) => 
-    api.get('/admin/reports/sales-by-category', { params: { startDate, endDate } }),
-  getSalesbyProduct: (startDate, endDate) => 
-    api.get('/admin/reports/sales-by-product', { params: { startDate, endDate } }),
-  getRevenue: (startDate, endDate) => 
-    api.get('/admin/reports/revenue', { params: { startDate, endDate } }),
-  getTopProducts: (limit = 10) => 
-    api.get('/admin/reports/top-products', { params: { limit } }),
-  getOrderStats: () => api.get('/admin/reports/order-stats'),
-  getDailyMetrics: (startDate, endDate) => 
-    api.get('/admin/reports/daily-metrics', { params: { startDate, endDate } }),
-  getDashboard: () => api.get('/admin/dashboard'),
-  getUsers: () => api.get('/admin/users'),
-  getOrders: () => api.get('/admin/orders'),
-  createProduct: (data) => api.post('/products', data),
-  updateProduct: (id, data) => api.put(`/products/${id}`, data),
-  deleteProduct: (id) => api.delete(`/products/${id}`)
-};
-// ===== COMPLETE MONGODB ADMIN API (Updated Version) =====
-export const mongoAdminAPIComplete = {
   // ===== USER MANAGEMENT =====
   
-  /**
-   * Get all users from MongoDB
-   * GET /api/mongo/admin/users
-   */
+  // Get all users from MongoDB
   getUsers: () => {
     console.log('👥 MongoDB Admin API - Get All Users');
     return api.get('/mongo/admin/users');
   },
   
-  /**
-   * Get user by MongoDB ID
-   * GET /api/mongo/admin/users/{mongoId}
-   */
-  getUserById: (mongoId) => {
-    if (!mongoId || !isValidMongoId(mongoId)) {
-      return Promise.reject(new Error('Valid MongoDB User ID is required'));
+  // Get user by ID
+  getUserById: (userId) => {
+    if (!userId) {
+      return Promise.reject(new Error('User ID is required'));
     }
-    console.log('👤 MongoDB Admin API - Get User:', mongoId);
-    return api.get(`/mongo/admin/users/${mongoId}`);
-  },
-  
-  /**
-   * Delete user by MongoDB ID
-   * DELETE /api/mongo/admin/users/{mongoId}
-   */
-  deleteUser: (mongoId) => {
-    if (!mongoId || !isValidMongoId(mongoId)) {
-      return Promise.reject(new Error('Valid MongoDB User ID is required'));
-    }
-    console.log('🗑️ MongoDB Admin API - Delete User:', mongoId);
-    return api.delete(`/mongo/admin/users/${mongoId}`);
+    console.log('👤 MongoDB Admin API - Get User By ID:', userId);
+    return api.get(`/mongo/admin/users/${userId}`);
   },
   
   // ===== ORDER MANAGEMENT =====
   
-  /**
-   * Get all orders from MongoDB
-   * GET /api/mongo/admin/orders
-   */
+  // Get all orders from MongoDB
   getOrders: () => {
     console.log('📦 MongoDB Admin API - Get All Orders');
     return api.get('/mongo/admin/orders');
   },
   
-  /**
-   * Get order statistics
-   * GET /api/mongo/admin/order-stats
-   */
+  // Get order statistics
   getOrderStats: () => {
     console.log('📊 MongoDB Admin API - Get Order Stats');
     return api.get('/mongo/admin/order-stats');
   },
 
-  /**
-   * Update order status
-   * PUT /api/mongo/admin/orders/{orderId}/status
-   */
-  updateOrderStatus: (orderId, statusData) => {
+  // Update order status - FIXED: Now uses correct endpoint
+  updateOrderStatus: (orderId, newStatus) => {
     if (!orderId) {
       return Promise.reject(new Error('Order ID is required'));
     }
-    console.log('✏️ MongoDB Admin API - Update Order Status:', { orderId, statusData });
-    return api.put(`/mongo/admin/orders/${orderId}/status`, statusData);
+    console.log('✏️ MongoDB Admin API - Update Order Status:', { orderId, newStatus });
+    
+    // The status can be passed as string or object
+    const statusValue = typeof newStatus === 'string' ? newStatus : newStatus.status;
+    
+    return api.put(`/mongo/admin/orders/${orderId}/status`, { status: statusValue });
   },
   
   // ===== SALES & REVENUE REPORTS =====
   
-  /**
-   * Get sales report
-   * GET /api/mongo/admin/sales-report
-   */
+  // Get sales report
   getSalesReport: (startDate, endDate) => {
     console.log('📊 MongoDB Admin API - Get Sales Report:', { startDate, endDate });
     return api.get('/mongo/admin/sales-report', { 
@@ -478,10 +472,7 @@ export const mongoAdminAPIComplete = {
     });
   },
   
-  /**
-   * Get revenue analytics
-   * GET /api/mongo/admin/revenue
-   */
+  // Get revenue analytics
   getRevenue: (startDate, endDate) => {
     console.log('💰 MongoDB Admin API - Get Revenue:', { startDate, endDate });
     return api.get('/mongo/admin/revenue', { 
@@ -489,10 +480,7 @@ export const mongoAdminAPIComplete = {
     });
   },
   
-  /**
-   * Get sales by category
-   * GET /api/mongo/admin/sales-by-category
-   */
+  // Get sales by category
   getSalesByCategory: (startDate, endDate) => {
     console.log('📊 MongoDB Admin API - Get Sales By Category:', { startDate, endDate });
     return api.get('/mongo/admin/sales-by-category', { 
@@ -500,10 +488,7 @@ export const mongoAdminAPIComplete = {
     });
   },
   
-  /**
-   * Get sales by product
-   * GET /api/mongo/admin/sales-by-product
-   */
+  // Get sales by product
   getSalesByProduct: (startDate, endDate) => {
     console.log('📦 MongoDB Admin API - Get Sales By Product:', { startDate, endDate });
     return api.get('/mongo/admin/sales-by-product', { 
@@ -511,10 +496,7 @@ export const mongoAdminAPIComplete = {
     });
   },
   
-  /**
-   * Get top selling products
-   * GET /api/mongo/admin/top-products
-   */
+  // Get top selling products
   getTopProducts: (limit = 10) => {
     console.log('🏆 MongoDB Admin API - Get Top Products:', { limit });
     return api.get('/mongo/admin/top-products', { 
@@ -524,63 +506,71 @@ export const mongoAdminAPIComplete = {
   
   // ===== STOCK & INVENTORY =====
   
-  /**
-   * Get stock analysis
-   * GET /api/mongo/admin/stock-analysis
-   */
+  // Get stock analysis
   getStockAnalysis: () => {
     console.log('📈 MongoDB Admin API - Get Stock Analysis');
     return api.get('/mongo/admin/stock-analysis');
   },
 
-  /**
-   * Get all products (uses existing products endpoint)
-   * GET /api/products
-   */
+  // ===== PRODUCT MANAGEMENT - FIXED =====
+  
+  // Get all products
   getProducts: () => {
     console.log('📦 MongoDB Admin API - Get All Products');
-    return api.get('/products');
+    return api.get('/mongo/products');
   },
 
-  /**
-   * Add new product
-   * POST /api/products
-   */
+  // Add new product - FIXED: Proper payload structure
   addProduct: (productData) => {
     console.log('➕ MongoDB Admin API - Add Product:', productData);
-    return api.post('/products', productData);
+    
+    // Ensure proper structure for MongoDB
+    const payload = {
+      name: productData.name,
+      brand: productData.brand || '',
+      price: parseFloat(productData.price),
+      stockQuantity: parseInt(productData.stockQuantity),
+      category: productData.category || 'Uncategorized',
+      description: productData.description || '',
+      imageUrl: productData.imageUrl || ''
+    };
+    
+    return api.post('/mongo/products', payload);
   },
 
-  /**
-   * Update product
-   * PUT /api/products/{id}
-   */
+  // Update product - FIXED: Proper payload structure
   updateProduct: (productId, productData) => {
     if (!productId) {
       return Promise.reject(new Error('Product ID is required'));
     }
     console.log('✏️ MongoDB Admin API - Update Product:', { productId, productData });
-    return api.put(`/products/${productId}`, productData);
+    
+    // Ensure proper structure for MongoDB
+    const payload = {
+      name: productData.name,
+      brand: productData.brand || '',
+      price: parseFloat(productData.price),
+      stockQuantity: parseInt(productData.stockQuantity),
+      category: productData.category || 'Uncategorized',
+      description: productData.description || '',
+      imageUrl: productData.imageUrl || ''
+    };
+    
+    return api.put(`/mongo/products/${productId}`, payload);
   },
 
-  /**
-   * Delete product
-   * DELETE /api/products/{id}
-   */
+  // Delete product
   deleteProduct: (productId) => {
     if (!productId) {
       return Promise.reject(new Error('Product ID is required'));
     }
     console.log('🗑️ MongoDB Admin API - Delete Product:', productId);
-    return api.delete(`/products/${productId}`);
+    return api.delete(`/mongo/products/${productId}`);
   },
   
   // ===== CUSTOMER ANALYTICS =====
   
-  /**
-   * Get customer insights
-   * GET /api/mongo/admin/customer-insights
-   */
+  // Get customer insights
   getCustomerInsights: () => {
     console.log('👥 MongoDB Admin API - Get Customer Insights');
     return api.get('/mongo/admin/customer-insights');
@@ -588,10 +578,7 @@ export const mongoAdminAPIComplete = {
   
   // ===== METRICS & ANALYTICS =====
   
-  /**
-   * Get daily metrics
-   * GET /api/mongo/admin/daily-metrics
-   */
+  // Get daily metrics
   getDailyMetrics: (startDate, endDate) => {
     console.log('📅 MongoDB Admin API - Get Daily Metrics:', { startDate, endDate });
     return api.get('/mongo/admin/daily-metrics', { 
@@ -601,10 +588,7 @@ export const mongoAdminAPIComplete = {
   
   // ===== DASHBOARD =====
   
-  /**
-   * Get admin dashboard summary
-   * GET /api/mongo/admin/dashboard
-   */
+  // Get admin dashboard summary
   getDashboard: () => {
     console.log('🎯 MongoDB Admin API - Get Dashboard');
     return api.get('/mongo/admin/dashboard');
@@ -621,7 +605,6 @@ export const isValidMongoId = (id) => {
   if (!id || typeof id !== 'string') return false;
   return /^[0-9a-f]{24}$/i.test(id);
 };
-
 
 // ===================== HELPER: Extract MongoDB ObjectId =====================
 /**
@@ -672,7 +655,6 @@ export const getMongoId = (obj) => {
   console.warn('⚠️ Could not extract MongoDB ObjectId from object:', obj);
   return null;
 };
-
 
 // ===================== HELPER: Detect User Type =====================
 export const getUserType = () => {

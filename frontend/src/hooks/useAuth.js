@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { authAPI, ordersAPI, addressAPI, mongoAuthAPI, getUserIdFromToken } from '../api';
+import { mongoAuthAPI, ordersAPI, addressAPI, getUserIdFromToken } from '../api';
 
 export const useAuth = () => {
   const [user, setUser] = useState(null);
@@ -24,6 +24,8 @@ export const useAuth = () => {
         throw new Error('Password is required');
       }
 
+      console.log('🔐 Attempting MongoDB login...');
+
       const response = await mongoAuthAPI.login(
         loginData.email.trim(),
         loginData.password
@@ -47,6 +49,8 @@ export const useAuth = () => {
         );
       }
 
+      sessionStorage.setItem('token', data.token);
+      
       const userIdFromToken = getUserIdFromToken();
       const finalUserId = userIdFromToken || data.mongoUserId || data.userId || data.id;
       
@@ -62,7 +66,6 @@ export const useAuth = () => {
         email: data.email
       };
       
-      sessionStorage.setItem('token', data.token);
       sessionStorage.setItem('user', JSON.stringify(userData));
 
       setUser({
@@ -75,9 +78,11 @@ export const useAuth = () => {
         gender: data.gender || ''
       });
 
+      console.log('✅ Login successful');
+
       return userRole;
     } catch (err) {
-      console.error('Login error details:', err);
+      console.error('❌ Login error:', err);
       throw err;
     } finally {
       setLoading(false);
@@ -115,6 +120,8 @@ export const useAuth = () => {
     setError('');
     
     try {
+      console.log('📝 Attempting MongoDB registration...');
+
       const response = await mongoAuthAPI.register(
         fullName.trim(),
         email.trim(),
@@ -136,7 +143,7 @@ export const useAuth = () => {
       sessionStorage.setItem('token', data.token);
       
       const userIdFromToken = getUserIdFromToken();
-      const finalUserId = userIdFromToken || data.userId || data.id || data.mongoUserId || `user_${Date.now()}`;
+      const finalUserId = userIdFromToken || data.userId || data.id || data.mongoUserId;
       
       if (!finalUserId) {
         throw new Error('User ID not found in token. Please contact support.');
@@ -168,9 +175,11 @@ export const useAuth = () => {
         addresses: []
       });
       
+      console.log('✅ Registration successful');
+      
       return true;
     } catch (err) {
-      console.error('Registration error:', err);
+      console.error('❌ Registration error:', err);
       throw err;
     } finally {
       setLoading(false);
@@ -180,6 +189,7 @@ export const useAuth = () => {
   const handleLogout = () => {
     sessionStorage.removeItem('token');
     sessionStorage.removeItem('user');
+    localStorage.removeItem('cart');
     
     setUser(null);
     setOrders([]);
@@ -187,103 +197,79 @@ export const useAuth = () => {
       fullName: '',
       email: '',
       mobile: '',
+      gender: '',
       addresses: []
     });
     
-    console.log('User logged out successfully');
+    console.log('✅ User logged out successfully');
   };
 
   const loadProfile = async () => {
     if (!user) return;
     
     try {
+      console.log('📋 Loading profile data...');
+      
       let addresses = [];
-      let profileData = {};
       
       try {
+        // Try to get addresses from addressAPI
         if (typeof addressAPI?.getAll === 'function') {
           const addrRes = await addressAPI.getAll();
-          addresses = Array.isArray(addrRes?.data) ? addrRes.data : addrRes?.data?.addresses || addrRes?.data || [];
-        } else {
-          const response = await authAPI.getProfile();
-          const data = response.data || {};
-          const rawAddresses = data.addresses || data.addressList || [];
-          addresses = Array.isArray(rawAddresses) ? rawAddresses : [];
-          profileData = data;
+          addresses = Array.isArray(addrRes?.data) 
+            ? addrRes.data 
+            : addrRes?.data?.addresses || [];
         }
-      } catch (innerErr) {
-        console.warn('Address fetch via addressAPI failed, trying authAPI profile', innerErr);
-        try {
-          const response = await authAPI.getProfile();
-          const data = response.data || {};
-          const rawAddresses = data.addresses || data.addressList || [];
-          addresses = Array.isArray(rawAddresses) ? rawAddresses : [];
-          profileData = data;
-        } catch (e) {
-          addresses = [];
-        }
+      } catch (err) {
+        console.warn('⚠️ Could not fetch addresses:', err);
+        addresses = [];
       }
 
-      addresses = (addresses || []).map(a => {
-        const addrLine1 = a.AddressLine1 || a.address || a.line1 || '';
-        const addrLine2 = a.AddressLine2 || a.line2 || '';
-        const city = a.City || a.city || '';
-        const state = a.State || a.state || '';
-        const postal = a.PostalCode || a.postalCode || a.pincode || '';
-        const country = a.Country || a.country || '';
-
-        const addressString = a.address || [
-          addrLine1,
-          addrLine2,
-          city,
-          state,
-          postal,
-          country
-        ].filter(Boolean).join(', ').trim();
-
+      // Normalize addresses
+      addresses = (addresses || []).map((a, index) => {
+        const mongoId = a._id || a.id || a.Id || `addr_${index}`;
+        
         return {
-          id: a.Id ?? a.id ?? a.addressId ?? null,
-          label: a.label || (a.IsDefault ? 'Home' : a.type) || 'Address',
-          AddressLine1: addrLine1 || '',
-          AddressLine2: addrLine2 || '',
-          City: city || '',
-          State: state || '',
-          PostalCode: postal || '',
-          Country: country || '',
-          IsDefault: !!a.IsDefault,
-          address: addressString || ''
+          id: mongoId,
+          _id: mongoId,
+          label: a.label || a.Label || (a.IsDefault ? 'Home' : 'Address'),
+          AddressLine1: a.AddressLine1 || a.addressLine1 || '',
+          AddressLine2: a.AddressLine2 || a.addressLine2 || '',
+          City: a.City || a.city || '',
+          State: a.State || a.state || '',
+          PostalCode: a.PostalCode || a.postalCode || '',
+          Country: a.Country || a.country || 'India',
+          IsDefault: Boolean(a.IsDefault || a.isDefault)
         };
       });
 
-      const gender = profileData.gender || profileData.Gender || user.gender || '';
-
       setProfileData(prev => ({
         ...prev,
-        fullName: profileData.fullName || profileData.FullName || prev.fullName || '',
-        email: profileData.email || profileData.Email || prev.email || '',
-        mobile: (profileData.mobile || profileData.Mobile || prev.mobile || '').toString().trim(),
-        gender: gender,
-        addresses: addresses || []
+        addresses: addresses
       }));
 
-      setUser(prev => ({
-        ...prev,
-        gender: gender
-      }));
+      console.log('✅ Profile loaded with', addresses.length, 'addresses');
 
     } catch (err) {
-      console.error('Error loading profile:', err);
+      console.error('❌ Error loading profile:', err);
       setProfileData(prev => ({ ...prev, addresses: [] }));
     }
   };
 
   const loadOrders = async () => {
     if (!user) return;
+    
     try {
+      console.log('📦 Loading orders...');
+      
       const response = await ordersAPI.history();
-      setOrders(response.data || []);
+      const ordersData = response?.data || [];
+      
+      setOrders(ordersData);
+      console.log('✅ Orders loaded:', ordersData.length);
     } catch (err) {
-      console.error('Error loading orders:', err);
+      console.error('❌ Error loading orders:', err);
+      setOrders([]);
     }
   };
 

@@ -9,7 +9,7 @@ using ECommerceAPI.Infrastructure.Repositories.Interfaces;
 namespace ECommerceAPI.Infrastructure.Repositories.Implementations
 {
     /// <summary>
-    /// MongoDB Order Repository Implementation
+    /// MongoDB Order Repository Implementation - FIXED (removed duplicate UpdateAsync)
     /// </summary>
     public class MongoOrderRepository : IMongoOrderRepository
     {
@@ -105,21 +105,46 @@ namespace ECommerceAPI.Infrastructure.Repositories.Implementations
             return order;
         }
 
-        public async Task UpdateAsync(MongoOrder order)
+        /// <summary>
+        /// Update an existing order - SINGLE METHOD (removed duplicate)
+        /// </summary>
+        public async Task<bool> UpdateAsync(MongoOrder order)
         {
-            if (order == null)
-                throw new ArgumentNullException(nameof(order));
+            try
+            {
+                if (order == null)
+                    throw new ArgumentNullException(nameof(order));
 
-            if (string.IsNullOrWhiteSpace(order.Id))
-                throw new ArgumentException("Order ID is required for update");
+                if (string.IsNullOrWhiteSpace(order.Id))
+                    throw new ArgumentException("Order ID is required for update");
 
-            // Set update timestamp
-            order.UpdatedAt = DateTime.UtcNow;
+                Console.WriteLine($"✏️ [MongoOrderRepository] Updating order: {order.Id}");
 
-            var result = await _orders.ReplaceOneAsync(o => o.Id == order.Id, order);
-            
-            if (result.MatchedCount == 0)
-                throw new KeyNotFoundException($"Order not found with ID: {order.Id}");
+                order.UpdatedAt = DateTime.UtcNow;
+
+                var result = await _orders.ReplaceOneAsync(
+                    o => o.Id == order.Id,
+                    order
+                );
+
+                var success = result.ModifiedCount > 0;
+
+                if (success)
+                {
+                    Console.WriteLine($"✅ Order updated successfully: {order.Id}");
+                }
+                else
+                {
+                    Console.WriteLine($"⚠️ No order was modified: {order.Id}");
+                }
+
+                return success;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Error updating order: {ex.Message}");
+                throw;
+            }
         }
 
         public async Task<IEnumerable<MongoOrder>> GetAllAsync()
@@ -151,7 +176,7 @@ namespace ECommerceAPI.Infrastructure.Repositories.Implementations
                 throw new FormatException($"Invalid MongoDB ObjectId format: {id}");
 
             var result = await _orders.DeleteOneAsync(o => o.Id == id);
-            
+
             if (result.DeletedCount == 0)
                 throw new KeyNotFoundException($"Order not found with ID: {id}");
         }

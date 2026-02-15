@@ -1,35 +1,22 @@
 import { useState } from 'react';
-import { productsAPI } from '../api';
+import { productsAPI, getMongoId } from '../api';
 
-// Helper function to extract MongoDB ObjectId
-const getMongoId = (obj) => {
-  if (!obj) return null;
-  
-  if (obj._id && obj._id.$oid) {
-    return obj._id.$oid;
-  }
-  
-  if (typeof obj._id === 'string') {
-    return obj._id;
-  }
-  
-  if (typeof obj.id === 'string') {
-    return obj.id;
-  }
-  
-  if (typeof obj.mongoId === 'string') {
-    return obj.mongoId;
-  }
-  
-  return null;
-};
-
-// Normalize product structure
+// Normalize product structure to ensure consistent ID handling
 const normalizeProduct = (product) => {
+  const mongoId = getMongoId(product);
+  
   return {
     ...product,
-    id: getMongoId(product),
-    _id: getMongoId(product)
+    id: mongoId,
+    _id: mongoId,
+    // Ensure all required fields exist
+    name: product.name || product.productName || 'Unknown Product',
+    price: product.price || 0,
+    stockQuantity: product.stockQuantity || 0,
+    category: product.category || product.categoryName || 'Uncategorized',
+    brand: product.brand || '',
+    description: product.description || '',
+    imageUrl: product.imageUrl || product.image || ''
   };
 };
 
@@ -38,19 +25,69 @@ export const useProducts = () => {
 
   const loadProducts = async () => {
     try {
+      console.log('📦 Loading products from MongoDB...');
+      
       const response = await productsAPI.getAll();
-      const normalizedProducts = response.data.map(normalizeProduct);
+      const rawProducts = response?.data || [];
+      
+      console.log('Raw products received:', rawProducts.length);
+      
+      const normalizedProducts = rawProducts.map(normalizeProduct);
+      
       setProducts(normalizedProducts);
-      console.log('Products loaded:', normalizedProducts.length);
+      console.log('✅ Products loaded and normalized:', normalizedProducts.length);
+      
+      return normalizedProducts;
     } catch (err) {
-      console.error('Error loading products:', err);
-      throw new Error('Failed to load products');
+      console.error('❌ Error loading products:', err);
+      setProducts([]);
+      throw new Error(err.response?.data?.message || err.message || 'Failed to load products');
+    }
+  };
+
+  const searchProducts = async (query) => {
+    try {
+      console.log('🔍 Searching products:', query);
+      
+      const response = await productsAPI.search(query);
+      const rawProducts = response?.data || [];
+      
+      const normalizedProducts = rawProducts.map(normalizeProduct);
+      
+      console.log('✅ Search results:', normalizedProducts.length);
+      return normalizedProducts;
+    } catch (err) {
+      console.error('❌ Error searching products:', err);
+      throw new Error(err.response?.data?.message || err.message || 'Failed to search products');
+    }
+  };
+
+  const getProductById = async (id) => {
+    try {
+      console.log('🔎 Fetching product by ID:', id);
+      
+      const response = await productsAPI.getById(id);
+      const product = response?.data;
+      
+      if (!product) {
+        throw new Error('Product not found');
+      }
+      
+      const normalized = normalizeProduct(product);
+      console.log('✅ Product fetched:', normalized.name);
+      
+      return normalized;
+    } catch (err) {
+      console.error('❌ Error fetching product:', err);
+      throw new Error(err.response?.data?.message || err.message || 'Failed to fetch product');
     }
   };
 
   return {
     products,
     setProducts,
-    loadProducts
+    loadProducts,
+    searchProducts,
+    getProductById
   };
 };

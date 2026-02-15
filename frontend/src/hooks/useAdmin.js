@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { mongoAdminAPI } from '../api';
+import { adminAPI } from '../api';
 
 export const useAdmin = () => {
   const [adminStats, setAdminStats] = useState({
@@ -10,34 +10,27 @@ export const useAdmin = () => {
   });
   const [adminCustomers, setAdminCustomers] = useState([]);
   const [adminOrders, setAdminOrders] = useState([]);
-  const [stockAnalysis, setStockAnalysis] = useState({
-    lowStock: [],
-    outOfStock: [],
-    totalValue: 0
-  });
+  const [stockAnalysis, setStockAnalysis] = useState([]);
+  const [lowStockProducts, setLowStockProducts] = useState([]);
+  const [stockByCategory, setStockByCategory] = useState([]);
   const [salesReport, setSalesReport] = useState(null);
 
   /**
-   * Fetch overview data for admin dashboard from MongoDB
+   * Fetch overview data for admin dashboard
    */
   const fetchAdminData = async () => {
     try {
       console.log('🚀 [useAdmin] Fetching admin data from MongoDB...');
 
-    const [customersRes, ordersRes, productsRes] = await Promise.all([
-      mongoAdminAPI.getUsers(),
-      mongoAdminAPI.getOrders(),
-      mongoAdminAPI.getProducts()
-    ]);
+      const [customersRes, ordersRes, productsRes] = await Promise.all([
+        adminAPI.getUsers(),
+        adminAPI.getOrders(),
+        adminAPI.getProducts()
+      ]);
 
+      console.log('📦 Raw API Responses received');
 
-      console.log('📦 Raw API Responses:', {
-        customers: customersRes,
-        orders: ordersRes,
-        products: productsRes
-      });
-
-      // Extract data arrays - handle both direct arrays and nested data property
+      // Extract data arrays
       const customers = Array.isArray(customersRes) 
         ? customersRes 
         : (customersRes?.data || []);
@@ -65,7 +58,7 @@ export const useAdmin = () => {
       setAdminCustomers(actualCustomers);
       setAdminOrders(orders);
 
-      // Calculate stats from MongoDB data
+      // Calculate stats
       const completedOrders = orders.filter(o => 
         o.status !== 'Cancelled' && o.Status !== 'Cancelled'
       );
@@ -93,36 +86,29 @@ export const useAdmin = () => {
   };
 
   /**
-   * Fetch stock analysis data from MongoDB
+   * Fetch stock analysis data
    */
   const fetchStockAnalysis = async () => {
     try {
-      console.log('📈 [useAdmin] Fetching stock analysis from MongoDB...');
+      console.log('📈 [useAdmin] Fetching stock analysis...');
 
-      // Try dedicated endpoint
-      if (typeof mongoAdminAPI.getStockAnalysis === 'function') {
-        const analysisRes = await mongoAdminAPI.getStockAnalysis();
+      // Try dedicated endpoint if available
+      if (typeof adminAPI.getStockAnalysis === 'function') {
+        const analysisRes = await adminAPI.getStockAnalysis();
         const analysis = analysisRes?.data || analysisRes || {};
         
-        console.log('✅ Stock Analysis:', analysis);
+        console.log('✅ Stock Analysis received');
         
-        // Transform to expected format
-        const transformed = {
-          lowStock: analysis.lowStockItems || analysis.LowStockItems || [],
-          outOfStock: analysis.lowStockItems?.filter(p => p.currentStock === 0 || p.CurrentStock === 0) || [],
-          totalValue: analysis.totalStockValue || analysis.TotalStockValue || 0,
-          totalProducts: analysis.totalProducts || analysis.TotalProducts || 0,
-          lowStockCount: analysis.lowStockProducts || analysis.LowStockProducts || 0,
-          outOfStockCount: analysis.outOfStockProducts || analysis.OutOfStockProducts || 0
-        };
+        setStockAnalysis(analysis.items || []);
+        setLowStockProducts(analysis.lowStock || []);
+        setStockByCategory(analysis.byCategory || []);
         
-        setStockAnalysis(transformed);
-        return transformed;
+        return analysis;
       }
 
       // Fallback: fetch products and calculate locally
       console.log('⚠️ Using fallback stock calculation');
-      const productsRes = await mongoAdminAPI.getProducts?.() || { data: [] };
+      const productsRes = await adminAPI.getProducts();
       const products = Array.isArray(productsRes) ? productsRes : (productsRes?.data || []);
 
       const lowStock = products.filter(p => {
@@ -130,28 +116,41 @@ export const useAdmin = () => {
         return stock > 0 && stock < 10;
       });
 
-      const outOfStock = products.filter(p => {
-        const stock = p.stockQuantity || p.StockQuantity || 0;
-        return stock === 0;
+      const analysis = products.map(p => ({
+        productName: p.name || p.productName,
+        category: p.category || p.categoryName,
+        brand: p.brand,
+        quantity: p.stockQuantity || p.StockQuantity || 0,
+        price: p.price || 0,
+        minimumStock: 10,
+        id: p._id || p.id,
+        productId: p._id || p.id
+      }));
+
+      // Group by category
+      const categoryMap = {};
+      products.forEach(p => {
+        const cat = p.category || p.categoryName || 'Uncategorized';
+        if (!categoryMap[cat]) {
+          categoryMap[cat] = {
+            category: cat,
+            items: [],
+            totalQuantity: 0,
+            totalValue: 0
+          };
+        }
+        categoryMap[cat].items.push(p);
+        categoryMap[cat].totalQuantity += (p.stockQuantity || 0);
+        categoryMap[cat].totalValue += (p.price || 0) * (p.stockQuantity || 0);
       });
 
-      const totalValue = products.reduce((sum, p) => {
-        const price = p.price || p.Price || 0;
-        const stock = p.stockQuantity || p.StockQuantity || 0;
-        return sum + (price * stock);
-      }, 0);
-
-      const analysis = {
-        lowStock,
-        outOfStock,
-        totalValue,
-        totalProducts: products.length,
-        lowStockCount: lowStock.length,
-        outOfStockCount: outOfStock.length
-      };
+      const byCategory = Object.values(categoryMap);
 
       setStockAnalysis(analysis);
-      return analysis;
+      setLowStockProducts(lowStock);
+      setStockByCategory(byCategory);
+
+      return { analysis, lowStock, byCategory };
     } catch (err) {
       console.error('❌ Failed to fetch stock analysis:', err);
       throw err;
@@ -159,24 +158,23 @@ export const useAdmin = () => {
   };
 
   /**
-   * Fetch sales report for date range from MongoDB
+   * Fetch sales report for date range
    */
   const fetchSalesReport = async (startDate, endDate) => {
     try {
-      console.log('📊 [useAdmin] Fetching sales report from MongoDB...');
+      console.log('📊 [useAdmin] Fetching sales report...');
 
-      if (typeof mongoAdminAPI.getSalesReport === 'function') {
-        const reportRes = await mongoAdminAPI.getSalesReport(startDate, endDate);
+      if (typeof adminAPI.getSalesReport === 'function') {
+        const reportRes = await adminAPI.getSalesReport(startDate, endDate);
         const report = reportRes?.data || reportRes || {};
         
-        console.log('✅ Sales Report:', report);
+        console.log('✅ Sales Report received');
         
-        // Transform to expected format
         const transformed = {
-          totalRevenue: report.totalSales || report.TotalSales || 0,
+          totalRevenue: report.totalSales || report.TotalSales || report.totalRevenue || 0,
           totalOrders: report.totalOrders || report.TotalOrders || 0,
           averageOrderValue: report.averageOrderValue || report.AverageOrderValue || 0,
-          dailySales: report.dailySalesList || report.DailySalesList || [],
+          dailySales: report.dailySales || report.dailySalesList || report.DailySalesList || [],
           topProducts: report.topProducts || report.TopProducts || []
         };
         
@@ -186,7 +184,7 @@ export const useAdmin = () => {
 
       // Fallback: calculate from orders
       console.log('⚠️ Using fallback sales calculation');
-      const ordersRes = await mongoAdminAPI.getOrders();
+      const ordersRes = await adminAPI.getOrders();
       const allOrders = Array.isArray(ordersRes) ? ordersRes : (ordersRes?.data || []);
 
       // Filter by date range
@@ -219,49 +217,18 @@ export const useAdmin = () => {
   };
 
   /**
-   * Delete a user/customer (MongoDB)
+   * Update order status
    */
-  const deleteUser = async (userId) => {
+  const updateOrderStatus = async (orderId, statusData) => {
     try {
-      console.log('🗑️ [useAdmin] Deleting user:', userId);
+      console.log('✏️ [useAdmin] Updating order status:', { orderId, statusData });
       
-      if (typeof mongoAdminAPI.deleteUser === 'function') {
-        await mongoAdminAPI.deleteUser(userId);
-      } else {
-        console.warn('⚠️ Delete user API not implemented');
-        throw new Error('Delete user not implemented');
-      }
-      
-      // Update local state
-      setAdminCustomers(prev => prev.filter(c => 
-        c.id !== userId && c.Id !== userId && c._id !== userId
-      ));
-      
-      console.log('✅ User deleted successfully');
-    } catch (err) {
-      console.error('❌ Failed to delete user:', err);
-      throw err;
-    }
-  };
-
-  /**
-   * Update order status (MongoDB)
-   */
-  const updateOrderStatus = async (orderId, status) => {
-    try {
-      console.log('✏️ [useAdmin] Updating order status:', { orderId, status });
-      
-      if (typeof mongoAdminAPI.updateOrderStatus === 'function') {
-        await mongoAdminAPI.updateOrderStatus(orderId, { status });
-      } else {
-        console.warn('⚠️ Update order status API not implemented');
-        throw new Error('Update order status not implemented');
-      }
+      await adminAPI.updateOrderStatus(orderId, statusData);
       
       // Update local state
       setAdminOrders(prev => prev.map(o => 
         (o.id === orderId || o.Id === orderId || o._id === orderId)
-          ? { ...o, status, Status: status }
+          ? { ...o, status: statusData.status || statusData, Status: statusData.status || statusData }
           : o
       ));
       
@@ -273,20 +240,16 @@ export const useAdmin = () => {
   };
 
   /**
-   * Add a new product (MongoDB)
+   * Add a new product
    */
   const addProduct = async (productData) => {
     try {
-      console.log('➕ [useAdmin] Adding product:', productData);
+      console.log('➕ [useAdmin] Adding product');
       
-      if (typeof mongoAdminAPI.addProduct === 'function') {
-        const response = await mongoAdminAPI.addProduct(productData);
-        console.log('✅ Product added successfully');
-        return response?.data || response;
-      }
+      const response = await adminAPI.addProduct(productData);
+      console.log('✅ Product added successfully');
       
-      console.warn('⚠️ Add product API not implemented');
-      throw new Error('Add product not implemented');
+      return response?.data || response;
     } catch (err) {
       console.error('❌ Failed to add product:', err);
       throw err;
@@ -294,20 +257,16 @@ export const useAdmin = () => {
   };
 
   /**
-   * Update existing product (MongoDB)
+   * Update existing product
    */
   const updateProduct = async (productId, productData) => {
     try {
-      console.log('✏️ [useAdmin] Updating product:', { productId, productData });
+      console.log('✏️ [useAdmin] Updating product:', productId);
       
-      if (typeof mongoAdminAPI.updateProduct === 'function') {
-        const response = await mongoAdminAPI.updateProduct(productId, productData);
-        console.log('✅ Product updated successfully');
-        return response?.data || response;
-      }
+      const response = await adminAPI.updateProduct(productId, productData);
+      console.log('✅ Product updated successfully');
       
-      console.warn('⚠️ Update product API not implemented');
-      throw new Error('Update product not implemented');
+      return response?.data || response;
     } catch (err) {
       console.error('❌ Failed to update product:', err);
       throw err;
@@ -315,19 +274,14 @@ export const useAdmin = () => {
   };
 
   /**
-   * Delete a product (MongoDB)
+   * Delete a product
    */
   const deleteProduct = async (productId) => {
     try {
       console.log('🗑️ [useAdmin] Deleting product:', productId);
       
-      if (typeof mongoAdminAPI.deleteProduct === 'function') {
-        await mongoAdminAPI.deleteProduct(productId);
-        console.log('✅ Product deleted successfully');
-      } else {
-        console.warn('⚠️ Delete product API not implemented');
-        throw new Error('Delete product not implemented');
-      }
+      await adminAPI.deleteProduct(productId);
+      console.log('✅ Product deleted successfully');
     } catch (err) {
       console.error('❌ Failed to delete product:', err);
       throw err;
@@ -340,13 +294,14 @@ export const useAdmin = () => {
     adminCustomers,
     adminOrders,
     stockAnalysis,
+    lowStockProducts,
+    stockByCategory,
     salesReport,
     
     // Methods
     fetchAdminData,
     fetchStockAnalysis,
     fetchSalesReport,
-    deleteUser,
     updateOrderStatus,
     addProduct,
     updateProduct,
@@ -357,7 +312,10 @@ export const useAdmin = () => {
     setAdminCustomers,
     setAdminOrders,
     setStockAnalysis,
+    setLowStockProducts,
+    setStockByCategory,
     setSalesReport
   };
 };
+
 export default useAdmin;

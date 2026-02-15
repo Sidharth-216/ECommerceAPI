@@ -1,7 +1,6 @@
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
-using ECommerceAPI.Infrastructure.Repositories.Interfaces;
 
 namespace ECommerceAPI.API.Middleware
 {
@@ -18,7 +17,7 @@ namespace ECommerceAPI.API.Middleware
             _next = next;
         }
 
-        public async Task Invoke(HttpContext context, IUserRepository userRepository)
+        public async Task Invoke(HttpContext context)
         {
             var token = context.Request.Headers["Authorization"].FirstOrDefault()?.Split(" ").Last();
 

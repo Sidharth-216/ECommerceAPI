@@ -255,7 +255,7 @@ const ProfilePage = ({
         <div className="mb-8">
           <div className="flex items-center justify-between mb-2">
             <div>
-              <h2 className="text-4xl font-bold text-gray-900 mb-2">Welcome, {user?.name || 'User'}! 👋</h2>
+              <h2 className="text-4xl font-bold text-gray-900 mb-2">Welcome, {profileData.fullName || user?.fullName || user?.name || 'User'}! 👋</h2>
               <p className="text-gray-600">Manage your profile, addresses, and orders in one place</p>
             </div>
             <button
@@ -437,15 +437,27 @@ const ProfilePage = ({
                         const line1 = window.prompt('📍 Address Line 1');
                         if (!line1) return;
 
+                        // Get user ID from session storage
+                        const userData = JSON.parse(sessionStorage.getItem('user') || '{}');
+                        const userId = userData.id || userData.userId || userData.Id;
+
+                        if (!userId) {
+                          alert('❌ User ID not found. Please re-login.');
+                          return;
+                        }
+
                         const payload = {
-                          AddressLine1: line1,
-                          AddressLine2: window.prompt('📍 Address Line 2 (optional)') || '',
-                          City: window.prompt('🏙️ City') || '',
-                          State: window.prompt('📌 State (optional)') || '',
-                          PostalCode: window.prompt('📮 Postal Code (optional)') || '',
-                          Country: window.prompt('🌍 Country', 'India') || 'India',
-                          IsDefault: window.confirm('⭐ Set as default address?')
+                          userId: userId,  // MongoDB ObjectId string
+                          addressLine1: line1,
+                          addressLine2: window.prompt('📍 Address Line 2 (optional)') || '',
+                          city: window.prompt('🏙️ City') || '',
+                          state: window.prompt('📌 State (optional)') || '',
+                          postalCode: window.prompt('📮 Postal Code (optional)') || '',
+                          country: window.prompt('🌍 Country', 'India') || 'India',
+                          isDefault: window.confirm('⭐ Set as default address?')
                         };
+
+                        console.log('Adding address with payload:', payload);
 
                         await addressAPI.add(payload);
 

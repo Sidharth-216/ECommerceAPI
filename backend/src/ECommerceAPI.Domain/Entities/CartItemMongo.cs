@@ -6,6 +6,8 @@ namespace ECommerceAPI.Domain.Entities.Mongo
     {
         public string ProductId { get; set; } = ""; // Mongo ObjectId
         public string ProductName { get; set; } = "";
+        public string ProductIdString { get; set; }
+
         public decimal Price { get; set; }           // per unit price
         public int Quantity { get; set; }
         public string ImageUrl { get; set; } = "";

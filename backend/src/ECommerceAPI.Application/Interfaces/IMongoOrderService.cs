@@ -1,95 +1,81 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using ECommerceAPI.Application.DTOs.Orders;
+using ECommerceAPI.Domain.Entities.MongoDB;
 
 namespace ECommerceAPI.Application.Interfaces
 {
     /// <summary>
-    /// MongoDB Order Service Interface - Pure MongoDB Support
+    /// MongoDB Order Service Interface - CORRECTED to match existing implementation
     /// </summary>
     public interface IMongoOrderService
     {
-        // ═══════════════════════════════════════════════════════════
-        // PURE MONGODB METHODS (Use these for MongoDB-only mode)
-        // ═══════════════════════════════════════════════════════════
-
         /// <summary>
-        /// Create a new order from cart (Pure MongoDB)
+        /// Create an order from cart (Pure MongoDB)
         /// </summary>
-        /// <param name="mongoUserId">MongoDB User ObjectId (24 hex characters)</param>
-        /// <param name="createDto">Order creation data</param>
         Task<OrderDto> CreateOrderAsync(string mongoUserId, CreateOrderDto createDto);
 
         /// <summary>
-        /// Get all orders for a user (Pure MongoDB)
-        /// </summary>
-        /// <param name="mongoUserId">MongoDB User ObjectId (24 hex characters)</param>
-        Task<IEnumerable<OrderDto>> GetUserOrdersAsync(string mongoUserId);
-
-        /// <summary>
-        /// Get order by MongoDB ID (Pure MongoDB)
-        /// </summary>
-        /// <param name="mongoId">MongoDB Order ObjectId</param>
-        /// <param name="mongoUserId">MongoDB User ObjectId</param>
-        Task<OrderDto> GetOrderByMongoIdAsync(string mongoId, string mongoUserId);
-
-        /// <summary>
-        /// Get order by Order Number (Pure MongoDB)
-        /// </summary>
-        /// <param name="orderNumber">Order number</param>
-        /// <param name="mongoUserId">MongoDB User ObjectId</param>
-        Task<OrderDto> GetOrderByOrderNumberAsync(string orderNumber, string mongoUserId);
-
-        /// <summary>
-        /// Cancel an order (Pure MongoDB)
-        /// </summary>
-        /// <param name="mongoId">MongoDB Order ObjectId</param>
-        /// <param name="mongoUserId">MongoDB User ObjectId</param>
-        Task CancelOrderAsync(string mongoId, string mongoUserId);
-
-        // ═══════════════════════════════════════════════════════════
-        // LEGACY SQL OVERLOADS (For backwards compatibility)
-        // These throw NotSupportedException in pure MongoDB mode
-        // ═══════════════════════════════════════════════════════════
-
-        /// <summary>
-        /// [LEGACY] Create order with SQL User ID - Not supported in pure MongoDB mode
+        /// Create an order from cart (SQL compatibility - throws NotSupportedException)
         /// </summary>
         Task<OrderDto> CreateOrderAsync(int sqlUserId, CreateOrderDto createDto);
 
         /// <summary>
-        /// [LEGACY] Get orders with SQL User ID - Not supported in pure MongoDB mode
+        /// Get all orders for a user (Pure MongoDB)
+        /// </summary>
+        Task<IEnumerable<OrderDto>> GetUserOrdersAsync(string mongoUserId);
+
+        /// <summary>
+        /// Get all orders for a user (SQL compatibility - throws NotSupportedException)
         /// </summary>
         Task<IEnumerable<OrderDto>> GetUserOrdersAsync(int sqlUserId);
 
         /// <summary>
-        /// [LEGACY] Get order with SQL User ID - Not supported in pure MongoDB mode
+        /// Get order by MongoDB ID (Pure MongoDB)
+        /// </summary>
+        Task<OrderDto> GetOrderByMongoIdAsync(string mongoId, string mongoUserId);
+
+        /// <summary>
+        /// Get order by MongoDB ID (SQL compatibility - throws NotSupportedException)
         /// </summary>
         Task<OrderDto> GetOrderByMongoIdAsync(string mongoId, int sqlUserId);
 
         /// <summary>
-        /// [LEGACY] Get order by number with SQL User ID - Not supported in pure MongoDB mode
+        /// Get order by order number (Pure MongoDB)
+        /// </summary>
+        Task<OrderDto> GetOrderByOrderNumberAsync(string orderNumber, string mongoUserId);
+
+        /// <summary>
+        /// Get order by order number (SQL compatibility - throws NotSupportedException)
         /// </summary>
         Task<OrderDto> GetOrderByOrderNumberAsync(string orderNumber, int sqlUserId);
 
         /// <summary>
-        /// [LEGACY] Cancel order with SQL User ID - Not supported in pure MongoDB mode
+        /// Cancel an order (Pure MongoDB) - Returns Task (void)
+        /// </summary>
+        Task CancelOrderAsync(string mongoId, string mongoUserId);
+
+        /// <summary>
+        /// Cancel an order (SQL compatibility - throws NotSupportedException)
         /// </summary>
         Task CancelOrderAsync(string mongoId, int sqlUserId);
 
-        // ═══════════════════════════════════════════════════════════
-        // COMMON METHODS (Work in both modes)
-        // ═══════════════════════════════════════════════════════════
-
         /// <summary>
-        /// Get all orders (Admin only)
+        /// Get all orders (Admin)
         /// </summary>
         Task<IEnumerable<OrderDto>> GetAllOrdersAsync();
 
         /// <summary>
         /// Check if order exists
         /// </summary>
-        /// <param name="mongoId">MongoDB Order ObjectId</param>
         Task<bool> OrderExistsAsync(string mongoId);
+
+        /// <summary>
+        /// Update order status (ADMIN ONLY)
+        /// </summary>
+        /// <param name="orderId">MongoDB ObjectId of the order</param>
+        /// <param name="newStatus">New status (Pending, Processing, Shipped, Delivered, Cancelled)</param>
+        /// <returns>True if update successful, false if order not found</returns>
+        Task<bool> UpdateOrderStatusAsync(string orderId, string newStatus);
     }
 }

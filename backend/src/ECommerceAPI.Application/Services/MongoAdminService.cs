@@ -14,8 +14,8 @@ using Microsoft.Extensions.Logging;
 namespace ECommerceAPI.Application.Services
 {
     /// <summary>
-    /// MongoDB Admin Service Implementation - FIXED VERSION
-    /// Properly retrieves data from MongoDB Atlas
+    /// MongoDB Admin Service Implementation - COMPLETE & FIXED
+    /// All features intact with proper error handling
     /// </summary>
     public class MongoAdminService : IMongoAdminService
     {
@@ -30,10 +30,10 @@ namespace ECommerceAPI.Application.Services
             IProductMongoRepository productRepository,
             ILogger<MongoAdminService> logger)
         {
-            _userRepository = userRepository;
-            _orderRepository = orderRepository;
-            _productRepository = productRepository;
-            _logger = logger;
+            _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
+            _orderRepository = orderRepository ?? throw new ArgumentNullException(nameof(orderRepository));
+            _productRepository = productRepository ?? throw new ArgumentNullException(nameof(productRepository));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         #region User Management
@@ -260,23 +260,30 @@ namespace ECommerceAPI.Application.Services
                 var orders = await _orderRepository.GetAllAsync();
                 var completedOrders = orders.Where(o => o.Status != "Cancelled").ToList();
 
+                if (!completedOrders.Any())
+                {
+                    _logger.LogWarning("⚠️ No completed orders found for top products");
+                    return new List<TopProductDto>();
+                }
+
                 var products = await _productRepository.GetAllAsync();
                 var productDict = products.ToDictionary(p => p.Id, p => p);
 
                 var topProducts = completedOrders
-                    .SelectMany(o => o.Items)
+                    .SelectMany(o => o.Items ?? new List<MongoOrderItem>())
+                    .Where(i => !string.IsNullOrEmpty(i.ProductId))
                     .GroupBy(i => new
                     {
                         i.ProductId,
                         i.ProductName,
                         Category = productDict.ContainsKey(i.ProductId)
-                            ? productDict[i.ProductId].Category?.Name ?? "Uncategorized"
+                            ? (productDict[i.ProductId].Category?.Name ?? "Uncategorized")
                             : "Uncategorized"
                     })
                     .Select(g => new TopProductDto
                     {
                         ProductId = g.Key.ProductId,
-                        ProductName = g.Key.ProductName,
+                        ProductName = g.Key.ProductName ?? "Unknown Product",
                         Category = g.Key.Category,
                         QuantitySold = g.Sum(i => i.Quantity),
                         Revenue = g.Sum(i => i.Price * i.Quantity),
@@ -307,18 +314,25 @@ namespace ECommerceAPI.Application.Services
                 var orders = await _orderRepository.GetOrdersByDateRangeAsync(start, end);
                 var completedOrders = orders.Where(o => o.Status != "Cancelled").ToList();
 
+                if (!completedOrders.Any())
+                {
+                    _logger.LogWarning("⚠️ No completed orders found for category sales");
+                    return new List<CategorySalesDto>();
+                }
+
                 var products = await _productRepository.GetAllAsync();
                 var productDict = products.ToDictionary(p => p.Id, p => p);
 
                 var totalRevenue = completedOrders.Sum(o => o.TotalAmount);
 
                 var categorySales = completedOrders
-                    .SelectMany(o => o.Items)
+                    .SelectMany(o => o.Items ?? new List<MongoOrderItem>())
+                    .Where(i => !string.IsNullOrEmpty(i.ProductId))
                     .Select(i => new
                     {
                         Item = i,
                         Category = productDict.ContainsKey(i.ProductId)
-                            ? productDict[i.ProductId].Category?.Name ?? "Uncategorized"
+                            ? (productDict[i.ProductId].Category?.Name ?? "Uncategorized")
                             : "Uncategorized"
                     })
                     .GroupBy(x => x.Category)
@@ -356,23 +370,30 @@ namespace ECommerceAPI.Application.Services
                 var orders = await _orderRepository.GetOrdersByDateRangeAsync(start, end);
                 var completedOrders = orders.Where(o => o.Status != "Cancelled").ToList();
 
+                if (!completedOrders.Any())
+                {
+                    _logger.LogWarning("⚠️ No completed orders found for product sales");
+                    return new List<ProductSalesDto>();
+                }
+
                 var products = await _productRepository.GetAllAsync();
                 var productDict = products.ToDictionary(p => p.Id, p => p);
 
                 var productSales = completedOrders
-                    .SelectMany(o => o.Items)
+                    .SelectMany(o => o.Items ?? new List<MongoOrderItem>())
+                    .Where(i => !string.IsNullOrEmpty(i.ProductId))
                     .GroupBy(i => new
                     {
                         i.ProductId,
                         i.ProductName,
                         Category = productDict.ContainsKey(i.ProductId)
-                            ? productDict[i.ProductId].Category?.Name ?? "Uncategorized"
+                            ? (productDict[i.ProductId].Category?.Name ?? "Uncategorized")
                             : "Uncategorized"
                     })
                     .Select(g => new ProductSalesDto
                     {
                         ProductId = g.Key.ProductId,
-                        ProductName = g.Key.ProductName,
+                        ProductName = g.Key.ProductName ?? "Unknown Product",
                         Category = g.Key.Category,
                         QuantitySold = g.Sum(i => i.Quantity),
                         Revenue = g.Sum(i => i.Price * i.Quantity),
@@ -403,13 +424,16 @@ namespace ECommerceAPI.Application.Services
                 var products = await _productRepository.GetAllAsync();
                 var productList = products?.ToList() ?? new List<ProductMongo>();
 
+                _logger.LogInformation($"📦 Found {productList.Count} products in database");
+
+                // Extract low stock items with detailed logging
                 var lowStockItems = productList
                     .Where(p => p.StockQuantity > 0 && p.StockQuantity <= 10)
                     .OrderBy(p => p.StockQuantity)
                     .Select(p => new LowStockProductDto
                     {
                         ProductId = p.Id,
-                        ProductName = p.Name,
+                        ProductName = p.Name ?? "Unknown Product",
                         Category = p.Category?.Name ?? "Uncategorized",
                         CurrentStock = p.StockQuantity,
                         ReorderLevel = 10,
@@ -417,6 +441,9 @@ namespace ECommerceAPI.Application.Services
                     })
                     .ToList();
 
+                _logger.LogInformation($"⚠️ Found {lowStockItems.Count} low stock items");
+
+                // Group by category with detailed logging
                 var stockByCategory = productList
                     .GroupBy(p => p.Category?.Name ?? "Uncategorized")
                     .Select(g => new CategoryStockDto
@@ -429,7 +456,9 @@ namespace ECommerceAPI.Application.Services
                     .OrderByDescending(c => c.TotalValue)
                     .ToList();
 
-                return new StockAnalysisDto
+                _logger.LogInformation($"📊 Grouped into {stockByCategory.Count} categories");
+
+                var analysis = new StockAnalysisDto
                 {
                     TotalProducts = productList.Count,
                     TotalStockQuantity = productList.Sum(p => p.StockQuantity),
@@ -439,6 +468,14 @@ namespace ECommerceAPI.Application.Services
                     LowStockItems = lowStockItems,
                     StockByCategory = stockByCategory
                 };
+
+                _logger.LogInformation($"✅ Stock analysis complete:");
+                _logger.LogInformation($"   Total Products: {analysis.TotalProducts}");
+                _logger.LogInformation($"   Low Stock: {analysis.LowStockProducts}");
+                _logger.LogInformation($"   Out of Stock: {analysis.OutOfStockProducts}");
+                _logger.LogInformation($"   Total Value: ₹{analysis.TotalStockValue:N2}");
+
+                return analysis;
             }
             catch (Exception ex)
             {
@@ -487,16 +524,23 @@ namespace ECommerceAPI.Application.Services
                 var topCustomers = new List<TopCustomer>();
                 foreach (var customerData in topCustomersData)
                 {
-                    var user = await _userRepository.GetByIdAsync(customerData.UserId);
-                    if (user != null)
+                    try
                     {
-                        topCustomers.Add(new TopCustomer
+                        var user = await _userRepository.GetByIdAsync(customerData.UserId);
+                        if (user != null)
                         {
-                            UserId = user.SqlUserId ?? 0,
-                            Name = user.FullName,
-                            TotalSpent = customerData.TotalSpent,
-                            OrderCount = customerData.OrderCount
-                        });
+                            topCustomers.Add(new TopCustomer
+                            {
+                                UserId = user.SqlUserId ?? 0,
+                                Name = user.FullName ?? "Unknown",
+                                TotalSpent = customerData.TotalSpent,
+                                OrderCount = customerData.OrderCount
+                            });
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, $"Could not fetch user {customerData.UserId} for top customers");
                     }
                 }
 
@@ -547,7 +591,7 @@ namespace ECommerceAPI.Application.Services
                         Date = date,
                         Orders = dayOrders.Count,
                         Revenue = dayOrders.Sum(o => o.TotalAmount),
-                        ItemsSold = dayOrders.Sum(o => o.Items.Sum(i => i.Quantity)),
+                        ItemsSold = dayOrders.Sum(o => (o.Items ?? new List<MongoOrderItem>()).Sum(i => i.Quantity)),
                         NewCustomers = newCustomers
                     });
                 }
@@ -653,13 +697,13 @@ namespace ECommerceAPI.Application.Services
                 Status = order.Status ?? "Unknown",
                 TotalAmount = order.TotalAmount,
                 CreatedAt = order.CreatedAt,
-                Items = order.Items?.Select(i => new OrderItemDto
+                Items = (order.Items ?? new List<MongoOrderItem>()).Select(i => new OrderItemDto
                 {
-                    ProductId = i.ProductId,
+                    ProductId = i.ProductId ?? "",
                     ProductName = i.ProductName ?? "Unknown Product",
                     Price = i.Price,
                     Quantity = i.Quantity
-                }).ToList() ?? new List<OrderItemDto>()
+                }).ToList()
             };
         }
 
