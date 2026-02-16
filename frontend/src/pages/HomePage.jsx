@@ -1,173 +1,199 @@
 import React from 'react';
-import { ShoppingBag, TrendingUp, Package, CreditCard, Users, MapPin, BarChart3 } from 'lucide-react';
+import { 
+  ShoppingBag, TrendingUp, Package, CreditCard, 
+  Users, MapPin, BarChart3, ArrowRight, Sparkles, 
+  ShieldCheck, Zap 
+} from 'lucide-react';
 import { getSampleProducts } from '../utils/helpers';
 
-const HomePage = ({ setCurrentPage, products, addToCart }) => {
+const HomePage = ({ setCurrentPage, products }) => {
   const displayProducts = (products && products.length) ? products : getSampleProducts();
 
+  // The specific theme class you provided
+  const primaryBtn = "bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 text-white font-semibold transition-all shadow-md hover:shadow-cyan-200/50 active:scale-95";
+  const secondaryBtn = "bg-white border-2 border-gray-100 text-gray-700 hover:border-teal-500 hover:text-teal-600 font-semibold transition-all active:scale-95";
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      {/* Header */}
-      <header className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <ShoppingBag className="w-10 h-10 text-blue-600" />
-          <div>
-            <h1 className="text-2xl font-extrabold text-gray-900">ShopAI</h1>
-            <p className="text-xs text-gray-500 -mt-0.5">AI-powered shopping made simple</p>
+    <div className="min-h-screen bg-[#F8FAFC] font-sans selection:bg-teal-100 selection:text-teal-900">
+      
+      {/* --- Navigation --- */}
+      <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100">
+        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+          <div className="flex items-center gap-2.5 group cursor-pointer">
+            <div className="bg-gradient-to-br from-teal-500 to-cyan-600 p-2 rounded-xl group-hover:rotate-12 transition-transform duration-300">
+              <ShoppingBag className="w-6 h-6 text-white" />
+            </div>
+            <span className="text-2xl font-black bg-clip-text text-transparent bg-gradient-to-r from-teal-600 to-cyan-700 tracking-tight">
+              ShopAI
+            </span>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setCurrentPage('login')}
+              className="hidden sm:block text-sm font-bold text-gray-500 hover:text-teal-600 transition-colors"
+            >
+              Sign In
+            </button>
+            <button
+              onClick={() => setCurrentPage('register')}
+              className={`${primaryBtn} px-5 py-2.5 rounded-xl text-sm`}
+            >
+              Get Started
+            </button>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setCurrentPage('login')}
-            className="px-4 py-2 rounded-md bg-white border text-sm font-medium hover:shadow"
-          >
-            Sign In
-          </button>
-          <button
-            onClick={() => setCurrentPage('register')}
-            className="px-4 py-2 rounded-md bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700"
-          >
-            Create Account
-          </button>
-        </div>
-      </header>
+      </nav>
 
-      <main className="max-w-7xl mx-auto px-6 py-12 grid lg:grid-cols-2 gap-10 items-center">
-        {/* Hero Section */}
-        <section className="space-y-6">
-          <h2 className="text-4xl lg:text-5xl font-extrabold text-gray-900 leading-tight">
-            Discover products you'll love — curated by AI
-          </h2>
-          <p className="text-gray-600 max-w-xl">
-            Smart recommendations, secure checkout and express delivery — all in one place.
-            Shop top gadgets, wearables and accessories handpicked to match your taste.
-          </p>
+      <main className="max-w-7xl mx-auto px-6 py-12 lg:py-20">
+        <div className="grid lg:grid-cols-12 gap-16 items-center">
+          
+          {/* --- Hero Section --- */}
+          <section className="lg:col-span-7 space-y-8 animate-[fadeIn_0.8s_ease-out]">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-teal-50 border border-teal-100 rounded-full text-teal-700 text-xs font-bold uppercase tracking-widest">
+              <Sparkles size={14} className="animate-pulse" />
+              Powered by Next-Gen AI
+            </div>
+            
+            <h2 className="text-5xl lg:text-7xl font-black text-slate-900 leading-[1.1] tracking-tight">
+              Shop Smarter, <br />
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-teal-500 to-cyan-600">
+                Not Harder.
+              </span>
+            </h2>
+            
+            <p className="text-xl text-slate-600 leading-relaxed max-w-xl">
+              Experience a marketplace that learns your style. From high-tech gadgets to lifestyle essentials, get curated picks delivered to your door.
+            </p>
 
-          <div className="flex flex-wrap gap-3">
-            <button
-              onClick={() => setCurrentPage('login')}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold shadow hover:bg-blue-700"
-            >
-              Shop Now
-            </button>
-            <button
-              onClick={() => setCurrentPage('login')}
-              className="px-6 py-3 bg-white border rounded-lg text-gray-800 hover:shadow"
-            >
-              Browse Categories
-            </button>
-          </div>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <button
+                onClick={() => setCurrentPage('login')}
+                className={`${primaryBtn} px-8 py-4 rounded-2xl text-lg flex items-center justify-center gap-2 group`}
+              >
+                Explore Collection
+                <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+              </button>
+              <button
+                onClick={() => setCurrentPage('login')}
+                className={`${secondaryBtn} px-8 py-4 rounded-2xl text-lg`}
+              >
+                Watch Demo
+              </button>
+            </div>
 
-          <div className="mt-6 grid grid-cols-3 gap-3">
-            <div className="flex items-start gap-3 bg-white p-3 rounded-lg shadow-sm">
-              <TrendingUp className="w-6 h-6 text-blue-600 mt-1" />
+            {/* Quick Stats */}
+            <div className="pt-8 grid grid-cols-3 gap-8 border-t border-gray-100">
               <div>
-                <p className="text-sm font-semibold">Smart Picks</p>
-                <p className="text-xs text-gray-500">AI recommendations</p>
+                <p className="text-2xl font-black text-slate-900">50k+</p>
+                <p className="text-sm text-slate-500 font-medium">Products</p>
+              </div>
+              <div>
+                <p className="text-2xl font-black text-slate-900">12h</p>
+                <p className="text-sm text-slate-500 font-medium">Avg. Delivery</p>
+              </div>
+              <div>
+                <p className="text-2xl font-black text-slate-900">4.9/5</p>
+                <p className="text-sm text-slate-500 font-medium">Rating</p>
               </div>
             </div>
-            <div className="flex items-start gap-3 bg-white p-3 rounded-lg shadow-sm">
-              <Package className="w-6 h-6 text-blue-600 mt-1" />
-              <div>
-                <p className="text-sm font-semibold">Fast Delivery</p>
-                <p className="text-xs text-gray-500">Reliable & on time</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3 bg-white p-3 rounded-lg shadow-sm">
-              <CreditCard className="w-6 h-6 text-blue-600 mt-1" />
-              <div>
-                <p className="text-sm font-semibold">Secure Payments</p>
-                <p className="text-xs text-gray-500">Encrypted checkout</p>
-              </div>
-            </div>
-          </div>
-        </section>
+          </section>
 
-        {/* Featured Products Preview */}
-        <aside className="bg-gradient-to-tr from-white to-blue-50 rounded-2xl p-6 shadow-lg">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold">Featured for you</h3>
-            <button
-              onClick={() => setCurrentPage('login')}
-              className="text-sm text-blue-600 hover:underline"
-            >
-              View all
-            </button>
-          </div>
+          {/* --- Featured Visual (Bento Style Preview) --- */}
+          <aside className="lg:col-span-5 relative group">
+            <div className="absolute inset-0 bg-gradient-to-r from-teal-400 to-cyan-400 blur-[80px] opacity-20 group-hover:opacity-30 transition-opacity"></div>
+            
+            <div className="relative bg-white border border-gray-100 rounded-[40px] p-8 shadow-2xl">
+              <div className="flex items-center justify-between mb-8">
+                <h3 className="text-xl font-bold text-slate-900">Trending Now</h3>
+                <Zap size={20} className="text-amber-500 fill-amber-500" />
+              </div>
 
-          <div className="grid grid-cols-1 gap-4">
-            {displayProducts.slice(0, 3).map((p) => (
-              <div key={p.id} className="flex items-center gap-4 bg-white rounded-lg p-3 shadow-sm">
-                <img src={p.image} alt={p.name} className="w-20 h-20 rounded-md object-cover" />
-                <div className="flex-1">
-                  <p className="text-sm text-gray-500">{p.brand}</p>
-                  <h4 className="text-sm font-semibold text-gray-900 line-clamp-2">{p.name}</h4>
-                  <div className="flex items-center justify-between mt-2">
-                    <span className="text-blue-600 font-bold">₹{p.price}</span>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setCurrentPage('login')}
-                        className="px-3 py-1 bg-green-600 text-white rounded-md text-xs hover:bg-green-700"
-                      >
-                        Add
-                      </button>
-                      <button
-                        onClick={() => setCurrentPage('login')}
-                        className="px-2 py-1 border rounded-md text-xs text-gray-600"
-                      >
-                        Details
-                      </button>
+              <div className="space-y-4">
+                {displayProducts.slice(0, 3).map((p, idx) => (
+                  <div 
+                    key={p.id} 
+                    className="flex items-center gap-4 p-4 bg-slate-50 rounded-3xl hover:bg-white hover:shadow-xl hover:scale-[1.02] transition-all cursor-pointer border border-transparent hover:border-teal-100 group/item"
+                    style={{ animationDelay: `${idx * 0.1}s` }}
+                  >
+                    <img src={p.image} alt={p.name} className="w-20 h-20 rounded-2xl object-cover bg-white shadow-sm" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] font-bold text-teal-600 uppercase tracking-widest">{p.brand}</p>
+                      <h4 className="text-sm font-bold text-slate-900 truncate">{p.name}</h4>
+                      <p className="text-lg font-black text-slate-900 mt-1">₹{p.price}</p>
                     </div>
+                    <button 
+                       onClick={() => setCurrentPage('login')}
+                       className="p-2 bg-white rounded-full text-slate-400 group-hover/item:text-teal-500 group-hover/item:bg-teal-50 shadow-sm transition-all"
+                    >
+                      <ArrowRight size={18} />
+                    </button>
                   </div>
+                ))}
+              </div>
+
+              <div className="mt-8 pt-6 border-t border-dashed border-gray-200">
+                <div className="flex items-center justify-around text-slate-400">
+                    <ShieldCheck size={20} />
+                    <div className="h-4 w-px bg-gray-200"></div>
+                    <span className="text-xs font-bold uppercase tracking-tighter">Verified Sellers Only</span>
                 </div>
               </div>
-            ))}
-          </div>
-
-          <div className="mt-6 text-center text-xs text-gray-500">
-            <p>Free returns • 24/7 support • Trusted sellers</p>
-          </div>
-        </aside>
+            </div>
+          </aside>
+        </div>
       </main>
 
-      {/* Why ShopAI Section */}
-      <section className="max-w-7xl mx-auto px-6 py-8">
-        <div className="bg-white rounded-xl p-6 shadow-sm">
-          <h4 className="text-lg font-bold mb-4">Why ShopAI?</h4>
-          <div className="grid md:grid-cols-3 gap-6">
-            <div className="flex gap-4 items-start">
-              <Users className="w-7 h-7 text-blue-600 mt-1" />
-              <div>
-                <p className="font-semibold">Personalized experience</p>
-                <p className="text-sm text-gray-500">Recommendations tailored to you.</p>
+      {/* --- Value Proposition Section --- */}
+      <section className="bg-slate-900 py-20 text-white overflow-hidden relative">
+        <div className="max-w-7xl mx-auto px-6 relative z-10">
+          <div className="grid md:grid-cols-3 gap-12">
+            {[
+              { icon: <TrendingUp className="text-teal-400" />, title: "Smart Picks", desc: "Our AI analyzes millions of reviews to find you the absolute best." },
+              { icon: <Package className="text-cyan-400" />, title: "Hyper-Fast", desc: "Warehouses in every major city ensuring 24-hour delivery cycles." },
+              { icon: <CreditCard className="text-teal-400" />, title: "Secure Pay", desc: "Military-grade encryption for every single transaction you make." }
+            ].map((feature, i) => (
+              <div key={i} className="group cursor-default">
+                <div className="mb-4 bg-white/5 w-14 h-14 rounded-2xl flex items-center justify-center group-hover:bg-teal-500/20 transition-colors">
+                  {feature.icon}
+                </div>
+                <h4 className="text-xl font-bold mb-2">{feature.title}</h4>
+                <p className="text-slate-400 text-sm leading-relaxed">{feature.desc}</p>
               </div>
-            </div>
-            <div className="flex gap-4 items-start">
-              <MapPin className="w-7 h-7 text-blue-600 mt-1" />
-              <div>
-                <p className="font-semibold">Wide delivery network</p>
-                <p className="text-sm text-gray-500">Fast shipping across regions.</p>
-              </div>
-            </div>
-            <div className="flex gap-4 items-start">
-              <BarChart3 className="w-7 h-7 text-blue-600 mt-1" />
-              <div>
-                <p className="font-semibold">Trusted insights</p>
-                <p className="text-sm text-gray-500">Top picks based on real data.</p>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="max-w-7xl mx-auto px-6 py-6 text-sm text-gray-500 flex justify-between">
-        <div>© {new Date().getFullYear()} ShopAI — All rights reserved</div>
-        <div className="flex gap-4">
-          <button onClick={() => setCurrentPage('login')} className="hover:underline">Products</button>
-          <button onClick={() => setCurrentPage('login')} className="hover:underline">Support</button>
+      {/* --- Footer --- */}
+      <footer className="bg-white py-12 border-t border-gray-100">
+        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-8">
+          <div className="flex items-center gap-2">
+            <div className="bg-teal-500 p-1.5 rounded-lg">
+              <ShoppingBag className="w-4 h-4 text-white" />
+            </div>
+            <span className="text-lg font-black text-slate-900 tracking-tight">ShopAI</span>
+          </div>
+          
+          <div className="text-slate-400 text-sm font-medium">
+            © {new Date().getFullYear()} — Designed for the future of commerce.
+          </div>
+
+          <div className="flex gap-8">
+            <button onClick={() => setCurrentPage('login')} className="text-sm font-bold text-slate-600 hover:text-teal-600 transition-colors">Help</button>
+            <button onClick={() => setCurrentPage('login')} className="text-sm font-bold text-slate-600 hover:text-teal-600 transition-colors">Privacy</button>
+            <button onClick={() => setCurrentPage('login')} className="text-sm font-bold text-slate-600 hover:text-teal-600 transition-colors">Terms</button>
+          </div>
         </div>
       </footer>
+
+      {/* Basic Keyframe Animation */}
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 };

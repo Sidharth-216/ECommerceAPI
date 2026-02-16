@@ -1,5 +1,9 @@
 import React, { useState } from 'react';
-import { ShoppingBag, User, Mail, Phone, Eye, EyeOff } from 'lucide-react';
+import { 
+  ShoppingBag, User, Mail, Phone, Eye, EyeOff, 
+  ArrowRight, CheckCircle2, ShieldCheck, 
+  Globe, Truck, CreditCard, ChevronLeft 
+} from 'lucide-react';
 
 const RegisterPage = ({ 
   setCurrentPage, 
@@ -21,36 +25,19 @@ const RegisterPage = ({
   });
   const [loginRole, setLoginRole] = useState('Customer');
 
+  // Theme Constants
+  const primaryGradient = "bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700";
+  const inputStyle = "w-full pl-11 pr-4 py-3 bg-gray-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-teal-500 outline-none transition-all font-medium text-sm";
+
   const handleRegister = async () => {
     const { fullName, email, mobile, password, confirmPassword, gender } = registerData;
     
-    if (!fullName?.trim()) {
-      setError('Full name is required');
+    if (!fullName?.trim() || !email?.trim() || !mobile?.trim() || !password) {
+      setError('Please fill in all required fields');
       return;
     }
-    
-    if (!email?.trim()) {
-      setError('Email is required');
-      return;
-    }
-    
-    if (!mobile?.trim()) {
-      setError('Mobile number is required');
-      return;
-    }
-    
-    if (!password) {
-      setError('Password is required');
-      return;
-    }
-    
     if (password !== confirmPassword) {
       setError('Passwords do not match');
-      return;
-    }
-    
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
       return;
     }
     
@@ -59,454 +46,228 @@ const RegisterPage = ({
     
     try {
       const { mongoAuthAPI, getUserIdFromToken } = await import('../api');
-      
-      const response = await mongoAuthAPI.register(
-        fullName.trim(),
-        email.trim(),
-        mobile.trim(),
-        password,
-        gender
-      );
-      
+      const response = await mongoAuthAPI.register(fullName.trim(), email.trim(), mobile.trim(), password, gender);
       const data = response.data;
       
-      if (!data.token) {
-        throw new Error('No token received from server');
-      }
-
-      if (!data.role) {
-        throw new Error('No role returned from server');
-      }
-
       sessionStorage.setItem('token', data.token);
+      const userId = getUserIdFromToken() || data.userId || data.id;
       
-      const userIdFromToken = getUserIdFromToken();
-      const finalUserId = userIdFromToken || data.userId || data.id || data.mongoUserId || `user_${Date.now()}`;
-      
-      const userData = {
-        ...data,
-        userId: finalUserId,
-        id: finalUserId
-      };
-      
+      const userData = { ...data, userId, id: userId };
       sessionStorage.setItem('user', JSON.stringify(userData));
       
-      setUser({
-        id: finalUserId,
-        userId: finalUserId,
-        email: data.email,
-        role: data.role,
-        name: data.fullName,
-        mobile: data.mobile || mobile,
-        gender: data.gender || gender
-      });
-      
-      setProfileData({
-        fullName: data.fullName || fullName,
-        email: data.email || email,
-        mobile: data.mobile || mobile,
-        gender: data.gender || gender,
-        addresses: []
-      });
-      
+      setUser(userData);
+      setProfileData({ ...userData, addresses: [] });
       setCurrentPage('products');
       
     } catch (err) {
-      console.error('Registration error:', err);
-      
-      const errorMessage = err.response?.data?.message || 
-                          err.response?.data?.title ||
-                          err.response?.data?.errors?.Email?.[0] ||
-                          err.message || 
-                          'Registration failed. Please try again.';
-      
-      setError(errorMessage);
+      setError(err.response?.data?.message || 'Registration failed.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Header */}
-      <header className="border-b border-gray-200 sticky top-0 z-40 bg-white">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-[#FDFDFF] flex flex-col lg:flex-row">
+      
+      {/* --- Left Column: Brand & Benefits --- */}
+      <section className="lg:w-[40%] bg-slate-900 lg:fixed lg:h-full p-8 lg:p-16 flex flex-col justify-between overflow-hidden">
+        {/* Abstract Background Element */}
+        <div className="absolute top-0 right-0 w-64 h-64 bg-teal-500/10 rounded-full blur-[100px] -mr-32 -mt-32"></div>
+        
+        <div className="relative z-10">
           <button 
             onClick={() => setCurrentPage('home')}
-            className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+            className="flex items-center gap-2 group mb-12"
           >
-            <div className="bg-blue-600 text-white font-bold px-2 py-1 rounded text-sm">
-              Shop
+            <div className={`${primaryGradient} p-2 rounded-xl`}>
+              <ShoppingBag className="w-5 h-5 text-white" />
             </div>
-            <span className="text-xl font-bold text-gray-900">AI</span>
+            <span className="text-xl font-black text-white tracking-tight">ShopAI</span>
           </button>
-          <div className="text-sm text-gray-600">
-            Already have an account?{' '}
-            <button
-              onClick={() => setCurrentPage('login')}
-              className="text-blue-600 font-semibold hover:text-blue-700"
-            >
-              Sign in
-            </button>
+
+          <h1 className="text-4xl lg:text-5xl font-black text-white leading-tight mb-6">
+            Start your <span className="text-teal-400">journey</span> with us today.
+          </h1>
+          <p className="text-slate-400 text-lg mb-12">Join over 10 million shoppers worldwide.</p>
+
+          <div className="space-y-8">
+            {[
+              { icon: <Truck className="text-teal-400" />, title: "Free Express Shipping", desc: "On all orders above ₹999" },
+              { icon: <ShieldCheck className="text-cyan-400" />, title: "Secure Transactions", desc: "100% payment protection" },
+              { icon: <Globe className="text-teal-400" />, title: "Exclusive Rewards", desc: "Earn points on every purchase" }
+            ].map((benefit, i) => (
+              <div key={i} className="flex gap-4 group">
+                <div className="bg-white/5 p-3 rounded-2xl group-hover:bg-teal-500/20 transition-colors">
+                  {benefit.icon}
+                </div>
+                <div>
+                  <h3 className="font-bold text-white">{benefit.title}</h3>
+                  <p className="text-sm text-slate-500">{benefit.desc}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
-      </header>
 
-      <main className="max-w-6xl mx-auto px-6 py-12">
-        <div className="grid lg:grid-cols-2 gap-16 items-start">
-          {/* Left Column - Benefits */}
-          <section className="space-y-8 hidden lg:block">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Create account</h1>
-              <p className="text-gray-600">Join millions of shoppers and enjoy exclusive deals</p>
-            </div>
-
-            <div className="space-y-6">
-              <div className="flex gap-4">
-                <div className="text-2xl">🚚</div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 mb-1">Fast & Free Shipping</h3>
-                  <p className="text-sm text-gray-600">Get your orders delivered quickly at no extra cost</p>
-                </div>
-              </div>
-
-              <div className="flex gap-4">
-                <div className="text-2xl">🔒</div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 mb-1">Secure Payments</h3>
-                  <p className="text-sm text-gray-600">Your payment information is encrypted and safe</p>
-                </div>
-              </div>
-
-              <div className="flex gap-4">
-                <div className="text-2xl">↩️</div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 mb-1">Easy Returns</h3>
-                  <p className="text-sm text-gray-600">Return or exchange items within 7 days hassle-free</p>
-                </div>
-              </div>
-
-              <div className="flex gap-4">
-                <div className="text-2xl">💳</div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 mb-1">Flexible Payment Options</h3>
-                  <p className="text-sm text-gray-600">Pay with cards, UPI, wallets, or cash on delivery</p>
-                </div>
-              </div>
-
-              <div className="flex gap-4">
-                <div className="text-2xl">⭐</div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 mb-1">Trusted Reviews</h3>
-                  <p className="text-sm text-gray-600">Read verified reviews from real buyers like you</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Stats */}
-            <div className="grid grid-cols-3 gap-4 pt-6 border-t border-gray-200">
-              <div>
-                <p className="text-2xl font-bold text-gray-900">10M+</p>
-                <p className="text-xs text-gray-600 mt-1">Happy Customers</p>
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-gray-900">50K+</p>
-                <p className="text-xs text-gray-600 mt-1">Sellers</p>
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-gray-900">1M+</p>
-                <p className="text-xs text-gray-600 mt-1">Products</p>
-              </div>
-            </div>
-          </section>
-
-          {/* Right Column - Form */}
-          <section className="max-w-md w-full mx-auto lg:mx-0">
-            <div className="bg-white">
-              {/* Error Alert */}
-              {error && (
-                <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg mb-6 text-sm">
-                  {error}
-                </div>
-              )}
-
-              <form onSubmit={(e) => { e.preventDefault(); handleRegister(); }} className="space-y-5">
-                {/* Register As */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">
-                    Register as
-                  </label>
-                  <select
-                    value={loginRole}
-                    onChange={(e) => setLoginRole(e.target.value)}
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="Customer">Customer</option>
-                    <option value="Admin">Admin (Seller)</option>
-                  </select>
-                </div>
-
-                {/* Full Name */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">
-                    Full name
-                  </label>
-                  <input
-                    type="text"
-                    value={registerData.fullName}
-                    onChange={(e) => setRegisterData({ ...registerData, fullName: e.target.value })}
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="John Doe"
-                    required
-                  />
-                </div>
-
-                {/* Email */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">
-                    Email address
-                  </label>
-                  <input
-                    type="email"
-                    value={registerData.email}
-                    onChange={(e) => setRegisterData({ ...registerData, email: e.target.value })}
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="you@example.com"
-                    required
-                  />
-                  <p className="text-xs text-gray-500 mt-1">We'll send you a confirmation link</p>
-                </div>
-
-                {/* Mobile */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">
-                    Mobile number
-                  </label>
-                  <div className="flex gap-2">
-                    <select className="w-16 px-2 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                      <option>+91</option>
-                    </select>
-                    <input
-                      type="tel"
-                      value={registerData.mobile}
-                      onChange={(e) => setRegisterData({ ...registerData, mobile: e.target.value })}
-                      className="flex-1 px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="9876543210"
-                      maxLength={10}
-                      required
-                    />
-                  </div>
-                </div>
-
-                {/* Gender */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">
-                    Gender <span className="text-gray-400 font-normal">(Optional)</span>
-                  </label>
-                  <select
-                    value={registerData.gender}
-                    onChange={(e) => setRegisterData({ ...registerData, gender: e.target.value })}
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="">Prefer not to say</option>
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-
-                {/* Password */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">
-                    Password
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      value={registerData.password}
-                      onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="At least 8 characters"
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    >
-                      {showPassword ? (
-                        <EyeOff className="w-4 h-4" />
-                      ) : (
-                        <Eye className="w-4 h-4" />
-                      )}
-                    </button>
-                  </div>
-                  <ul className="text-xs text-gray-600 mt-2 space-y-1">
-                    <li>✓ At least 8 characters</li>
-                    <li>✓ Mix of uppercase and lowercase letters</li>
-                    <li>✓ At least one number</li>
-                  </ul>
-                </div>
-
-                {/* Confirm Password */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">
-                    Confirm password
-                  </label>
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={registerData.confirmPassword}
-                    onChange={(e) => setRegisterData({ ...registerData, confirmPassword: e.target.value })}
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Re-enter your password"
-                    required
-                  />
-                </div>
-
-                {/* Terms & Conditions */}
-                <div className="flex items-start gap-3 py-2">
-                  <input
-                    type="checkbox"
-                    id="terms"
-                    className="w-4 h-4 border border-gray-300 rounded mt-0.5 accent-blue-600 cursor-pointer"
-                    required
-                  />
-                  <label htmlFor="terms" className="text-xs text-gray-600 cursor-pointer">
-                    I agree to the{' '}
-                    <button type="button" className="text-blue-600 hover:underline font-medium">
-                      Terms of Use
-                    </button>
-                    {' '}and{' '}
-                    <button type="button" className="text-blue-600 hover:underline font-medium">
-                      Privacy Policy
-                    </button>
-                  </label>
-                </div>
-
-                {/* Submit Button */}
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white py-2.5 rounded-lg font-semibold text-sm transition-colors mt-6"
-                >
-                  {loading ? (
-                    <div className="flex items-center justify-center gap-2">
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      Creating account...
-                    </div>
-                  ) : (
-                    'Create account'
-                  )}
-                </button>
-              </form>
-
-              {/* Divider */}
-              <div className="flex items-center gap-3 my-6">
-                <div className="flex-1 h-px bg-gray-200"></div>
-                <span className="text-xs text-gray-500">or</span>
-                <div className="flex-1 h-px bg-gray-200"></div>
-              </div>
-
-              {/* Social Sign Up */}
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-900 hover:bg-gray-50 transition-colors"
-                >
-                  Continue with Google
-                </button>
-                <button
-                  type="button"
-                  className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-900 hover:bg-gray-50 transition-colors"
-                >
-                  Continue with Apple
-                </button>
-              </div>
-
-              {/* Footer */}
-              <div className="mt-8 pt-6 border-t border-gray-200">
-                <p className="text-xs text-gray-600 text-center">
-                  By creating an account, you accept our Terms & Privacy Policy
-                </p>
-              </div>
-            </div>
-          </section>
-        </div>
-      </main>
-
-      {/* Mobile Benefits Section */}
-      <section className="lg:hidden bg-gray-50 mt-12 py-8 px-6">
-        <h2 className="font-bold text-gray-900 mb-6">Why shop with us?</h2>
-        <div className="space-y-4">
-          <div className="flex gap-3">
-            <span className="text-lg">✓</span>
-            <div>
-              <p className="text-sm font-medium text-gray-900">Free shipping on all orders</p>
-            </div>
-          </div>
-          <div className="flex gap-3">
-            <span className="text-lg">✓</span>
-            <div>
-              <p className="text-sm font-medium text-gray-900">7 days easy returns</p>
-            </div>
-          </div>
-          <div className="flex gap-3">
-            <span className="text-lg">✓</span>
-            <div>
-              <p className="text-sm font-medium text-gray-900">Secure checkout</p>
-            </div>
-          </div>
-          <div className="flex gap-3">
-            <span className="text-lg">✓</span>
-            <div>
-              <p className="text-sm font-medium text-gray-900">24/7 customer support</p>
-            </div>
-          </div>
+        <div className="relative z-10 pt-12 border-t border-white/5">
+          <p className="text-slate-500 text-sm">© 2026 ShopAI Global Marketplace</p>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-gray-200 mt-12 py-8 px-6 bg-white">
-        <div className="max-w-6xl mx-auto">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 mb-8">
+      {/* --- Right Column: Registration Form --- */}
+      <section className="lg:w-[60%] lg:ml-[40%] min-h-screen p-6 lg:p-20 flex flex-col justify-center">
+        <div className="max-w-xl mx-auto w-full">
+          
+          <div className="flex justify-between items-end mb-10">
             <div>
-              <p className="text-xs font-semibold text-gray-900 uppercase tracking-wide mb-4">About</p>
-              <ul className="space-y-2 text-sm text-gray-600">
-                <li><button className="hover:text-blue-600">About Us</button></li>
-                <li><button className="hover:text-blue-600">Careers</button></li>
-                <li><button className="hover:text-blue-600">Blog</button></li>
-              </ul>
+              <h2 className="text-3xl font-black text-slate-900">Create Account</h2>
+              <p className="text-slate-500 font-medium mt-1">Fill in the details to get started</p>
             </div>
-            <div>
-              <p className="text-xs font-semibold text-gray-900 uppercase tracking-wide mb-4">Help</p>
-              <ul className="space-y-2 text-sm text-gray-600">
-                <li><button className="hover:text-blue-600">Contact Us</button></li>
-                <li><button className="hover:text-blue-600">Track Order</button></li>
-                <li><button className="hover:text-blue-600">Returns</button></li>
-              </ul>
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-gray-900 uppercase tracking-wide mb-4">Policies</p>
-              <ul className="space-y-2 text-sm text-gray-600">
-                <li><button className="hover:text-blue-600">Privacy Policy</button></li>
-                <li><button className="hover:text-blue-600">Terms of Use</button></li>
-                <li><button className="hover:text-blue-600">Cookies</button></li>
-              </ul>
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-gray-900 uppercase tracking-wide mb-4">Follow Us</p>
-              <ul className="space-y-2 text-sm text-gray-600">
-                <li><button className="hover:text-blue-600">Twitter</button></li>
-                <li><button className="hover:text-blue-600">Facebook</button></li>
-                <li><button className="hover:text-blue-600">Instagram</button></li>
-              </ul>
-            </div>
+            <button 
+              onClick={() => setCurrentPage('login')}
+              className="text-sm font-bold text-teal-600 hover:text-teal-700"
+            >
+              Sign in instead
+            </button>
           </div>
-          <div className="pt-6 border-t border-gray-200 text-xs text-gray-600 text-center">
-            <p>© 2024 ShopAI. All rights reserved.</p>
-          </div>
+
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 text-sm font-bold rounded-r-xl animate-pulse">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={(e) => { e.preventDefault(); handleRegister(); }} className="space-y-5">
+            
+            {/* Role Toggle */}
+            <div className="flex p-1 bg-gray-100 rounded-2xl mb-8">
+              <button
+                type="button"
+                onClick={() => setLoginRole('Customer')}
+                className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all ${loginRole === 'Customer' ? 'bg-white text-teal-600 shadow-sm' : 'text-gray-500'}`}
+              >
+                Shopping Account
+              </button>
+              <button
+                type="button"
+                onClick={() => setLoginRole('Admin')}
+                className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all ${loginRole === 'Admin' ? 'bg-white text-teal-600 shadow-sm' : 'text-gray-500'}`}
+              >
+                Seller Account
+              </button>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-5">
+              {/* Full Name */}
+              <div className="space-y-2">
+                <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Full Name</label>
+                <div className="relative group">
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-teal-500 transition-colors" size={18} />
+                  <input 
+                    type="text" required className={inputStyle} placeholder="John Doe"
+                    value={registerData.fullName}
+                    onChange={(e) => setRegisterData({ ...registerData, fullName: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              {/* Mobile */}
+              <div className="space-y-2">
+                <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Mobile Number</label>
+                <div className="relative group">
+                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-teal-500 transition-colors" size={18} />
+                  <input 
+                    type="tel" required className={inputStyle} placeholder="9876543210" maxLength={10}
+                    value={registerData.mobile}
+                    onChange={(e) => setRegisterData({ ...registerData, mobile: e.target.value.replace(/\D/g, '') })}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Email */}
+            <div className="space-y-2">
+              <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Email Address</label>
+              <div className="relative group">
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-teal-500 transition-colors" size={18} />
+                <input 
+                  type="email" required className={inputStyle} placeholder="john@example.com"
+                  value={registerData.email}
+                  onChange={(e) => setRegisterData({ ...registerData, email: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-5">
+              {/* Password */}
+              <div className="space-y-2">
+                <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Password</label>
+                <div className="relative group">
+                  <Eye className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-teal-500 transition-colors" size={18} />
+                  <input 
+                    type={showPassword ? "text" : "password"} required className={inputStyle} placeholder="••••••••"
+                    value={registerData.password}
+                    onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              {/* Confirm Password */}
+              <div className="space-y-2">
+                <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Confirm</label>
+                <div className="relative group">
+                  <CheckCircle2 className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-teal-500 transition-colors" size={18} />
+                  <input 
+                    type={showPassword ? "text" : "password"} required className={inputStyle} placeholder="••••••••"
+                    value={registerData.confirmPassword}
+                    onChange={(e) => setRegisterData({ ...registerData, confirmPassword: e.target.value })}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Gender Selection */}
+            <div className="space-y-2">
+              <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Gender (Optional)</label>
+              <div className="flex gap-3">
+                {['Male', 'Female', 'Other'].map((g) => (
+                  <button
+                    key={g} type="button"
+                    onClick={() => setRegisterData({...registerData, gender: g})}
+                    className={`flex-1 py-2.5 rounded-xl border-2 font-bold text-sm transition-all ${registerData.gender === g ? 'border-teal-500 bg-teal-50 text-teal-700' : 'border-gray-100 text-gray-400'}`}
+                  >
+                    {g}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="pt-4">
+              <button
+                type="submit"
+                disabled={loading}
+                className={`w-full py-4 rounded-2xl text-white font-bold shadow-xl shadow-teal-200/50 flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-70 ${primaryGradient}`}
+              >
+                {loading ? "Creating your account..." : "Create My Account"} <ArrowRight size={20} />
+              </button>
+            </div>
+          </form>
+
+          <p className="mt-8 text-center text-slate-400 text-xs leading-relaxed">
+            By clicking "Create My Account", you agree to our <br />
+            <span className="text-slate-900 font-bold cursor-pointer">Terms of Service</span> and <span className="text-slate-900 font-bold cursor-pointer">Privacy Policy</span>.
+          </p>
         </div>
-      </footer>
+      </section>
+
+      {/* Floating Back Button (Mobile) */}
+      <button 
+        onClick={() => setCurrentPage('home')}
+        className="fixed bottom-6 right-6 lg:hidden w-12 h-12 bg-white shadow-2xl rounded-full flex items-center justify-center text-slate-900 border border-gray-100"
+      >
+        <ChevronLeft size={24} />
+      </button>
+
     </div>
   );
 };
