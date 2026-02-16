@@ -17,16 +17,6 @@ const ProfilePage = ({
 }) => {
   const [editMode, setEditMode] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [form, setForm] = useState({
-    AddressLine1: '',
-    AddressLine2: '',
-    City: '',
-    State: '',
-    PostalCode: '',
-    Country: '',
-    IsDefault: false
-  });
 
   useEffect(() => {
     fetchAddresses();
@@ -43,8 +33,6 @@ const ProfilePage = ({
     try {
       setLoadingProfile(true);
       const res = await authAPI.getProfile();
-      console.log('Profile API response:', res.data);
-      
       const data = res.data;
       
       setProfileData({
@@ -78,7 +66,6 @@ const ProfilePage = ({
       try {
         const profileRes = await authAPI.getProfile();
         currentUserId = profileRes.data?.id || profileRes.data?.userId || profileRes.data?.Id;
-        console.log('Current user ID:', currentUserId);
       } catch (err) {
         console.error('Failed to get user profile:', err);
       }
@@ -89,7 +76,6 @@ const ProfilePage = ({
         const profileRes = await authAPI.getProfile();
         res = { data: profileRes.data?.addresses || profileRes.data?.addressList || [] };
       } else {
-        console.warn('No API available for fetching addresses');
         setProfileData(prev => ({ ...prev, addresses: [] }));
         return;
       }
@@ -98,16 +84,12 @@ const ProfilePage = ({
         ? res.data 
         : (res.data?.addresses || res.data?.addressList || []);
 
-      console.log('Raw addresses from API:', rawAddresses);
-
       const userAddresses = currentUserId 
         ? rawAddresses.filter(a => {
             const addrUserId = a.userId || a.UserId || a.user_id || a.UserID;
             return addrUserId === currentUserId || addrUserId === String(currentUserId);
           })
         : rawAddresses;
-
-      console.log('Filtered addresses for user:', userAddresses);
 
       const normalized = userAddresses.map((a, index) => {
         const addrLine1 = a.AddressLine1 || a.addressLine1 || a.line1 || '';
@@ -136,7 +118,6 @@ const ProfilePage = ({
         };
       });
 
-      console.log('Final normalized addresses:', normalized);
       setProfileData(prev => ({ ...prev, addresses: normalized }));
       
     } catch (err) {
@@ -158,8 +139,6 @@ const ProfilePage = ({
 
       if (typeof authAPI.updateProfile === 'function') {
         await authAPI.updateProfile(payload);
-      } else {
-        console.warn('updateProfile method not available on authAPI');
       }
 
       const userData = JSON.parse(sessionStorage.getItem('user') || '{}');
@@ -193,54 +172,54 @@ const ProfilePage = ({
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-50">
+    <div className="min-h-screen bg-slate-50">
       {/* HEADER */}
-      <header className="bg-white shadow-md sticky top-0 z-40 border-b border-gray-100">
+      <header className="bg-gradient-to-r from-teal-600 to-cyan-600 text-white sticky top-0 z-40 shadow-lg">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center gap-4">
           <div className="flex items-center gap-3">
-            <div className="bg-gradient-to-br from-blue-600 to-indigo-600 p-2.5 rounded-xl shadow-lg">
-              <ShoppingBag className="w-7 h-7 text-white" />
+            <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
+              <ShoppingBag className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">ShopAI</h1>
-              <p className="text-xs text-gray-500">AI-Powered Shopping Assistant</p>
+              <h1 className="text-2xl font-bold">ShopAI</h1>
+              <p className="text-xs text-teal-100">.marketplace</p>
             </div>
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
             <button
               onClick={() => setCurrentPage('products')}
-              className="hidden sm:flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-blue-50 rounded-lg transition-all font-medium"
+              className="hidden sm:flex items-center gap-2 px-4 py-2 text-white hover:bg-white/20 rounded-lg transition-all font-medium"
             >
               🛍️ Shop
             </button>
 
             <button
               onClick={() => setCurrentPage('orders')}
-              className="hidden sm:flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-blue-50 rounded-lg transition-all font-medium"
+              className="hidden sm:flex items-center gap-2 px-4 py-2 text-white hover:bg-white/20 rounded-lg transition-all font-medium"
             >
               📦 Orders
             </button>
 
             <button
               onClick={() => setCurrentPage('cart')}
-              className="relative p-3 hover:bg-gradient-to-br hover:from-blue-50 hover:to-indigo-50 rounded-xl transition-all group"
+              className="relative p-3 hover:bg-white/20 rounded-lg transition-all"
             >
-              <ShoppingCart className="w-6 h-6 text-gray-700 group-hover:text-blue-600 transition-colors" />
+              <ShoppingCart className="w-6 h-6 text-white" />
               {cart.length > 0 && (
-                <span className="absolute -top-2 -right-2 bg-gradient-to-br from-red-500 to-red-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg transform group-hover:scale-110 transition-transform">
+                <span className="absolute -top-1 -right-1 bg-coral-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
                   {cart.length}
                 </span>
               )}
             </button>
 
-            <button className="p-3 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-xl hover:shadow-md transition-all group border border-blue-200">
-              <User className="w-6 h-6 text-blue-600 group-hover:text-indigo-700 transition-colors" />
+            <button className="p-3 bg-white/20 rounded-lg">
+              <User className="w-6 h-6 text-white" />
             </button>
 
             <button
               onClick={handleLogout}
-              className="flex items-center gap-2 px-4 py-2.5 text-red-600 hover:bg-red-50 rounded-xl transition-all font-semibold hover:shadow-sm"
+              className="flex items-center gap-2 px-4 py-2.5 bg-coral-500 hover:bg-coral-600 rounded-lg transition-all font-semibold"
             >
               <LogOut className="w-5 h-5" />
               <span className="hidden sm:inline">Logout</span>
@@ -255,32 +234,18 @@ const ProfilePage = ({
         <div className="mb-8">
           <div className="flex items-center justify-between mb-2">
             <div>
-              <h2 className="text-4xl font-bold text-gray-900 mb-2">Welcome, {profileData.fullName || user?.fullName || user?.name || 'User'}! 👋</h2>
-              <p className="text-gray-600">Manage your profile, addresses, and orders in one place</p>
+              <h2 className="text-4xl font-bold text-slate-900 mb-2">Welcome, {profileData.fullName || user?.fullName || user?.name || 'User'}! 👋</h2>
+              <p className="text-slate-600">Manage your profile, addresses, and orders</p>
             </div>
             <button
               onClick={editMode ? handleSaveProfile : () => setEditMode(true)}
               className={`px-6 py-3 rounded-xl font-bold transition-all duration-300 shadow-md hover:shadow-lg transform hover:scale-105 flex items-center gap-2 ${
                 editMode
-                  ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white'
-                  : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white'
+                  ? 'bg-gradient-to-r from-emerald-500 to-green-600 text-white'
+                  : 'bg-gradient-to-r from-teal-500 to-cyan-600 text-white'
               }`}
             >
-              {editMode ? (
-                <>
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  Save Changes
-                </>
-              ) : (
-                <>
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                  </svg>
-                  Edit Profile
-                </>
-              )}
+              {editMode ? '✓ Save Changes' : '✏️ Edit Profile'}
             </button>
           </div>
         </div>
@@ -289,10 +254,10 @@ const ProfilePage = ({
           {/* MAIN CONTENT */}
           <div className="lg:col-span-2 space-y-6">
             {/* PERSONAL INFO CARD */}
-            <div className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden hover:shadow-lg transition-all duration-300">
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-8 py-6 border-b border-gray-200">
-                <h3 className="text-xl font-bold text-gray-900 flex items-center gap-3">
-                  <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
+            <div className="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden">
+              <div className="bg-gradient-to-r from-teal-50 to-cyan-50 px-8 py-5 border-b border-slate-200">
+                <h3 className="text-xl font-bold text-slate-900 flex items-center gap-3">
+                  <div className="w-10 h-10 bg-teal-500 rounded-lg flex items-center justify-center">
                     <User className="w-6 h-6 text-white" />
                   </div>
                   Personal Information
@@ -302,35 +267,35 @@ const ProfilePage = ({
                 <div className="grid md:grid-cols-2 gap-6">
                   {/* Full Name */}
                   <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">Full Name</label>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">FULL NAME</label>
                     <input
                       value={profileData.fullName || ''}
                       onChange={e =>
                         setProfileData({ ...profileData, fullName: e.target.value })
                       }
                       disabled={!editMode}
-                      className={`w-full px-4 py-3 border-2 rounded-xl transition-all duration-300 focus:outline-none ${
+                      className={`w-full px-4 py-3 border-2 rounded-lg transition-all focus:outline-none ${
                         editMode
-                          ? 'border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 bg-white'
-                          : 'border-gray-200 bg-gray-50 cursor-not-allowed'
+                          ? 'border-teal-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 bg-white'
+                          : 'border-slate-200 bg-slate-50 cursor-not-allowed'
                       }`}
                     />
                   </div>
 
                   {/* Email */}
                   <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">Email Address</label>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">EMAIL ADDRESS</label>
                     <input
                       value={profileData.email || ''}
                       disabled
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 cursor-not-allowed text-gray-600"
+                      className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg bg-slate-50 cursor-not-allowed text-slate-600"
                     />
-                    <p className="text-xs text-gray-500 mt-1">✓ Email cannot be changed</p>
+                    <p className="text-xs text-slate-500 mt-1">✓ Email cannot be changed</p>
                   </div>
 
                   {/* Mobile */}
                   <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">Mobile Number</label>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">MOBILE NUMBER</label>
                     <input
                       type="tel"
                       value={(profileData.mobile || '').toString()}
@@ -338,52 +303,45 @@ const ProfilePage = ({
                         setProfileData({ ...profileData, mobile: e.target.value })
                       }
                       disabled={!editMode}
-                      className={`w-full px-4 py-3 border-2 rounded-xl transition-all duration-300 focus:outline-none ${
+                      className={`w-full px-4 py-3 border-2 rounded-lg transition-all focus:outline-none ${
                         editMode
-                          ? 'border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 bg-white'
-                          : 'border-gray-200 bg-gray-50 cursor-not-allowed'
+                          ? 'border-teal-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 bg-white'
+                          : 'border-slate-200 bg-slate-50 cursor-not-allowed'
                       }`}
                     />
                   </div>
 
                   {/* Gender */}
                   <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">Gender</label>
-                    <div className="relative">
-                      <select
-                        value={profileData.gender || ''}
-                        onChange={e =>
-                          setProfileData({ ...profileData, gender: e.target.value })
-                        }
-                        disabled={!editMode}
-                        className={`w-full px-4 py-3 border-2 rounded-xl transition-all duration-300 focus:outline-none appearance-none cursor-pointer ${
-                          editMode
-                            ? 'border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 bg-white'
-                            : 'border-gray-200 bg-gray-50 cursor-not-allowed'
-                        }`}
-                      >
-                        <option value="">Select Gender (Optional)</option>
-                        <option value="Male">👨 Male</option>
-                        <option value="Female">👩 Female</option>
-                        <option value="Other">🧑 Other</option>
-                        <option value="PreferNotToSay">🤐 Prefer Not to Say</option>
-                      </select>
-                      <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">
-                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
-                        </svg>
-                      </div>
-                    </div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">GENDER</label>
+                    <select
+                      value={profileData.gender || ''}
+                      onChange={e =>
+                        setProfileData({ ...profileData, gender: e.target.value })
+                      }
+                      disabled={!editMode}
+                      className={`w-full px-4 py-3 border-2 rounded-lg transition-all focus:outline-none ${
+                        editMode
+                          ? 'border-teal-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 bg-white'
+                          : 'border-slate-200 bg-slate-50 cursor-not-allowed'
+                      }`}
+                    >
+                      <option value="">Select Gender (Optional)</option>
+                      <option value="Male">👨 Male</option>
+                      <option value="Female">👩 Female</option>
+                      <option value="Other">🧑 Other</option>
+                      <option value="PreferNotToSay">🤐 Prefer Not to Say</option>
+                    </select>
                   </div>
                 </div>
 
                 {/* Save Changes Button */}
                 {editMode && (
-                  <div className="mt-8 flex gap-4 pt-6 border-t border-gray-200">
+                  <div className="mt-8 flex gap-4 pt-6 border-t border-slate-200">
                     <button
                       onClick={handleSaveProfile}
                       disabled={loading}
-                      className="flex-1 px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-xl font-bold transition-all duration-300 transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 group shadow-lg hover:shadow-xl"
+                      className="flex-1 px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white rounded-lg font-bold transition-all transform hover:scale-105 disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg"
                     >
                       {loading ? (
                         <>
@@ -391,12 +349,7 @@ const ProfilePage = ({
                           Saving...
                         </>
                       ) : (
-                        <>
-                          <svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                          </svg>
-                          Save Changes
-                        </>
+                        <>✓ Save Changes</>
                       )}
                     </button>
 
@@ -405,12 +358,9 @@ const ProfilePage = ({
                         setEditMode(false);
                         fetchProfile();
                       }}
-                      className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 hover:border-red-300 hover:bg-red-50 rounded-xl font-bold transition-all duration-300 flex items-center justify-center gap-2 group"
+                      className="flex-1 px-6 py-3 border-2 border-slate-300 text-slate-700 hover:border-coral-300 hover:bg-coral-50 rounded-lg font-bold transition-all"
                     >
-                      <svg className="w-5 h-5 group-hover:rotate-180 transition-transform" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                      </svg>
-                      Cancel
+                      ✕ Cancel
                     </button>
                   </div>
                 )}
@@ -418,10 +368,10 @@ const ProfilePage = ({
             </div>
 
             {/* ADDRESSES CARD */}
-            <div className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden hover:shadow-lg transition-all duration-300">
-              <div className="bg-gradient-to-r from-green-50 to-emerald-50 px-8 py-6 border-b border-gray-200">
-                <h3 className="text-xl font-bold text-gray-900 flex items-center gap-3">
-                  <div className="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center">
+            <div className="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden">
+              <div className="bg-gradient-to-r from-purple-50 to-pink-50 px-8 py-5 border-b border-slate-200">
+                <h3 className="text-xl font-bold text-slate-900 flex items-center gap-3">
+                  <div className="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
                     <MapPin className="w-6 h-6 text-white" />
                   </div>
                   Saved Addresses
@@ -437,7 +387,6 @@ const ProfilePage = ({
                         const line1 = window.prompt('📍 Address Line 1');
                         if (!line1) return;
 
-                        // Get user ID from session storage
                         const userData = JSON.parse(sessionStorage.getItem('user') || '{}');
                         const userId = userData.id || userData.userId || userData.Id;
 
@@ -447,7 +396,7 @@ const ProfilePage = ({
                         }
 
                         const payload = {
-                          userId: userId,  // MongoDB ObjectId string
+                          userId: userId,
                           addressLine1: line1,
                           addressLine2: window.prompt('📍 Address Line 2 (optional)') || '',
                           city: window.prompt('🏙️ City') || '',
@@ -456,8 +405,6 @@ const ProfilePage = ({
                           country: window.prompt('🌍 Country', 'India') || 'India',
                           isDefault: window.confirm('⭐ Set as default address?')
                         };
-
-                        console.log('Adding address with payload:', payload);
 
                         await addressAPI.add(payload);
 
@@ -472,17 +419,17 @@ const ProfilePage = ({
                         alert(err?.response?.data?.message || err.message || 'Failed to add address');
                       }
                     }}
-                    className="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl hover:shadow-lg active:scale-95 transition-all font-bold flex items-center gap-2 group"
+                    className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-lg hover:shadow-lg transition-all font-bold flex items-center gap-2"
                   >
-                    <Plus className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                    Add New Address
+                    <Plus className="w-5 h-5" />
+                    Add Address
                   </button>
 
                   {/* Delete All Button */}
                   {profileData.addresses && profileData.addresses.length > 0 && (
                     <button
                       onClick={async () => {
-                        if (!window.confirm('🗑️ Delete all your addresses? This cannot be undone!')) return;
+                        if (!window.confirm('🗑️ Delete all addresses? Cannot be undone!')) return;
 
                         try {
                           for (const addr of profileData.addresses) {
@@ -495,9 +442,9 @@ const ProfilePage = ({
                           alert('❌ Failed to delete some addresses');
                         }
                       }}
-                      className="px-6 py-3 bg-gradient-to-r from-red-500 to-pink-600 text-white rounded-xl hover:shadow-lg active:scale-95 transition-all font-bold flex items-center gap-2 group"
+                      className="px-6 py-3 bg-gradient-to-r from-coral-500 to-orange-600 text-white rounded-lg hover:shadow-lg transition-all font-bold flex items-center gap-2"
                     >
-                      <Trash2 className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                      <Trash2 className="w-5 h-5" />
                       Delete All
                     </button>
                   )}
@@ -505,26 +452,26 @@ const ProfilePage = ({
 
                 {/* Address List */}
                 {!profileData.addresses || profileData.addresses.length === 0 ? (
-                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-8 text-center border-2 border-dashed border-gray-300">
-                    <MapPin className="w-12 h-12 mx-auto text-gray-300 mb-3" />
-                    <p className="text-gray-600 font-medium">No addresses saved yet</p>
-                    <p className="text-sm text-gray-500 mt-1">Add your first address to make checkout faster</p>
+                  <div className="bg-slate-50 rounded-lg p-8 text-center border-2 border-dashed border-slate-300">
+                    <MapPin className="w-12 h-12 mx-auto text-slate-300 mb-3" />
+                    <p className="text-slate-600 font-medium">No addresses saved</p>
+                    <p className="text-sm text-slate-500 mt-1">Add your first address</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {profileData.addresses.map((addr, idx) => (
                       <div
                         key={addr.id}
-                        className="border-2 border-gray-200 rounded-xl p-5 bg-gradient-to-br from-white to-gray-50 hover:from-blue-50 hover:to-indigo-50 hover:border-blue-300 transition-all duration-300 group shadow-sm hover:shadow-md"
+                        className="border-2 border-slate-200 rounded-lg p-5 bg-white hover:border-teal-300 hover:shadow-md transition-all"
                       >
                         <div className="flex justify-between items-start mb-3">
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1">
-                              <p className="font-bold text-lg text-gray-900">
+                              <p className="font-bold text-lg text-slate-900">
                                 {addr.label || (addr.IsDefault ? 'Home' : `Address ${idx + 1}`)}
                               </p>
                               {addr.IsDefault && (
-                                <span className="text-xs font-bold bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-3 py-1 rounded-full">
+                                <span className="text-xs font-bold bg-teal-100 text-teal-700 px-3 py-1 rounded-full">
                                   ⭐ Default
                                 </span>
                               )}
@@ -542,12 +489,12 @@ const ProfilePage = ({
                                 alert('❌ Failed to delete address');
                               }
                             }}
-                            className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded-lg transition-all"
+                            className="text-coral-500 hover:text-coral-700 hover:bg-coral-50 p-2 rounded-lg transition-all"
                           >
                             <Trash2 className="w-5 h-5" />
                           </button>
                         </div>
-                        <p className="text-sm text-gray-700 leading-relaxed mb-3 group-hover:text-gray-900 transition-colors">
+                        <p className="text-sm text-slate-700 leading-relaxed">
                           {[
                             addr.AddressLine1,
                             addr.AddressLine2,
@@ -570,65 +517,65 @@ const ProfilePage = ({
           {/* SIDEBAR */}
           <div className="lg:col-span-1">
             {/* ACCOUNT STATS */}
-            <div className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden mb-6">
-              <div className="bg-gradient-to-r from-purple-50 to-pink-50 px-6 py-6 border-b border-gray-200">
-                <h3 className="text-lg font-bold text-gray-900">Account Stats</h3>
+            <div className="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden mb-6">
+              <div className="bg-gradient-to-r from-orange-50 to-amber-50 px-6 py-5 border-b border-slate-200">
+                <h3 className="text-lg font-bold text-slate-900">Account Stats</h3>
               </div>
               <div className="p-6 space-y-4">
-                <div className="flex items-center justify-between p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
+                <div className="flex items-center justify-between p-4 bg-gradient-to-br from-teal-50 to-cyan-50 rounded-lg border border-teal-200">
                   <div>
-                    <p className="text-sm text-gray-600">Total Orders</p>
-                    <p className="text-2xl font-bold text-blue-600">{orders.length}</p>
+                    <p className="text-sm text-slate-600">Total Orders</p>
+                    <p className="text-2xl font-bold text-teal-600">{orders.length}</p>
                   </div>
-                  <Package className="w-8 h-8 text-blue-400 opacity-30" />
+                  <Package className="w-8 h-8 text-teal-400 opacity-30" />
                 </div>
 
-                <div className="flex items-center justify-between p-4 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-200">
+                <div className="flex items-center justify-between p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg border border-purple-200">
                   <div>
-                    <p className="text-sm text-gray-600">Addresses Saved</p>
-                    <p className="text-2xl font-bold text-green-600">{profileData.addresses?.length || 0}</p>
+                    <p className="text-sm text-slate-600">Addresses</p>
+                    <p className="text-2xl font-bold text-purple-600">{profileData.addresses?.length || 0}</p>
                   </div>
-                  <MapPin className="w-8 h-8 text-green-400 opacity-30" />
+                  <MapPin className="w-8 h-8 text-purple-400 opacity-30" />
                 </div>
 
-                <div className="flex items-center justify-between p-4 bg-gradient-to-br from-orange-50 to-red-50 rounded-xl border border-orange-200">
+                <div className="flex items-center justify-between p-4 bg-gradient-to-br from-coral-50 to-orange-50 rounded-lg border border-coral-200">
                   <div>
-                    <p className="text-sm text-gray-600">Cart Items</p>
-                    <p className="text-2xl font-bold text-orange-600">{cart.length}</p>
+                    <p className="text-sm text-slate-600">Cart Items</p>
+                    <p className="text-2xl font-bold text-coral-600">{cart.length}</p>
                   </div>
-                  <ShoppingCart className="w-8 h-8 text-orange-400 opacity-30" />
+                  <ShoppingCart className="w-8 h-8 text-coral-400 opacity-30" />
                 </div>
               </div>
             </div>
 
             {/* QUICK ACTIONS */}
-            <div className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden">
-              <div className="bg-gradient-to-r from-indigo-50 to-blue-50 px-6 py-6 border-b border-gray-200">
-                <h3 className="text-lg font-bold text-gray-900">Quick Actions</h3>
+            <div className="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden">
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-5 border-b border-slate-200">
+                <h3 className="text-lg font-bold text-slate-900">Quick Actions</h3>
               </div>
               <div className="p-6 space-y-3">
                 <button
                   onClick={() => setCurrentPage('products')}
-                  className="w-full px-4 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl hover:shadow-lg active:scale-95 transition-all font-bold flex items-center justify-center gap-2 group"
+                  className="w-full px-4 py-3 bg-gradient-to-r from-teal-500 to-cyan-600 text-white rounded-lg hover:shadow-lg transition-all font-bold flex items-center justify-center gap-2"
                 >
-                  <ShoppingBag className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                  <ShoppingBag className="w-5 h-5" />
                   Continue Shopping
                 </button>
 
                 <button
                   onClick={() => setCurrentPage('orders')}
-                  className="w-full px-4 py-3 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-xl hover:shadow-lg active:scale-95 transition-all font-bold flex items-center justify-center gap-2 group"
+                  className="w-full px-4 py-3 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-lg hover:shadow-lg transition-all font-bold flex items-center justify-center gap-2"
                 >
-                  <Package className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                  View All Orders
+                  <Package className="w-5 h-5" />
+                  View Orders
                 </button>
 
                 <button
                   onClick={() => setCurrentPage('cart')}
-                  className="w-full px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl hover:shadow-lg active:scale-95 transition-all font-bold flex items-center justify-center gap-2 group"
+                  className="w-full px-4 py-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-lg hover:shadow-lg transition-all font-bold flex items-center justify-center gap-2"
                 >
-                  <ShoppingCart className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                  View My Cart
+                  <ShoppingCart className="w-5 h-5" />
+                  View Cart
                 </button>
               </div>
             </div>
@@ -637,76 +584,59 @@ const ProfilePage = ({
 
         {/* RECENT ORDERS SECTION */}
         {orders.length > 0 && (
-          <div className="mt-8 bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden">
-            <div className="bg-gradient-to-r from-amber-50 to-orange-50 px-8 py-6 border-b border-gray-200">
-              <h3 className="text-xl font-bold text-gray-900 flex items-center gap-3">
-                <div className="w-10 h-10 bg-orange-600 rounded-lg flex items-center justify-center">
+          <div className="mt-8 bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden">
+            <div className="bg-gradient-to-r from-amber-50 to-orange-50 px-8 py-5 border-b border-slate-200">
+              <h3 className="text-xl font-bold text-slate-900 flex items-center gap-3">
+                <div className="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center">
                   <Clock className="w-6 h-6 text-white" />
                 </div>
                 Recent Orders
               </h3>
             </div>
 
-            <div className="overflow-x-auto">
-              <div className="p-8 space-y-3">
-                {orders.slice(0, 5).map((order, idx) => (
-                  <div
-                    key={order.id}
-                    className="border-2 border-gray-200 rounded-xl p-5 flex justify-between items-center hover:border-blue-300 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-300 group"
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-lg flex items-center justify-center text-sm font-bold text-blue-700">
-                          #{order.id % 100}
-                        </div>
-                        <div>
-                          <p className="font-bold text-gray-900">Order #{order.id}</p>
-                          <p className="text-sm text-gray-500">
-                            {order.orderDate ? new Date(order.orderDate).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A'}
-                          </p>
-                        </div>
+            <div className="p-8 space-y-3">
+              {orders.slice(0, 5).map((order) => (
+                <div
+                  key={order.id}
+                  className="border-2 border-slate-200 rounded-lg p-5 flex justify-between items-center hover:border-teal-300 hover:shadow-md transition-all"
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-10 h-10 bg-gradient-to-br from-teal-100 to-cyan-100 rounded-lg flex items-center justify-center text-sm font-bold text-teal-700">
+                        #{order.id % 100}
+                      </div>
+                      <div>
+                        <p className="font-bold text-slate-900">Order #{order.id}</p>
+                        <p className="text-sm text-slate-500">
+                          {order.orderDate ? new Date(order.orderDate).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A'}
+                        </p>
                       </div>
                     </div>
-
-                    <div className="text-right mr-4">
-                      <p className="font-bold text-lg bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                        ₹{(order.totalAmount || 0).toLocaleString()}
-                      </p>
-                      <span className={`inline-block text-xs font-bold px-3 py-1 rounded-full mt-1 ${
-                        order.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' :
-                        order.status === 'Processing' ? 'bg-blue-100 text-blue-800' :
-                        order.status === 'Shipped' ? 'bg-purple-100 text-purple-800' :
-                        order.status === 'Delivered' ? 'bg-green-100 text-green-800' :
-                        'bg-red-100 text-red-800'
-                      }`}>
-                        {order.status === 'Pending' && '⏳ '}
-                        {order.status === 'Processing' && '⚙️ '}
-                        {order.status === 'Shipped' && '🚚 '}
-                        {order.status === 'Delivered' && '✅ '}
-                        {order.status || 'Processing'}
-                      </span>
-                    </div>
-
-                    <button
-                      onClick={() => setCurrentPage('orders')}
-                      className="px-4 py-2 bg-white border-2 border-gray-200 text-gray-700 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all font-semibold group-hover:scale-105"
-                    >
-                      View →
-                    </button>
                   </div>
-                ))}
-              </div>
 
-              {orders.length > 5 && (
-                <div className="px-8 py-4 border-t border-gray-200 text-center">
+                  <div className="text-right mr-4">
+                    <p className="font-bold text-lg text-teal-600">
+                      ₹{(order.totalAmount || 0).toLocaleString()}
+                    </p>
+                    <span className={`inline-block text-xs font-bold px-3 py-1 rounded-full mt-1 ${
+                      order.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' :
+                      order.status === 'Processing' ? 'bg-blue-100 text-blue-800' :
+                      order.status === 'Shipped' ? 'bg-purple-100 text-purple-800' :
+                      order.status === 'Delivered' ? 'bg-green-100 text-green-800' :
+                      'bg-red-100 text-red-800'
+                    }`}>
+                      {order.status || 'Processing'}
+                    </span>
+                  </div>
+
                   <button
                     onClick={() => setCurrentPage('orders')}
-                    className="text-blue-600 hover:text-blue-700 font-bold text-sm"
+                    className="px-4 py-2 bg-white border-2 border-slate-200 text-slate-700 rounded-lg hover:border-teal-400 hover:bg-teal-50 transition-all font-semibold"
                   >
-                    View All {orders.length} Orders →
+                    View →
                   </button>
                 </div>
-              )}
+              ))}
             </div>
           </div>
         )}

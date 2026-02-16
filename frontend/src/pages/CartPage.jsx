@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShoppingCart, LogOut, Plus, Minus, Trash2 } from 'lucide-react';
+import { ShoppingCart, LogOut, Plus, Minus, Trash2, ShoppingBag, Package, ArrowLeft } from 'lucide-react';
 
 const CartPage = ({
   user,
@@ -11,24 +11,29 @@ const CartPage = ({
   setError
 }) => {
   const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const savings = cart.reduce((sum, item) => sum + (item.price * 0.2 * item.quantity), 0); // 20% discount simulation
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-50">
-      <header className="bg-white shadow-md sticky top-0 z-40 border-b border-gray-100">
+    <div className="min-h-screen bg-slate-50">
+      {/* Header - Teal Theme */}
+      <header className="bg-gradient-to-r from-teal-600 to-cyan-600 text-white sticky top-0 z-40 shadow-lg">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <button 
             onClick={() => setCurrentPage('products')} 
-            className="flex items-center gap-2 text-gray-700 hover:text-blue-600 font-semibold transition-colors group"
+            className="flex items-center gap-2 text-white hover:bg-white/20 px-4 py-2 rounded-lg font-semibold transition-all group"
           >
-            <svg className="w-5 h-5 group-hover:-translate-x-1 transition-transform" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" />
-            </svg>
+            <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
             <span>Continue Shopping</span>
           </button>
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">Shopping Cart</h1>
+          
+          <div className="flex items-center gap-3">
+            <ShoppingCart className="w-7 h-7" />
+            <h1 className="text-2xl font-bold">Shopping Cart</h1>
+          </div>
+          
           <button 
             onClick={handleLogout} 
-            className="flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-all font-semibold"
+            className="flex items-center gap-2 px-4 py-2 bg-coral-500 hover:bg-coral-600 rounded-lg transition-all font-semibold"
           >
             <LogOut className="w-5 h-5" />
             <span className="hidden sm:inline">Logout</span>
@@ -38,126 +43,254 @@ const CartPage = ({
 
       <div className="max-w-7xl mx-auto px-6 py-8">
         {cart.length === 0 ? (
-          <div className="bg-white rounded-3xl shadow-lg p-16 text-center border border-gray-100">
-            <ShoppingCart className="w-24 h-24 mx-auto text-gray-300 mb-6" />
-            <h2 className="text-3xl font-bold text-gray-900 mb-3">Your cart is empty</h2>
-            <p className="text-gray-600 mb-8 text-lg">Add some amazing products to get started!</p>
+          // Empty Cart State
+          <div className="bg-white rounded-xl shadow-md p-16 text-center">
+            <div className="w-32 h-32 mx-auto mb-6 bg-gradient-to-br from-teal-100 to-cyan-100 rounded-full flex items-center justify-center">
+              <ShoppingCart className="w-16 h-16 text-teal-600" />
+            </div>
+            <h2 className="text-3xl font-bold text-slate-900 mb-3">Your cart is empty</h2>
+            <p className="text-slate-600 mb-8 text-lg">Add some amazing products to get started!</p>
             <button 
               onClick={() => setCurrentPage('products')} 
-              className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-8 py-4 rounded-xl hover:shadow-lg hover:scale-105 transition-all font-semibold text-lg"
+              className="bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 text-white px-8 py-4 rounded-lg font-bold text-lg transition-all hover:shadow-lg inline-flex items-center gap-2"
             >
-              🛍️ Start Shopping
+              <ShoppingBag className="w-5 h-5" />
+              Start Shopping
             </button>
           </div>
         ) : (
           <div className="grid lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 space-y-4">
-              <div className="bg-white rounded-2xl shadow-md overflow-hidden border border-gray-100">
+            {/* Cart Items Section */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Cart Header */}
+              <div className="bg-white rounded-lg shadow-md p-6 border border-slate-200">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h2 className="text-2xl font-bold text-slate-900">Cart Items</h2>
+                    <p className="text-sm text-slate-600 mt-1">{cart.length} {cart.length === 1 ? 'item' : 'items'} in your cart</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm text-slate-600">You're saving</p>
+                    <p className="text-lg font-bold text-emerald-600">₹{savings.toLocaleString()}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Cart Items List */}
+              <div className="bg-white rounded-lg shadow-md overflow-hidden border border-slate-200">
                 {cart.map((item, idx) => {
                   const itemId = item.productIdString || item.productId;
+                  const originalPrice = item.price * 1.2; // Simulated original price
                   
                   return (
                     <div 
                       key={itemId} 
-                      className={`p-6 flex gap-6 items-start hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-300 ${idx !== cart.length - 1 ? 'border-b border-gray-100' : ''}`}
+                      className={`p-6 flex gap-6 items-start hover:bg-teal-50/50 transition-all duration-300 ${idx !== cart.length - 1 ? 'border-b border-slate-200' : ''}`}
                     >
-                      <div className="w-28 h-28 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl overflow-hidden flex-shrink-0 shadow-sm">
+                      {/* Product Image */}
+                      <div className="w-32 h-32 bg-slate-100 rounded-lg overflow-hidden flex-shrink-0 border border-slate-200">
                         <img 
-                          src={item.imageUrl} 
+                          src={item.imageUrl || 'https://via.placeholder.com/150'} 
                           alt={item.productName} 
                           className="w-full h-full object-cover hover:scale-110 transition-transform duration-300"
+                          onError={(e) => {
+                            e.currentTarget.src = 'https://via.placeholder.com/150/f1f5f9/94a3b8?text=Product';
+                          }}
                         />
                       </div>
 
+                      {/* Product Details */}
                       <div className="flex-1">
-                        <div className="flex justify-between items-start mb-2">
-                          <h3 className="font-bold text-lg text-gray-900">{item.productName}</h3>
-                          <span className="text-sm font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
-                            ₹{(item.price * item.quantity).toLocaleString()}
-                          </span>
+                        <div className="flex justify-between items-start mb-3">
+                          <div>
+                            <h3 className="font-bold text-lg text-slate-900 mb-1">{item.productName}</h3>
+                            <p className="text-sm text-slate-500">In Stock</p>
+                          </div>
+                          <button 
+                            onClick={() => {
+                              console.log('Delete clicked:', { itemId });
+                              removeFromCart(itemId, setError);
+                            }} 
+                            className="p-2 hover:bg-coral-50 rounded-lg transition-all group"
+                            title="Remove item"
+                          >
+                            <Trash2 className="w-5 h-5 text-slate-400 group-hover:text-coral-600 transition-colors" />
+                          </button>
                         </div>
-                        <p className="text-gray-600 text-sm mb-4">₹{item.price.toLocaleString()} each</p>
 
-                        <div className="flex items-center gap-3 bg-gradient-to-r from-gray-50 to-gray-100 w-fit rounded-xl p-2">
-                          <button 
-                            onClick={() => {
-                              console.log('Decrement clicked:', { itemId, quantity: item.quantity - 1 });
-                              updateCartQuantity(itemId, item.quantity - 1, setError);
-                            }} 
-                            className="p-2 hover:bg-white rounded-lg transition-all"
-                          >
-                            <Minus className="w-5 h-5 text-gray-700 hover:text-blue-600" />
-                          </button>
-                          <span className="font-bold text-lg min-w-[2rem] text-center">{item.quantity}</span>
-                          <button 
-                            onClick={() => {
-                              console.log('Increment clicked:', { itemId, quantity: item.quantity + 1 });
-                              updateCartQuantity(itemId, item.quantity + 1, setError);
-                            }} 
-                            className="p-2 hover:bg-white rounded-lg transition-all"
-                          >
-                            <Plus className="w-5 h-5 text-gray-700 hover:text-blue-600" />
-                          </button>
+                        {/* Price Section */}
+                        <div className="mb-4">
+                          <div className="flex items-baseline gap-3 mb-1">
+                            <span className="text-2xl font-bold text-slate-900">₹{item.price.toLocaleString()}</span>
+                            <span className="text-sm text-slate-500 line-through">₹{originalPrice.toLocaleString()}</span>
+                            <span className="text-sm font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded">20% OFF</span>
+                          </div>
+                          <p className="text-xs text-slate-600">Price per unit</p>
+                        </div>
+
+                        {/* Quantity Controls */}
+                        <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-3 bg-slate-100 rounded-lg p-1 border border-slate-200">
+                            <button 
+                              onClick={() => {
+                                console.log('Decrement clicked:', { itemId, quantity: item.quantity - 1 });
+                                updateCartQuantity(itemId, item.quantity - 1, setError);
+                              }} 
+                              disabled={item.quantity <= 1}
+                              className="p-2 hover:bg-white rounded-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              <Minus className="w-4 h-4 text-slate-700 hover:text-teal-600" />
+                            </button>
+                            <span className="font-bold text-lg min-w-[3rem] text-center text-slate-900">{item.quantity}</span>
+                            <button 
+                              onClick={() => {
+                                console.log('Increment clicked:', { itemId, quantity: item.quantity + 1 });
+                                updateCartQuantity(itemId, item.quantity + 1, setError);
+                              }} 
+                              className="p-2 hover:bg-white rounded-md transition-all"
+                            >
+                              <Plus className="w-4 h-4 text-slate-700 hover:text-teal-600" />
+                            </button>
+                          </div>
+                          
+                          <div className="flex items-center gap-2 text-sm">
+                            <span className="text-slate-600">Subtotal:</span>
+                            <span className="font-bold text-lg text-teal-600">₹{(item.price * item.quantity).toLocaleString()}</span>
+                          </div>
                         </div>
                       </div>
-
-                      <button 
-                        onClick={() => {
-                          console.log('Delete clicked:', { itemId });
-                          removeFromCart(itemId, setError);
-                        }} 
-                        className="p-3 hover:bg-red-50 rounded-xl transition-all group"
-                      >
-                        <Trash2 className="w-6 h-6 text-gray-400 group-hover:text-red-600 transition-colors" />
-                      </button>
                     </div>
                   );
                 })}
               </div>
+
+              {/* Free Shipping Banner */}
+              <div className="bg-gradient-to-r from-emerald-50 to-green-50 border-2 border-emerald-200 rounded-lg p-4 flex items-center gap-3">
+                <div className="w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center flex-shrink-0">
+                  <Package className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <p className="font-bold text-emerald-900">Congratulations! You've got FREE shipping!</p>
+                  <p className="text-sm text-emerald-700">Your order qualifies for free delivery</p>
+                </div>
+              </div>
             </div>
 
-            {/* Order Summary */}
-            <div className="bg-white rounded-2xl shadow-lg p-8 h-fit border border-gray-100 sticky top-24">
-              <h3 className="text-xl font-bold mb-6">Order Summary</h3>
-              
-              <div className="space-y-4 border-b border-gray-200 pb-6 mb-6">
-                <div className="flex justify-between text-gray-600">
-                  <span className="font-medium">Subtotal</span>
-                  <span className="font-semibold">₹{total.toLocaleString()}</span>
+            {/* Order Summary Sidebar */}
+            <div className="lg:col-span-1">
+              <div className="bg-white rounded-lg shadow-lg p-6 border border-slate-200 sticky top-24 space-y-6">
+                <h3 className="text-xl font-bold text-slate-900 pb-4 border-b border-slate-200">Order Summary</h3>
+                
+                {/* Price Breakdown */}
+                <div className="space-y-4">
+                  <div className="flex justify-between text-slate-700">
+                    <span>Subtotal ({cart.length} {cart.length === 1 ? 'item' : 'items'})</span>
+                    <span className="font-semibold">₹{(total + savings).toLocaleString()}</span>
+                  </div>
+                  
+                  <div className="flex justify-between text-emerald-600">
+                    <span className="flex items-center gap-1">
+                      Discount
+                      <span className="text-xs bg-emerald-100 px-2 py-0.5 rounded">20%</span>
+                    </span>
+                    <span className="font-semibold">-₹{savings.toLocaleString()}</span>
+                  </div>
+                  
+                  <div className="flex justify-between text-slate-700">
+                    <span>Shipping</span>
+                    <span className="font-semibold text-emerald-600">FREE</span>
+                  </div>
+                  
+                  <div className="flex justify-between text-slate-700">
+                    <span>Estimated Tax</span>
+                    <span className="font-semibold">₹0</span>
+                  </div>
                 </div>
-                <div className="flex justify-between text-gray-600">
-                  <span className="font-medium">Shipping</span>
-                  <span className="font-semibold text-green-600">Free</span>
+
+                {/* Total */}
+                <div className="pt-4 border-t-2 border-slate-200">
+                  <div className="flex justify-between items-center bg-gradient-to-r from-teal-50 to-cyan-50 p-4 rounded-lg border border-teal-200">
+                    <span className="text-lg font-bold text-slate-900">Total Amount</span>
+                    <span className="text-3xl font-bold text-teal-600">₹{total.toLocaleString()}</span>
+                  </div>
+                  <p className="text-xs text-center text-slate-500 mt-2">Inclusive of all taxes</p>
                 </div>
-                <div className="flex justify-between text-gray-600">
-                  <span className="font-medium">Estimated Tax</span>
-                  <span className="font-semibold">₹0</span>
+
+                {/* Action Buttons */}
+                        <div className="space-y-3">
+                          <button 
+                          onClick={() => setCurrentPage('checkout')} 
+                          className="w-full bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white py-4 rounded-lg font-bold text-lg transition-all hover:shadow-lg flex items-center justify-center gap-2"
+                          >
+                          Proceed to Checkout
+                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" />
+                          </svg>
+                          </button>
+
+                          <button 
+                          onClick={() => setCurrentPage('products')} 
+                          className="w-full border-2 border-slate-300 text-slate-700 hover:border-teal-400 hover:bg-teal-50 py-3 rounded-lg font-semibold transition-all"
+                          >
+                          Continue Shopping
+                          </button>
+                        </div>
+
+                        {/* Trust Badges */}
+                <div className="pt-6 border-t border-slate-200 space-y-3">
+                  <p className="text-sm font-bold text-slate-900 mb-3">Why buy from us?</p>
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center flex-shrink-0">
+                      <span className="text-emerald-600">✓</span>
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">Free Returns</p>
+                      <p className="text-xs text-slate-600">Within 7 days of delivery</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 bg-teal-100 rounded-full flex items-center justify-center flex-shrink-0">
+                      <span className="text-teal-600">🔒</span>
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">Secure Payment</p>
+                      <p className="text-xs text-slate-600">100% encrypted checkout</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
+                      <span className="text-purple-600">💬</span>
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">24/7 Support</p>
+                      <p className="text-xs text-slate-600">Always here to help</p>
+                    </div>
+                  </div>
                 </div>
-              </div>
 
-              <div className="flex justify-between items-center mb-8 bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-200">
-                <span className="text-lg font-bold text-gray-900">Total</span>
-                <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">₹{total.toLocaleString()}</span>
-              </div>
-
-              <button 
-                onClick={() => setCurrentPage('checkout')} 
-                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-4 rounded-xl hover:shadow-lg hover:scale-105 font-bold text-lg transition-all active:scale-95"
-              >
-                Proceed to Checkout →
-              </button>
-
-              <button 
-                onClick={() => setCurrentPage('products')} 
-                className="w-full mt-3 border-2 border-gray-200 text-gray-700 hover:border-blue-300 hover:bg-blue-50 py-3 rounded-xl font-semibold transition-all"
-              >
-                Continue Shopping
-              </button>
-
-              <div className="mt-6 space-y-2 text-center text-xs text-gray-600">
-                <p className="flex items-center justify-center gap-2">✓ Free returns within 7 days</p>
-                <p className="flex items-center justify-center gap-2">✓ Secure checkout</p>
-                <p className="flex items-center justify-center gap-2">✓ 24/7 Customer support</p>
+                {/* Promo Code Section */}
+                <div className="pt-4 border-t border-slate-200">
+                  <details className="group">
+                    <summary className="flex items-center justify-between cursor-pointer text-sm font-semibold text-teal-600 hover:text-teal-700">
+                      <span>Have a promo code?</span>
+                      <svg className="w-4 h-4 transition-transform group-open:rotate-180" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+                      </svg>
+                    </summary>
+                    <div className="mt-3 flex gap-2">
+                      <input 
+                        type="text" 
+                        placeholder="Enter code"
+                        className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                      />
+                      <button className="px-4 py-2 bg-teal-500 hover:bg-teal-600 text-white rounded-lg text-sm font-semibold transition-all">
+                        Apply
+                      </button>
+                    </div>
+                  </details>
+                </div>
               </div>
             </div>
           </div>
