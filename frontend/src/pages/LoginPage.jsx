@@ -41,7 +41,6 @@ const LoginPage = ({
     }
   }, [otpTimer, otpSent, emailOtpSent]);
 
-  // --- Logic Handlers (Unchanged for Functionality) ---
   const handleLogin = async () => {
     setError(''); setLoading(true);
     try {
@@ -53,8 +52,11 @@ const LoginPage = ({
       if (userRole !== loginRole) throw new Error(`Login as ${userRole} instead.`);
       const userIdFromToken = getUserIdFromToken() || data.mongoUserId || data.userId || data.id;
       const userData = { ...data, role: userRole, userId: userIdFromToken };
-      sessionStorage.setItem('token', data.token);
-      sessionStorage.setItem('user', JSON.stringify(userData));
+
+      // ✅ localStorage — persists on refresh
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(userData));
+
       setUser(userData);
       setCurrentPage(userRole === 'Admin' ? 'admin' : 'products');
     } catch (err) { setError(err.response?.data?.message || err.message); } finally { setLoading(false); }
@@ -76,7 +78,11 @@ const LoginPage = ({
     try {
       const resp = await mongoAuthAPI.verifyOtp(mobileNumber, otpValue);
       const data = resp.data;
-      sessionStorage.setItem('token', data.token);
+
+      // ✅ localStorage — persists on refresh
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data));
+
       setUser(data);
       setCurrentPage(data.role === 'Admin' ? 'admin' : 'products');
     } catch (err) { setError(err.message); } finally { setLoading(false); }
@@ -98,7 +104,11 @@ const LoginPage = ({
     try {
       const resp = await mongoAuthAPI.verifyEmailOtp(emailForOtp, otpValue);
       const data = resp.data;
-      sessionStorage.setItem('token', data.token);
+
+      // ✅ localStorage — persists on refresh
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data));
+
       setUser(data);
       setCurrentPage(data.role === 'Admin' ? 'admin' : 'products');
     } catch (err) { setError(err.message); } finally { setLoading(false); }
@@ -116,42 +126,41 @@ const LoginPage = ({
 
   return (
     <div className="min-h-screen bg-[#FDFDFF] flex items-center justify-center p-4">
-      {/* Main Container */}
       <div className="max-w-5xl w-full flex bg-white rounded-[40px] shadow-2xl overflow-hidden border border-gray-100 min-h-[700px]">
         
-        {/* Left Side: Creative Branding (Standard Tailwind Animation) */}
-          <div className="hidden lg:flex w-5/12 bg-gradient-to-r from-teal-500 to-cyan-600 p-12 flex-col justify-between relative overflow-hidden">
-            <div className="absolute top-[-10%] right-[-10%] w-64 h-64 bg-cyan-500 rounded-full blur-3xl opacity-50 animate-pulse"></div>
+        {/* Left Side: Branding */}
+        <div className="hidden lg:flex w-5/12 bg-gradient-to-r from-teal-500 to-cyan-600 p-12 flex-col justify-between relative overflow-hidden">
+          <div className="absolute top-[-10%] right-[-10%] w-64 h-64 bg-cyan-500 rounded-full blur-3xl opacity-50 animate-pulse"></div>
+          
+          <div className="relative z-10">
+            <div className="flex items-center gap-2 mb-16">
+              <div className="bg-white p-2 rounded-xl">
+                <ShoppingBag className="w-6 h-6 text-teal-600" />
+              </div>
+              <span className="text-white font-bold text-xl tracking-tight">ShopAI.</span>
+            </div>
             
-            <div className="relative z-10">
-              <div className="flex items-center gap-2 mb-16">
-                <div className="bg-white p-2 rounded-xl">
-            <ShoppingBag className="w-6 h-6 text-teal-600" />
-                </div>
-                <span className="text-white font-bold text-xl tracking-tight">ShopAI.</span>
-              </div>
-              
-              <h2 className="text-5xl font-extrabold text-white leading-[1.1] mb-6">
-                Style is a way to say <span className="text-cyan-200">who you are.</span>
-              </h2>
-              <p className="text-cyan-100 text-lg font-medium opacity-80">
-                Access the world's most exclusive marketplace with just one click.
-              </p>
-            </div>
-
-            <div className="relative z-10 bg-white/10 backdrop-blur-md border border-white/20 p-6 rounded-3xl">
-              <div className="flex gap-4 items-center">
-                <div className="flex -space-x-3">
-            {[1,2,3].map(i => (
-              <div key={i} className="w-10 h-10 rounded-full bg-gray-300 border-2 border-teal-600" />
-            ))}
-                </div>
-                <p className="text-white text-sm font-semibold">Joined by 20k+ shoppers this month</p>
-              </div>
-            </div>
+            <h2 className="text-5xl font-extrabold text-white leading-[1.1] mb-6">
+              Style is a way to say <span className="text-cyan-200">who you are.</span>
+            </h2>
+            <p className="text-cyan-100 text-lg font-medium opacity-80">
+              Access the world's most exclusive marketplace with just one click.
+            </p>
           </div>
 
-          {/* Right Side: Functionality */}
+          <div className="relative z-10 bg-white/10 backdrop-blur-md border border-white/20 p-6 rounded-3xl">
+            <div className="flex gap-4 items-center">
+              <div className="flex -space-x-3">
+                {[1,2,3].map(i => (
+                  <div key={i} className="w-10 h-10 rounded-full bg-gray-300 border-2 border-teal-600" />
+                ))}
+              </div>
+              <p className="text-white text-sm font-semibold">Joined by 20k+ shoppers this month</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Side: Form */}
         <div className="w-full lg:w-7/12 p-8 md:p-14 flex flex-col justify-center">
           <div className="max-w-md mx-auto w-full">
             <div className="mb-8">
@@ -159,9 +168,8 @@ const LoginPage = ({
               <p className="text-gray-500 font-medium">Please sign in to your account</p>
             </div>
 
-            {/* Error Message */}
             {error && (
-              <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 rounded-r-xl flex items-center gap-3 animate-[shake_0.5s_ease-in-out]">
+              <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 rounded-r-xl flex items-center gap-3">
                 <div className="bg-red-500 p-1 rounded-full">
                   <Lock className="w-3 h-3 text-white" />
                 </div>
@@ -169,7 +177,7 @@ const LoginPage = ({
               </div>
             )}
 
-            {/* Role & Method Tabs */}
+            {/* Method & Role Tabs */}
             <div className="space-y-6 mb-8">
               <div className="flex p-1 bg-gray-100 rounded-2xl">
                 {['email', 'mobile', 'emailOtp'].map(m => (
@@ -205,7 +213,7 @@ const LoginPage = ({
               </div>
             </div>
 
-            {/* FORM RENDERER */}
+            {/* Form Renderer */}
             <div className="transition-all duration-500">
               {loginMethod === 'email' && (
                 <form onSubmit={(e) => { e.preventDefault(); handleLogin(); }} className="space-y-4">
@@ -214,8 +222,7 @@ const LoginPage = ({
                     <div className="relative group">
                       <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-600 transition-colors" size={20} />
                       <input 
-                        type="email" 
-                        required
+                        type="email" required
                         className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-indigo-600 outline-none transition-all font-medium"
                         placeholder="example@mail.com"
                         value={loginData.email}
@@ -228,8 +235,7 @@ const LoginPage = ({
                     <div className="relative group">
                       <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-600 transition-colors" size={20} />
                       <input 
-                        type={showPassword ? "text" : "password"}
-                        required
+                        type={showPassword ? "text" : "password"} required
                         className="w-full pl-12 pr-12 py-4 bg-gray-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-indigo-600 outline-none transition-all font-medium"
                         placeholder="••••••••"
                         value={loginData.password}
@@ -262,13 +268,19 @@ const LoginPage = ({
                           {loginMethod === 'mobile' ? 'Mobile Number' : 'Email for OTP'}
                         </label>
                         <div className="relative group">
-                          {loginMethod === 'mobile' ? <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20}/> : <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20}/>}
+                          {loginMethod === 'mobile'
+                            ? <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20}/>
+                            : <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20}/>
+                          }
                           <input 
                             type={loginMethod === 'mobile' ? "tel" : "email"}
                             className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-indigo-600 outline-none transition-all font-medium"
                             placeholder={loginMethod === 'mobile' ? "Enter 10 digits" : "example@mail.com"}
                             value={loginMethod === 'mobile' ? mobileNumber : emailForOtp}
-                            onChange={(e) => loginMethod === 'mobile' ? setMobileNumber(e.target.value.replace(/\D/g, '').slice(0, 10)) : setEmailForOtp(e.target.value)}
+                            onChange={(e) => loginMethod === 'mobile'
+                              ? setMobileNumber(e.target.value.replace(/\D/g, '').slice(0, 10))
+                              : setEmailForOtp(e.target.value)
+                            }
                           />
                         </div>
                       </div>
@@ -283,7 +295,9 @@ const LoginPage = ({
                     <div className="space-y-6 text-center">
                       <div className="bg-indigo-50 p-4 rounded-2xl flex items-center justify-center gap-2">
                         <CheckCircle2 className="text-indigo-600" size={18} />
-                        <span className="text-sm font-bold text-indigo-800">Code sent to {loginMethod === 'mobile' ? mobileNumber : emailForOtp}</span>
+                        <span className="text-sm font-bold text-indigo-800">
+                          Code sent to {loginMethod === 'mobile' ? mobileNumber : emailForOtp}
+                        </span>
                       </div>
                       <div className="flex gap-2 justify-center">
                         {(loginMethod === 'mobile' ? otp : emailOtp).map((digit, idx) => (
@@ -318,15 +332,27 @@ const LoginPage = ({
 
             {/* Demo Credentials */}
             <div className="mt-10 p-4 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
-               <div className="flex flex-col gap-2">
-                  <button onClick={() => {setLoginMethod('email'); setLoginRole('Admin'); setLoginData({email:'admin@ecommerce.com', password:'admin123'})}} className="text-[10px] text-left uppercase font-bold text-gray-400 hover:text-indigo-600">Quick Admin Access: admin@ecommerce.com</button>
-                  <button onClick={() => {setLoginMethod('email'); setLoginRole('Customer'); setLoginData({email:'customer@test.com', password:'password123'})}} className="text-[10px] text-left uppercase font-bold text-gray-400 hover:text-indigo-600">Quick Customer Access: customer@test.com</button>
-               </div>
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={() => { setLoginMethod('email'); setLoginRole('Admin'); setLoginData({email:'admin@ecommerce.com', password:'admin123'}); }}
+                  className="text-[10px] text-left uppercase font-bold text-gray-400 hover:text-indigo-600"
+                >
+                  Quick Admin Access: admin@ecommerce.com
+                </button>
+                <button
+                  onClick={() => { setLoginMethod('email'); setLoginRole('Customer'); setLoginData({email:'customer@test.com', password:'password123'}); }}
+                  className="text-[10px] text-left uppercase font-bold text-gray-400 hover:text-indigo-600"
+                >
+                  Quick Customer Access: customer@test.com
+                </button>
+              </div>
             </div>
 
             <div className="mt-8 text-center">
               <p className="text-gray-500 font-medium">New Shopper? 
-                <button onClick={() => setCurrentPage('register')} className="ml-2 text-indigo-600 font-black hover:underline">Create Account</button>
+                <button onClick={() => setCurrentPage('register')} className="ml-2 text-indigo-600 font-black hover:underline">
+                  Create Account
+                </button>
               </p>
             </div>
             
@@ -340,7 +366,6 @@ const LoginPage = ({
         </div>
       </div>
 
-      {/* Shake Animation for Error */}
       <style>{`
         @keyframes shake {
           0%, 100% { transform: translateX(0); }

@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace ECommerceAPI.Application.DTOs.Auth
 {
     /// <summary>
@@ -9,7 +11,7 @@ namespace ECommerceAPI.Application.DTOs.Auth
     }
 
     /// <summary>
-    /// Verify OTP and login
+    /// Verify OTP and login via mobile
     /// </summary>
     public class VerifyOtpDto
     {
@@ -25,5 +27,29 @@ namespace ECommerceAPI.Application.DTOs.Auth
         public bool Success { get; set; }
         public string Message { get; set; }
         public int? ExpiresInSeconds { get; set; }
+    }
+
+    /// <summary>
+    /// Request OTP for email login
+    /// </summary>
+    public class RequestEmailOtpDto
+    {
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; }
+    }
+
+    /// <summary>
+    /// Verify Email OTP and login
+    /// </summary>
+    public class VerifyEmailOtpDto
+    {
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; }
+
+        [Required]
+        [StringLength(6, MinimumLength = 6)]
+        public string Otp { get; set; }
     }
 }

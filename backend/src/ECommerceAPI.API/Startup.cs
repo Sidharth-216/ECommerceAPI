@@ -678,7 +678,6 @@ using ECommerceAPI.API.Middleware;
 using ECommerceAPI.Infrastructure.Repositories;
 using ECommerceAPI.Infrastructure.Repositories.Interfaces;
 using ECommerceAPI.Infrastructure.Repositories.Implementations;
-using ECommerceAPI.Infrastructure.Services;
 
 
 namespace ECommerceAPI.API
@@ -766,7 +765,9 @@ namespace ECommerceAPI.API
             services.AddScoped<MongoAuthService>();
             services.AddScoped<IMongoOtpService, MongoOtpService>();
             services.AddScoped<IMongoEmailOtpService, MongoEmailOtpService>();
-            services.AddScoped<IEmailService, EmailService>();
+            services.AddScoped<IMongoEmailOtpRepository, MongoEmailOtpRepository>();
+            services.AddScoped<IMongoEmailOtpService, MongoEmailOtpService>();
+
             services.AddScoped<IProductMongoService, ProductMongoService>();
             // ✅ ADDRESS SERVICE - ADD THIS
             services.AddScoped<IMongoAddressService, MongoAddressService>();

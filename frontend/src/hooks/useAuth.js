@@ -49,24 +49,24 @@ export const useAuth = () => {
         );
       }
 
-      sessionStorage.setItem('token', data.token);
-      
+      localStorage.setItem('token', data.token);
+
       const userIdFromToken = getUserIdFromToken();
       const finalUserId = userIdFromToken || data.mongoUserId || data.userId || data.id;
-      
+
       if (!finalUserId) {
         throw new Error('User ID not found. Please contact support.');
       }
 
-      const userData = { 
-        ...data, 
-        role: userRole, 
+      const userData = {
+        ...data,
+        role: userRole,
         userId: finalUserId,
         id: finalUserId,
         email: data.email
       };
-      
-      sessionStorage.setItem('user', JSON.stringify(userData));
+
+      localStorage.setItem('user', JSON.stringify(userData));
 
       setUser({
         id: finalUserId,
@@ -91,34 +91,17 @@ export const useAuth = () => {
 
   const handleRegister = async (registerData, loginRole, setError, setLoading) => {
     const { fullName, email, mobile, password, confirmPassword, gender } = registerData;
-    
-    if (!fullName?.trim()) {
-      throw new Error('Full name is required');
-    }
-    
-    if (!email?.trim()) {
-      throw new Error('Email is required');
-    }
-    
-    if (!mobile?.trim()) {
-      throw new Error('Mobile number is required');
-    }
-    
-    if (!password) {
-      throw new Error('Password is required');
-    }
-    
-    if (password !== confirmPassword) {
-      throw new Error('Passwords do not match');
-    }
-    
-    if (password.length < 6) {
-      throw new Error('Password must be at least 6 characters');
-    }
-    
+
+    if (!fullName?.trim()) throw new Error('Full name is required');
+    if (!email?.trim()) throw new Error('Email is required');
+    if (!mobile?.trim()) throw new Error('Mobile number is required');
+    if (!password) throw new Error('Password is required');
+    if (password !== confirmPassword) throw new Error('Passwords do not match');
+    if (password.length < 6) throw new Error('Password must be at least 6 characters');
+
     setLoading(true);
     setError('');
-    
+
     try {
       console.log('📝 Attempting MongoDB registration...');
 
@@ -129,34 +112,29 @@ export const useAuth = () => {
         password,
         gender
       );
-      
+
       const data = response.data;
-      
-      if (!data.token) {
-        throw new Error('No token received from server');
-      }
 
-      if (!data.role) {
-        throw new Error('No role returned from server');
-      }
+      if (!data.token) throw new Error('No token received from server');
+      if (!data.role) throw new Error('No role returned from server');
 
-      sessionStorage.setItem('token', data.token);
-      
+      localStorage.setItem('token', data.token);
+
       const userIdFromToken = getUserIdFromToken();
       const finalUserId = userIdFromToken || data.userId || data.id || data.mongoUserId;
-      
+
       if (!finalUserId) {
         throw new Error('User ID not found in token. Please contact support.');
       }
-      
+
       const userData = {
         ...data,
         userId: finalUserId,
         id: finalUserId
       };
-      
-      sessionStorage.setItem('user', JSON.stringify(userData));
-      
+
+      localStorage.setItem('user', JSON.stringify(userData));
+
       setUser({
         id: finalUserId,
         userId: finalUserId,
@@ -166,7 +144,7 @@ export const useAuth = () => {
         mobile: data.mobile || mobile,
         gender: data.gender || gender
       });
-      
+
       setProfileData({
         fullName: data.fullName || fullName,
         email: data.email || email,
@@ -174,9 +152,9 @@ export const useAuth = () => {
         gender: data.gender || gender,
         addresses: []
       });
-      
+
       console.log('✅ Registration successful');
-      
+
       return true;
     } catch (err) {
       console.error('❌ Registration error:', err);
@@ -187,10 +165,10 @@ export const useAuth = () => {
   };
 
   const handleLogout = () => {
-    sessionStorage.removeItem('token');
-    sessionStorage.removeItem('user');
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
     localStorage.removeItem('cart');
-    
+
     setUser(null);
     setOrders([]);
     setProfileData({
@@ -200,24 +178,23 @@ export const useAuth = () => {
       gender: '',
       addresses: []
     });
-    
+
     console.log('✅ User logged out successfully');
   };
 
   const loadProfile = async () => {
     if (!user) return;
-    
+
     try {
       console.log('📋 Loading profile data...');
-      
+
       let addresses = [];
-      
+
       try {
-        // Try to get addresses from addressAPI
         if (typeof addressAPI?.getAll === 'function') {
           const addrRes = await addressAPI.getAll();
-          addresses = Array.isArray(addrRes?.data) 
-            ? addrRes.data 
+          addresses = Array.isArray(addrRes?.data)
+            ? addrRes.data
             : addrRes?.data?.addresses || [];
         }
       } catch (err) {
@@ -225,10 +202,8 @@ export const useAuth = () => {
         addresses = [];
       }
 
-      // Normalize addresses
       addresses = (addresses || []).map((a, index) => {
         const mongoId = a._id || a.id || a.Id || `addr_${index}`;
-        
         return {
           id: mongoId,
           _id: mongoId,
@@ -245,11 +220,10 @@ export const useAuth = () => {
 
       setProfileData(prev => ({
         ...prev,
-        addresses: addresses
+        addresses
       }));
 
       console.log('✅ Profile loaded with', addresses.length, 'addresses');
-
     } catch (err) {
       console.error('❌ Error loading profile:', err);
       setProfileData(prev => ({ ...prev, addresses: [] }));
@@ -258,13 +232,11 @@ export const useAuth = () => {
 
   const loadOrders = async () => {
     if (!user) return;
-    
+
     try {
       console.log('📦 Loading orders...');
-      
       const response = await ordersAPI.history();
       const ordersData = response?.data || [];
-      
       setOrders(ordersData);
       console.log('✅ Orders loaded:', ordersData.length);
     } catch (err) {
