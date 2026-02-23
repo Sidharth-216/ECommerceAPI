@@ -18,6 +18,8 @@ using ECommerceAPI.API.Middleware;
 using ECommerceAPI.Infrastructure.Repositories;
 using ECommerceAPI.Infrastructure.Repositories.Interfaces;
 using ECommerceAPI.Infrastructure.Repositories.Implementations;
+using Application.Interfaces;
+using Infrastructure.Services;
 
 
 namespace ECommerceAPI.API
@@ -120,7 +122,11 @@ namespace ECommerceAPI.API
             
             // ✅ ADMIN SERVICE - ADD THIS (if you have MongoAdminController)
             services.AddScoped<IMongoAdminService, MongoAdminService>();
-
+            //-------------AI AGENT SERVICES DEPENDENCY INJECTION---------------------------
+             services.AddHttpClient<ISemanticSearchService, SemanticSearchService>(client =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(10);  // Don't wait too long
+             });
             // ================= Swagger =================
             services.AddSwaggerGen();
         }

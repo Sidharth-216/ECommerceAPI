@@ -262,7 +262,7 @@ const ProductsPage = ({
 
             {/* Logo */}
             <div className="flex items-center gap-2 cursor-pointer">
-              <div className="w-9 h-9 bg-gradient-to-br from-orange-400 to-orange-500 rounded-lg flex items-center justify-center">
+              <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-cyan-600 rounded-lg flex items-center justify-center">
                 <ShoppingBag className="w-5 h-5 text-white" />
               </div>
               <div>
@@ -371,7 +371,7 @@ const ProductsPage = ({
               {/* Search Button */}
               <button
                 onClick={() => handleFullSearch()}
-                className="bg-gradient-to-r from-orange-400 to-orange-500 hover:from-orange-500 hover:to-orange-600 px-6 py-2.5 rounded-r-lg transition-all"
+                className="bg-gradient-to-r from-cyan-400 to-cyan-500 hover:from-cyan-500 hover:to-cyan-600 px-6 py-2.5 rounded-r-lg transition-all"
               >
                 <Search className="w-5 h-5 text-white" />
               </button>
