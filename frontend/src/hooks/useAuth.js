@@ -168,6 +168,7 @@ export const useAuth = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('cart');
+    localStorage.removeItem('currentPage');
 
     setUser(null);
     setOrders([]);

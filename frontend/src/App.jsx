@@ -19,6 +19,7 @@ const App = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [appReady, setAppReady] = useState(false);
 
   // Custom hooks
   const auth = useAuth();
@@ -30,6 +31,13 @@ const App = () => {
     initializeApp();
   }, []);
 
+  // Save currentPage to localStorage whenever it changes (only after app is ready)
+  useEffect(() => {
+    if (appReady) {
+      localStorage.setItem('currentPage', currentPage);
+    }
+  }, [currentPage, appReady]);
+
   // Reload data when user changes
   useEffect(() => {
     if (auth.user) {
@@ -37,42 +45,78 @@ const App = () => {
     }
   }, [auth.user]);
 
+  const clearSession = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('cart');
+    localStorage.removeItem('currentPage');
+    setCurrentPage('home');
+  };
+
+  const validateToken = async (token) => {
+    try {
+      const response = await fetch('/api/mongo/auth/validate', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      return response.ok;
+    } catch (err) {
+      console.warn('⚠️ Token validation failed (server may be down):', err.message);
+      return false;
+    }
+  };
+
   const initializeApp = async () => {
     try {
       console.log('🚀 Initializing ShopAI...');
 
-      // Check for existing session
-      const token = sessionStorage.getItem('token');
-      const userData = sessionStorage.getItem('user');
+      const token = localStorage.getItem('token');
+      const userData = localStorage.getItem('user');
+      const savedPage = localStorage.getItem('currentPage');
 
       if (token && userData) {
+        console.log('🔍 Validating token with server...');
+        const isValid = await validateToken(token);
+
+        if (!isValid) {
+          console.warn('⚠️ Token invalid or server restarted — clearing session');
+          clearSession();
+          return;
+        }
+
         try {
           const parsedUser = JSON.parse(userData);
-          console.log('✅ Found existing session for:', parsedUser.email);
-          
+          console.log('✅ Found valid session for:', parsedUser.email);
+
           auth.setUser(parsedUser);
-          
-          // Set appropriate page based on role
+
           if (parsedUser.role === 'Admin') {
-            setCurrentPage('admin');
+            const adminPages = ['admin', 'products'];
+            setCurrentPage(savedPage && adminPages.includes(savedPage) ? savedPage : 'admin');
           } else {
-            setCurrentPage('products');
+            const customerPages = ['products', 'cart', 'checkout', 'orders', 'profile'];
+            setCurrentPage(savedPage && customerPages.includes(savedPage) ? savedPage : 'products');
           }
+
         } catch (err) {
           console.error('❌ Error parsing user data:', err);
-          sessionStorage.removeItem('token');
-          sessionStorage.removeItem('user');
-          setCurrentPage('home');
+          clearSession();
         }
       } else {
         console.log('ℹ️ No existing session found');
+        localStorage.removeItem('currentPage');
         setCurrentPage('home');
       }
 
       console.log('✅ App initialized');
     } catch (err) {
       console.error('❌ App initialization error:', err);
-      setCurrentPage('home');
+      clearSession();
+    } finally {
+      setAppReady(true);
     }
   };
 
@@ -136,16 +180,26 @@ const App = () => {
     loadProfile: auth.loadProfile
   };
 
+  // Show spinner until session check is complete
+  if (!appReady) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-teal-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-slate-600 font-semibold text-lg">Loading ShopAI...</p>
+        </div>
+      </div>
+    );
+  }
+
   // Route to appropriate page
   if (!auth.user) {
-    // Guest routes
     if (currentPage === 'login') {
       return <LoginPage {...pageProps} />;
     }
     if (currentPage === 'register') {
       return <RegisterPage {...pageProps} />;
     }
-    // Default to home for guests
     return <HomePage {...pageProps} />;
   }
 
@@ -166,7 +220,6 @@ const App = () => {
     case 'profile':
       return <ProfilePage {...pageProps} />;
     default:
-      // Default authenticated page
       return <ProductsPage {...pageProps} />;
   }
 };

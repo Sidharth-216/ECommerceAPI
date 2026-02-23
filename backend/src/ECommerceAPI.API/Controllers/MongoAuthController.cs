@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using System.Threading.Tasks;
 using ECommerceAPI.Application.DTOs.Auth;
 using ECommerceAPI.Application.Services;
@@ -16,12 +17,18 @@ namespace ECommerceAPI.API.Controllers
             _mongoAuthService = mongoAuthService;
         }
 
+        [HttpGet("validate")]
+        [Authorize]
+        public IActionResult ValidateToken()
+        {
+            return Ok(new { valid = true });
+        }
+
         [HttpPost("register")]
         public async Task<ActionResult<AuthResponseDto>> Register([FromBody] RegisterDto registerDto)
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
-
             var response = await _mongoAuthService.RegisterAsync(registerDto);
             return Ok(response);
         }
