@@ -250,18 +250,28 @@ export const addressAPI = {
 };
 
 // ===================== PRODUCTS API (MONGODB) =====================
+// Replace your existing productsAPI block in api.js with this one
+
 export const productsAPI = {
-  // Get all products
+  // Get all products (used on initial page load)
   getAll: () => {
     console.log('📦 Products API - Get All (MongoDB)');
     return api.get('/mongo/products');
   },
 
-  // Search products
-  search: (query) => {
-    console.log('🔍 Products API - Search (MongoDB):', query);
+  // Semantic search — calls .NET backend → FastAPI → MongoDB Atlas Vector Search
+  // query: the user's search string
+  // topK: how many results to return (default 8 for suggestions, 20 for full search)
+  search: (query, topK = 8) => {
+    if (!query || !query.trim()) {
+      return Promise.resolve({ data: [] });
+    }
+    console.log('🔍 Products API - Semantic Search:', query);
     return api.get('/mongo/products/search', {
-      params: { query: query || '' }
+      params: {
+        query: query.trim(),
+        topK: topK
+      }
     });
   },
 
@@ -274,7 +284,6 @@ export const productsAPI = {
     return api.get(`/mongo/products/${id}`);
   }
 };
-
 // ===================== CART API (MONGODB) =====================
 export const cartAPI = {
   // Get user's cart
