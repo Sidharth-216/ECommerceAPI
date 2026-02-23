@@ -20,19 +20,12 @@ const AdminDashboard = (props) => {
     { id: 'stock-analysis', label: 'Stock Analysis', icon: TrendingUp, color: 'amber' },
     { id: 'sales-report', label: 'Sales Report', icon: FileText, color: 'blue' }
   ];
-
-  const getTabColorClasses = (tab, isActive) => {
-    const colors = {
-      teal: isActive ? 'bg-teal-500 text-white' : 'text-slate-700 hover:bg-teal-50',
-      purple: isActive ? 'bg-purple-500 text-white' : 'text-slate-700 hover:bg-purple-50',
-      coral: isActive ? 'bg-coral-500 text-white' : 'text-slate-700 hover:bg-coral-50',
-      emerald: isActive ? 'bg-emerald-500 text-white' : 'text-slate-700 hover:bg-emerald-50',
-      amber: isActive ? 'bg-amber-500 text-white' : 'text-slate-700 hover:bg-amber-50',
-      blue: isActive ? 'bg-blue-500 text-white' : 'text-slate-700 hover:bg-blue-50'
+    const getTabColorClasses = (tab, isActive) => {
+      return isActive
+        ? 'bg-teal-500 text-white'
+        : 'text-slate-700 hover:bg-teal-50';
     };
-    return colors[tab.color] || colors.teal;
-  };
-
+    
   return (
     <div className="min-h-screen bg-slate-50 flex">
       {/* Sidebar */}
@@ -74,7 +67,20 @@ const AdminDashboard = (props) => {
             );
           })}
         </nav>
-
+        {/* Logout Button */}
+        <div className="p-4 border-t border-slate-200">
+          <button
+            onClick={() => {
+              handleLogout();
+              setCurrentPage('login');
+            }}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all font-medium text-slate-700 hover:bg-red-50 text-red-600 hover:text-red-700"
+            title={!sidebarOpen ? 'Logout' : ''}
+          >
+            <LogOut className="w-5 h-5 flex-shrink-0" />
+            {sidebarOpen && <span className="text-sm">Logout</span>}
+          </button>
+        </div>
         {/* Sidebar Toggle */}
         <div className="p-4 border-t border-slate-200">
           <button
