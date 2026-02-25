@@ -428,181 +428,137 @@ export const recommendationsAPI = {
 // ===================== ADMIN API (MONGODB) - COMPLETE FIX =====================
 export const adminAPI = {
   // ===== USER MANAGEMENT =====
-  
-  // Get all users from MongoDB
+
   getUsers: () => {
     console.log('👥 MongoDB Admin API - Get All Users');
     return api.get('/mongo/admin/users');
   },
-  
-  // Get user by ID
+
   getUserById: (userId) => {
-    if (!userId) {
-      return Promise.reject(new Error('User ID is required'));
-    }
-    console.log('👤 MongoDB Admin API - Get User By ID:', userId);
+    if (!userId) return Promise.reject(new Error('User ID is required'));
     return api.get(`/mongo/admin/users/${userId}`);
   },
-  
+
   // ===== ORDER MANAGEMENT =====
-  
-  // Get all orders from MongoDB
+
   getOrders: () => {
     console.log('📦 MongoDB Admin API - Get All Orders');
     return api.get('/mongo/admin/orders');
   },
-  
-  // Get order statistics
+
   getOrderStats: () => {
-    console.log('📊 MongoDB Admin API - Get Order Stats');
     return api.get('/mongo/admin/order-stats');
   },
 
-  // Update order status - FIXED: Now uses correct endpoint
   updateOrderStatus: (orderId, newStatus) => {
-    if (!orderId) {
-      return Promise.reject(new Error('Order ID is required'));
-    }
-    console.log('✏️ MongoDB Admin API - Update Order Status:', { orderId, newStatus });
-    
-    // The status can be passed as string or object
+    if (!orderId) return Promise.reject(new Error('Order ID is required'));
     const statusValue = typeof newStatus === 'string' ? newStatus : newStatus.status;
-    
     return api.put(`/mongo/admin/orders/${orderId}/status`, { status: statusValue });
   },
-  
+
   // ===== SALES & REVENUE REPORTS =====
-  
-  // Get sales report
-  getSalesReport: (startDate, endDate) => {
-    console.log('📊 MongoDB Admin API - Get Sales Report:', { startDate, endDate });
-    return api.get('/mongo/admin/sales-report', { 
-      params: { startDate, endDate } 
-    });
-  },
-  
-  // Get revenue analytics
-  getRevenue: (startDate, endDate) => {
-    console.log('💰 MongoDB Admin API - Get Revenue:', { startDate, endDate });
-    return api.get('/mongo/admin/revenue', { 
-      params: { startDate, endDate } 
-    });
-  },
-  
-  // Get sales by category
-  getSalesByCategory: (startDate, endDate) => {
-    console.log('📊 MongoDB Admin API - Get Sales By Category:', { startDate, endDate });
-    return api.get('/mongo/admin/sales-by-category', { 
-      params: { startDate, endDate } 
-    });
-  },
-  
-  // Get sales by product
-  getSalesByProduct: (startDate, endDate) => {
-    console.log('📦 MongoDB Admin API - Get Sales By Product:', { startDate, endDate });
-    return api.get('/mongo/admin/sales-by-product', { 
-      params: { startDate, endDate } 
-    });
-  },
-  
-  // Get top selling products
-  getTopProducts: (limit = 10) => {
-    console.log('🏆 MongoDB Admin API - Get Top Products:', { limit });
-    return api.get('/mongo/admin/top-products', { 
-      params: { limit } 
-    });
-  },
-  
+
+  getSalesReport: (startDate, endDate) =>
+    api.get('/mongo/admin/sales-report', { params: { startDate, endDate } }),
+
+  getRevenue: (startDate, endDate) =>
+    api.get('/mongo/admin/revenue', { params: { startDate, endDate } }),
+
+  getSalesByCategory: (startDate, endDate) =>
+    api.get('/mongo/admin/sales-by-category', { params: { startDate, endDate } }),
+
+  getSalesByProduct: (startDate, endDate) =>
+    api.get('/mongo/admin/sales-by-product', { params: { startDate, endDate } }),
+
+  getTopProducts: (limit = 10) =>
+    api.get('/mongo/admin/top-products', { params: { limit } }),
+
   // ===== STOCK & INVENTORY =====
-  
-  // Get stock analysis
+
   getStockAnalysis: () => {
     console.log('📈 MongoDB Admin API - Get Stock Analysis');
     return api.get('/mongo/admin/stock-analysis');
   },
 
-  // ===== PRODUCT MANAGEMENT - FIXED =====
-  
-  // Get all products
+  // ===== PRODUCT MANAGEMENT =====
+
   getProducts: () => {
     console.log('📦 MongoDB Admin API - Get All Products');
     return api.get('/mongo/products');
   },
 
-  // Add new product - FIXED: Proper payload structure
+  /**
+   * Admin: Add a new product.
+   *
+   * FIXED: The payload now sends `categoryName` (string) which maps to
+   * ProductCreateDto.CategoryName in the .NET backend.
+   * The old `category` key was being ignored by the DTO binder.
+   */
   addProduct: (productData) => {
     console.log('➕ MongoDB Admin API - Add Product:', productData);
-    
-    // Ensure proper structure for MongoDB
+
     const payload = {
-      name: productData.name,
-      brand: productData.brand || '',
-      price: parseFloat(productData.price),
-      stockQuantity: parseInt(productData.stockQuantity),
-      category: productData.category || 'Uncategorized',
-      description: productData.description || '',
-      imageUrl: productData.imageUrl || ''
+      name:          (productData.name          || '').trim(),
+      brand:         (productData.brand         || '').trim(),
+      price:         parseFloat(productData.price)       || 0,
+      stockQuantity: parseInt(productData.stockQuantity) || 0,
+      categoryName:  (productData.category || productData.categoryName || '').trim(),
+      categoryId:    0,
+      description:   (productData.description   || '').trim(),
+      imageUrl:      (productData.imageUrl       || '').trim(),
+      specifications: ''
     };
-    
+
     return api.post('/mongo/products', payload);
   },
-
-  // Update product - FIXED: Proper payload structure
-  updateProduct: (productId, productData) => {
-    if (!productId) {
-      return Promise.reject(new Error('Product ID is required'));
-    }
+  /**
+   * Admin: Update an existing product.
+   *
+   * FIXED: same `categoryName` correction as addProduct.
+   */
+ updateProduct: (productId, productData) => {
+    if (!productId) return Promise.reject(new Error('Product ID is required'));
     console.log('✏️ MongoDB Admin API - Update Product:', { productId, productData });
-    
-    // Ensure proper structure for MongoDB
+
     const payload = {
-      name: productData.name,
-      brand: productData.brand || '',
-      price: parseFloat(productData.price),
-      stockQuantity: parseInt(productData.stockQuantity),
-      category: productData.category || 'Uncategorized',
-      description: productData.description || '',
-      imageUrl: productData.imageUrl || ''
+      name:          (productData.name          || '').trim(),
+      brand:         (productData.brand         || '').trim(),
+      price:         parseFloat(productData.price)       || 0,
+      stockQuantity: parseInt(productData.stockQuantity) || 0,
+      categoryName:  (productData.category || productData.categoryName || '').trim(),
+      categoryId:    0,
+      description:   (productData.description   || '').trim(),
+      imageUrl:      (productData.imageUrl       || '').trim(),
+      specifications: ''
     };
-    
+
     return api.put(`/mongo/products/${productId}`, payload);
   },
 
-  // Delete product
   deleteProduct: (productId) => {
-    if (!productId) {
-      return Promise.reject(new Error('Product ID is required'));
-    }
+    if (!productId) return Promise.reject(new Error('Product ID is required'));
     console.log('🗑️ MongoDB Admin API - Delete Product:', productId);
     return api.delete(`/mongo/products/${productId}`);
   },
-  
+
   // ===== CUSTOMER ANALYTICS =====
-  
-  // Get customer insights
-  getCustomerInsights: () => {
-    console.log('👥 MongoDB Admin API - Get Customer Insights');
-    return api.get('/mongo/admin/customer-insights');
-  },
-  
+
+  getCustomerInsights: () =>
+    api.get('/mongo/admin/customer-insights'),
+
   // ===== METRICS & ANALYTICS =====
-  
-  // Get daily metrics
-  getDailyMetrics: (startDate, endDate) => {
-    console.log('📅 MongoDB Admin API - Get Daily Metrics:', { startDate, endDate });
-    return api.get('/mongo/admin/daily-metrics', { 
-      params: { startDate, endDate } 
-    });
-  },
-  
+
+  getDailyMetrics: (startDate, endDate) =>
+    api.get('/mongo/admin/daily-metrics', { params: { startDate, endDate } }),
+
   // ===== DASHBOARD =====
-  
-  // Get admin dashboard summary
+
   getDashboard: () => {
     console.log('🎯 MongoDB Admin API - Get Dashboard');
     return api.get('/mongo/admin/dashboard');
   }
 };
+
 
 // ===================== VALIDATION HELPER =====================
 /**

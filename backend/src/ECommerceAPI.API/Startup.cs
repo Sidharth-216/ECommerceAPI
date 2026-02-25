@@ -21,7 +21,6 @@ using ECommerceAPI.Infrastructure.Repositories.Implementations;
 using Application.Interfaces;
 using Infrastructure.Services;
 
-
 namespace ECommerceAPI.API
 {
     public class Startup
@@ -49,16 +48,19 @@ namespace ECommerceAPI.API
                 {
                     options.TokenValidationParameters = new TokenValidationParameters
                     {
-                        ValidateIssuer = true,
-                        ValidateAudience = true,
-                        ValidateLifetime = true,
+                        ValidateIssuer           = true,
+                        ValidateAudience         = true,
+                        ValidateLifetime         = true,
                         ValidateIssuerSigningKey = true,
-                        ValidIssuer = Configuration["Jwt:Issuer"],
-                        ValidAudience = Configuration["Jwt:Audience"],
-                        IssuerSigningKey =
-                            new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
-                        NameClaimType = ClaimTypes.NameIdentifier,
-                        RoleClaimType = ClaimTypes.Role
+                        ValidIssuer              = Configuration["Jwt:Issuer"],
+                        ValidAudience            = Configuration["Jwt:Audience"],
+                        IssuerSigningKey         = new SymmetricSecurityKey(
+                                                       Encoding.UTF8.GetBytes(jwtKey)),
+                        // ✅ Use ClaimTypes.* (long URIs) — matches what JwtHelper writes.
+                        // The default inbound claim type map (NOT cleared) automatically
+                        // maps the long URIs to their short names, so role auth works.
+                        NameClaimType            = ClaimTypes.NameIdentifier,
+                        RoleClaimType            = ClaimTypes.Role
                     };
                 });
 
@@ -89,44 +91,32 @@ namespace ECommerceAPI.API
             });
 
             // ================= MongoDB Repositories =================
-            services.AddScoped<IMongoUserRepository, MongoUserRepository>();
-            services.AddScoped<IMongoOtpRepository, MongoOtpRepository>();
-            services.AddScoped<IMongoEmailOtpRepository, MongoEmailOtpRepository>();
-            services.AddScoped<IProductMongoRepository, ProductMongoRepository>();
-            
-            // ✅ CART REPOSITORY - ADD THIS
-            services.AddScoped<ICartMongoRepository, CartMongoRepository>();
-            
-            // ✅ ORDER REPOSITORY - ADD THIS (if you have MongoOrderController)
-            services.AddScoped<IMongoOrderRepository, MongoOrderRepository>();
-            
-            // ✅ ADDRESS REPOSITORY - ADD THIS (if you have MongoAddressController)
-            services.AddScoped<IAddressMongoRepository, AddressMongoRepository>();
+            services.AddScoped<IMongoUserRepository,      MongoUserRepository>();
+            services.AddScoped<IMongoOtpRepository,       MongoOtpRepository>();
+            services.AddScoped<IMongoEmailOtpRepository,  MongoEmailOtpRepository>();
+            services.AddScoped<IProductMongoRepository,   ProductMongoRepository>();
+            services.AddScoped<ICartMongoRepository,      CartMongoRepository>();
+            services.AddScoped<IMongoOrderRepository,     MongoOrderRepository>();
+            services.AddScoped<IAddressMongoRepository,   AddressMongoRepository>();
 
             // ================= MongoDB Services =================
             services.AddScoped<MongoAuthService>();
-            services.AddScoped<IMongoOtpService, MongoOtpService>();
-            services.AddScoped<IMongoEmailOtpService, MongoEmailOtpService>();
-            services.AddScoped<IMongoEmailOtpRepository, MongoEmailOtpRepository>();
-            services.AddScoped<IMongoEmailOtpService, MongoEmailOtpService>();
+            services.AddScoped<IMongoOtpService,          MongoOtpService>();
+            services.AddScoped<IMongoEmailOtpService,     MongoEmailOtpService>();
+            services.AddScoped<IMongoEmailOtpRepository,  MongoEmailOtpRepository>();
+            services.AddScoped<IMongoEmailOtpService,     MongoEmailOtpService>();
+            services.AddScoped<IProductMongoService,      ProductMongoService>();
+            services.AddScoped<IMongoAddressService,      MongoAddressService>();
+            services.AddScoped<IMongoCartService,         MongoCartService>();
+            services.AddScoped<IMongoOrderService,        MongoOrderService>();
+            services.AddScoped<IMongoAdminService,        MongoAdminService>();
 
-            services.AddScoped<IProductMongoService, ProductMongoService>();
-            // ✅ ADDRESS SERVICE - ADD THIS
-            services.AddScoped<IMongoAddressService, MongoAddressService>();
-
-            // ✅ CART SERVICE - ADD THIS
-            services.AddScoped<IMongoCartService, MongoCartService>();
-            
-            // ✅ ORDER SERVICE - ADD THIS (if you have MongoOrderController)
-            services.AddScoped<IMongoOrderService, MongoOrderService>();
-            
-            // ✅ ADMIN SERVICE - ADD THIS (if you have MongoAdminController)
-            services.AddScoped<IMongoAdminService, MongoAdminService>();
-            //-------------AI AGENT SERVICES DEPENDENCY INJECTION---------------------------
-             services.AddHttpClient<ISemanticSearchService, SemanticSearchService>(client =>
+            // ================= AI / Semantic Search =================
+            services.AddHttpClient<ISemanticSearchService, SemanticSearchService>(client =>
             {
-                client.Timeout = TimeSpan.FromSeconds(10);  // Don't wait too long
-             });
+                client.Timeout = TimeSpan.FromSeconds(10);
+            });
+
             // ================= Swagger =================
             services.AddSwaggerGen();
         }

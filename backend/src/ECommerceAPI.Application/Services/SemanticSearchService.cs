@@ -24,7 +24,7 @@ namespace Infrastructure.Services
         {
             _httpClient = httpClient;
             _logger = logger;
-            _aiServiceBaseUrl = configuration["AIService:BaseUrl"] 
+             _aiServiceBaseUrl = configuration["AIService:BaseUrl"] 
                 ?? "http://localhost:8000";
         }
 

@@ -12,8 +12,10 @@ namespace ECommerceAPI.API
     {
         public static async Task Main(string[] args)
         {
-            // 🔥 IMPORTANT: Disable default inbound claim mapping
-            JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
+            // ✅ REMOVED: JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear()
+            // Clearing the map broke role-based authorization because ClaimTypes.Role
+            // (long URI) written by JwtHelper was no longer mapped to short "role" on
+            // the way in. Leave the default map intact so ASP.NET handles it correctly.
 
             var host = CreateHostBuilder(args).Build();
 
@@ -21,7 +23,7 @@ namespace ECommerceAPI.API
             using (var scope = host.Services.CreateScope())
             {
                 var services = scope.ServiceProvider;
-                var logger = services.GetRequiredService<ILogger<Program>>();
+                var logger   = services.GetRequiredService<ILogger<Program>>();
 
                 // =====================================================
                 // MongoDB Atlas Connection Test (PING)
@@ -32,7 +34,7 @@ namespace ECommerceAPI.API
                     var result = mongoClient
                         .GetDatabase("admin")
                         .RunCommand<BsonDocument>(new BsonDocument("ping", 1));
-                    
+
                     Console.WriteLine("✅ MongoDB Atlas Connected Successfully!");
                     Console.WriteLine($"   Ping Response: {result.ToJson()}");
                 }

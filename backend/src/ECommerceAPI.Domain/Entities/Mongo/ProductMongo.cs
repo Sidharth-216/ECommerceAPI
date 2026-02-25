@@ -10,6 +10,8 @@ namespace ECommerceAPI.Domain.Entities.Mongo
     /// ✅ CategoryInfo fixed with proper mapping
     /// ✅ IsActive as nullable to prevent casting errors
     /// </summary>
+    
+    [BsonIgnoreExtraElements] 
     public class ProductMongo
     {
         [BsonId]

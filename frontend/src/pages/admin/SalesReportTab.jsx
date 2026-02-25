@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, DollarSign, ShoppingCart, Calendar, RefreshCw, AlertCircle, Download } from 'lucide-react';
-import { adminAPI } from '../../api';
+import { adminAPI } from '/home/sidhu/Desktop/ECommerceAPI/frontend/src/api.js';
 
 const SalesReportTab = ({ error, setError }) => {
   const [loading, setLoading] = useState(false);
