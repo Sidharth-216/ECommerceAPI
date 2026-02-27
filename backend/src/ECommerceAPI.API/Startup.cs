@@ -18,8 +18,8 @@ using ECommerceAPI.API.Middleware;
 using ECommerceAPI.Infrastructure.Repositories;
 using ECommerceAPI.Infrastructure.Repositories.Interfaces;
 using ECommerceAPI.Infrastructure.Repositories.Implementations;
-using Application.Interfaces;
-using Infrastructure.Services;
+
+// NOTE: Do NOT add "using Application.Interfaces;" — always use the full namespace above
 
 namespace ECommerceAPI.API
 {
@@ -56,9 +56,6 @@ namespace ECommerceAPI.API
                         ValidAudience            = Configuration["Jwt:Audience"],
                         IssuerSigningKey         = new SymmetricSecurityKey(
                                                        Encoding.UTF8.GetBytes(jwtKey)),
-                        // ✅ Use ClaimTypes.* (long URIs) — matches what JwtHelper writes.
-                        // The default inbound claim type map (NOT cleared) automatically
-                        // maps the long URIs to their short names, so role auth works.
                         NameClaimType            = ClaimTypes.NameIdentifier,
                         RoleClaimType            = ClaimTypes.Role
                     };
@@ -112,9 +109,10 @@ namespace ECommerceAPI.API
             services.AddScoped<IMongoAdminService,        MongoAdminService>();
 
             // ================= AI / Semantic Search =================
+            // Timeout increased to 30s — ngrok + cold start can be slow
             services.AddHttpClient<ISemanticSearchService, SemanticSearchService>(client =>
             {
-                client.Timeout = TimeSpan.FromSeconds(10);
+                client.Timeout = TimeSpan.FromSeconds(30);  // ← was 10, increased to 30
             });
 
             // ================= Swagger =================

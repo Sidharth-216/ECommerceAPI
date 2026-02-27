@@ -263,17 +263,17 @@ export const productsAPI = {
   // query: the user's search string
   // topK: how many results to return (default 8 for suggestions, 20 for full search)
   search: (query, topK = 8) => {
-    if (!query || !query.trim()) {
-      return Promise.resolve({ data: [] });
+  if (!query || !query.trim()) {
+    return Promise.resolve({ data: { results: [] } });
+  }
+
+  return api.get('/mongo/search', {
+    params: {
+      query: query.trim(),
+      topK: topK
     }
-    console.log('🔍 Products API - Semantic Search:', query);
-    return api.get('/mongo/products/search', {
-      params: {
-        query: query.trim(),
-        topK: topK
-      }
-    });
-  },
+  });
+},
 
   // Get product by ID
   getById: (id) => {

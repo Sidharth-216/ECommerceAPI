@@ -46,21 +46,30 @@ export const useProducts = () => {
   };
 
   const searchProducts = async (query) => {
-    try {
-      console.log('🔍 Searching products:', query);
-      
-      const response = await productsAPI.search(query);
-      const rawProducts = response?.data || [];
-      
-      const normalizedProducts = rawProducts.map(normalizeProduct);
-      
-      console.log('✅ Search results:', normalizedProducts.length);
-      return normalizedProducts;
-    } catch (err) {
-      console.error('❌ Error searching products:', err);
-      throw new Error(err.response?.data?.message || err.message || 'Failed to search products');
-    }
-  };
+  try {
+    console.log('🔍 Searching products:', query);
+
+    const response = await productsAPI.search(query);
+
+    console.log("Full API response:", response.data);
+
+    const rawProducts = response?.data?.results || [];
+
+    const normalizedProducts = rawProducts.map(normalizeProduct);
+
+    console.log('✅ Search results:', normalizedProducts.length);
+
+    return normalizedProducts;
+
+  } catch (err) {
+    console.error('❌ Error searching products:', err);
+    throw new Error(
+      err.response?.data?.message ||
+      err.message ||
+      'Failed to search products'
+    );
+  }
+};
 
   const getProductById = async (id) => {
     try {

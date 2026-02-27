@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ShoppingBag, Search, ShoppingCart, MessageCircle, UserCircle, LogOut, Package, Plus, Minus, X, Send, ChevronLeft, ChevronRight } from 'lucide-react';
-import { productsAPI } from '../services/api'; // adjust path if needed
+import { productsAPI } from '/home/sidhu/Desktop/ECommerceAPI/frontend/src/api.js'; // adjust path if needed
 
 // ─────────────────────────────────────────────────────────────────
 // HELPER: safely extract category name from product
@@ -107,8 +107,8 @@ const ProductsPage = ({
 
       setSearchLoading(true);
       try {
-        const response = await productsAPI.search(query, 6); // top 6 for dropdown
-        const results = response?.data || [];
+        const response = await productsAPI.search(query, 6);
+          const results = response?.data?.results || []; 
         setSemanticSuggestions(results);
         setShowSuggestions(results.length > 0);
       } catch (err) {
@@ -136,8 +136,8 @@ const ProductsPage = ({
     setIsSemanticMode(true);
 
     try {
-      const response = await productsAPI.search(query, 20); // top 20 for grid
-      const results = response?.data || [];
+      const response = await productsAPI.search(query, 20);
+      const results = response?.data?.results || []; 
       setSemanticResults(results);
     } catch (err) {
       console.error('Semantic full search error:', err);
