@@ -1,15 +1,16 @@
 """
-models.py
+models.py  (v3)
 Pydantic request/response models for the AI Shopping Agent.
+ChatRequest now carries jwt_token so the orchestrator can forward it to .NET.
 """
 
 from typing import List, Optional, Any
 from pydantic import BaseModel, field_validator
 
 
-# ─────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────
 # Search Models
-# ─────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────
 
 class SearchRequest(BaseModel):
     query: str
@@ -29,8 +30,6 @@ class ProductResult(BaseModel):
     stockQuantity: int   = 0
     score:         float = 0.0
 
-    # Pydantic v2 validator — coerces any incoming price/rating to float
-    # This catches Decimal128 objects if they somehow slip through
     @field_validator("price", "rating", mode="before")
     @classmethod
     def coerce_to_float(cls, v):
@@ -38,14 +37,12 @@ class ProductResult(BaseModel):
             return 0.0
         if isinstance(v, (int, float)):
             return float(v)
-        # bson.Decimal128
         type_name = type(v).__name__
         if type_name == "Decimal128":
             try:
                 return float(v.to_decimal())
             except Exception:
                 return float(str(v))
-        # dict: { "$numberDecimal": "39999" }
         if isinstance(v, dict):
             nd = v.get("$numberDecimal")
             if nd is not None:
@@ -62,24 +59,29 @@ class SearchResponse(BaseModel):
     total:   int
 
 
-# ─────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────
 # Chat Models
-# ─────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────
 
 class Message(BaseModel):
-    role:    str   # "user" or "assistant"
+    role:    str    # "user" or "assistant"
     content: str
 
 
 class ChatRequest(BaseModel):
-    message:  str
-    userId:   Optional[str] = None
-    history:  List[Message] = []
+    message:   str
+    userId:    Optional[str] = None
+    history:   List[Message] = []
+
+    # JWT token forwarded from the React frontend.
+    # The orchestrator passes this to APIClient which sends it as
+    # Authorization: Bearer <token> to all /api/ai/* .NET endpoints.
+    jwt_token: Optional[str] = None
 
 
 class ChatResponse(BaseModel):
     response:   str
-    action:     Optional[str]            = None
-    data:       Optional[Any]            = None
-    products:   Optional[List[Any]]      = None
-    confidence: Optional[float]          = None
+    action:     Optional[str]       = None
+    data:       Optional[Any]       = None
+    products:   Optional[List[Any]] = None
+    confidence: Optional[float]     = None

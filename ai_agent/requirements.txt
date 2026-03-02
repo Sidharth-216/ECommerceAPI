@@ -1,3 +1,4 @@
+# ── Core (always required) ───────────────────────────────────────
 fastapi==0.111.0
 uvicorn==0.30.0
 sentence-transformers==3.0.1
@@ -5,3 +6,13 @@ pymongo==4.7.2
 python-dotenv==1.0.1
 requests==2.32.3
 pydantic==2.7.1
+
+# ── LLM providers (install only the one you need) ────────────────
+# Ollama  (local models — Mistral, LLaMA 3, Gemma, etc.)
+# pip install ollama
+
+# OpenAI  (GPT-4o, GPT-4o-mini)
+# pip install openai
+
+# Anthropic  (Claude Haiku / Sonnet / Opus)
+# pip install anthropic

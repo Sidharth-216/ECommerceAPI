@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { ShoppingBag, Search, ShoppingCart, MessageCircle, UserCircle, LogOut, Package, Plus, Minus, X, Send, ChevronLeft, ChevronRight } from 'lucide-react';
-import { productsAPI } from '/home/sidhu/Desktop/ECommerceAPI/frontend/src/api.js'; // adjust path if needed
+import { ShoppingBag, Search, ShoppingCart, MessageCircle, UserCircle, LogOut, Package, X, Send, ChevronLeft, ChevronRight, Sparkles, Zap, Star, TrendingUp, Bot, Mic, Paperclip, ThumbsUp, ThumbsDown, RotateCcw } from 'lucide-react';
+import { productsAPI } from '/home/sidhu/Desktop/ECommerceAPI/frontend/src/api.js';
 
 // ─────────────────────────────────────────────────────────────────
-// HELPER: safely extract category name from product
-// Your MongoDB category field is: { _id: 0, name: "Televisions" }
+// HELPERS
 // ─────────────────────────────────────────────────────────────────
 const getCategoryName = (product) => {
   if (!product) return 'Uncategorized';
@@ -15,9 +14,6 @@ const getCategoryName = (product) => {
   return String(cat);
 };
 
-// ─────────────────────────────────────────────────────────────────
-// HELPER: safely extract price (handles $numberDecimal format)
-// ─────────────────────────────────────────────────────────────────
 const getPrice = (product) => {
   if (!product?.price) return 0;
   if (typeof product.price === 'number') return product.price;
@@ -27,9 +23,6 @@ const getPrice = (product) => {
   return parseFloat(product.price) || 0;
 };
 
-// ─────────────────────────────────────────────────────────────────
-// HELPER: safely extract rating
-// ─────────────────────────────────────────────────────────────────
 const getRating = (product) => {
   if (!product?.rating) return null;
   if (typeof product.rating === 'number') return product.rating;
@@ -39,108 +32,642 @@ const getRating = (product) => {
   return parseFloat(product.rating) || null;
 };
 
+// ─────────────────────────────────────────────────────────────────
+// ANIMATED CHAT BOT ICON
+// ─────────────────────────────────────────────────────────────────
+const ChatBotIcon = ({ hasMessages, messageCount, onClick }) => {
+  const [pulse, setPulse] = useState(false);
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setPulse(p => !p);
+    }, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <button
+      onClick={onClick}
+      className="fixed bottom-8 right-8 z-50 group"
+      style={{ filter: 'drop-shadow(0 8px 32px rgba(20,184,166,0.55))' }}
+    >
+      {/* Outer glow ring */}
+      <span
+        className="absolute inset-0 rounded-full"
+        style={{
+          background: 'radial-gradient(circle, rgba(20,184,166,0.4) 0%, transparent 70%)',
+          animation: 'ping 2s cubic-bezier(0,0,0.2,1) infinite',
+          borderRadius: '50%',
+          width: '64px',
+          height: '64px',
+        }}
+      />
+      {/* Button */}
+      <div
+        className="relative w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 group-hover:scale-110"
+        style={{
+          background: 'linear-gradient(135deg, #14b8a6 0%, #0891b2 50%, #22d3ee 100%)',
+          boxShadow: '0 0 0 3px rgba(20,184,166,0.35), 0 8px 32px rgba(20,184,166,0.45)',
+        }}
+      >
+        {/* Animated inner ring */}
+        <div
+          className="absolute inset-0 rounded-full"
+          style={{
+            background: 'conic-gradient(from 0deg, transparent 60%, rgba(255,255,255,0.4) 80%, transparent 100%)',
+            animation: 'spin 3s linear infinite',
+          }}
+        />
+        {/* Bot face */}
+        <div className="relative z-10 flex flex-col items-center justify-center">
+          <Bot className="w-7 h-7 text-white" strokeWidth={1.5} />
+        </div>
+        {/* Badge */}
+        {hasMessages && (
+          <span
+            className="absolute -top-1.5 -right-1.5 w-6 h-6 bg-orange-500 text-white text-xs font-bold rounded-full flex items-center justify-center"
+            style={{ boxShadow: '0 2px 8px rgba(249,115,22,0.6)' }}
+          >
+            {Math.min(messageCount, 9)}
+          </span>
+        )}
+        {/* AI label */}
+        <span
+          className="absolute -top-7 left-1/2 -translate-x-1/2 text-xs font-bold text-cyan-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+        >
+          AI Assistant
+        </span>
+      </div>
+
+      <style>{`
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes ping {
+          75%, 100% { transform: scale(1.8); opacity: 0; }
+        }
+      `}</style>
+    </button>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────
+// CHAT WIDGET
+// ─────────────────────────────────────────────────────────────────
+const ChatWidget = ({ onClose, products, cart, addToCart, setError }) => {
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const [animateIn, setAnimateIn] = useState(false);
+  const endRef = useRef(null);
+
+  useEffect(() => {
+    setTimeout(() => setAnimateIn(true), 10);
+  }, []);
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isTyping]);
+
+  const quickPrompts = [
+    { icon: '📱', label: 'Smartphones', query: 'Show me top smartphones' },
+    { icon: '💰', label: 'Under ₹5k', query: 'Products under 5000' },
+    { icon: '⭐', label: 'Top Rated', query: 'Best rated products' },
+    { icon: '🎧', label: 'Audio', query: 'Show audio products' },
+  ];
+
+  const sendMessage = async (text) => {
+    const userMsg = { role: 'user', content: text, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
+    setMessages(prev => [...prev, userMsg]);
+    setInput('');
+    setIsTyping(true);
+
+    await new Promise(r => setTimeout(r, 900 + Math.random() * 800));
+
+    let reply = '';
+    const lc = text.toLowerCase();
+    if (lc.includes('hi') || lc.includes('hello') || lc.includes('hey')) {
+      reply = "👋 Hey there! I'm your AI shopping assistant powered by ShopAI.\n\nI can help you:\n• 🔍 Find the perfect products\n• 💸 Discover best deals & offers\n• 🛒 Manage your cart\n• ⭐ Get personalized recommendations\n\nWhat can I help you find today?";
+    } else if (lc.includes('smartphone') || lc.includes('phone') || lc.includes('mobile')) {
+      const phones = (products || []).filter(p => getCategoryName(p).toLowerCase().includes('phone') || getCategoryName(p).toLowerCase().includes('electronic'));
+      reply = `📱 **Smartphones** — ${phones.length} options available!\n\n🏆 Top Pick: Samsung Galaxy S25\n💰 Price: ₹79,999 | ⭐ 4.8/5\n📦 Free delivery by tomorrow\n\n🥈 Also Popular: Pixel 9 Pro — ₹89,999\n\nWant me to filter by budget or features?`;
+    } else if (lc.includes('under') || lc.includes('budget') || lc.includes('cheap')) {
+      reply = `💰 **Budget Picks** — Amazing deals found!\n\n✅ Under ₹999:\n• USB-C Cables, Phone Cases, Chargers\n\n✅ Under ₹5,000:\n• Wireless Earbuds, Smart Bands, Speakers\n\n✅ Under ₹10,000:\n• Entry Smartphones, Tablets, Cameras\n\nWhich range works for you?`;
+    } else if (lc.includes('cart') || lc.includes('show cart')) {
+      if (cart.length === 0) {
+        reply = "🛒 Your cart is empty right now!\n\nWant me to suggest some trending products? I can find:\n• 🔥 Today's hot deals\n• ⭐ Top-rated items\n• 💎 Premium picks";
+      } else {
+        const total = cart.reduce((s, i) => s + getPrice(i) * i.quantity, 0);
+        reply = `🛒 **Your Cart** — ${cart.length} items\n\n${cart.map(i => `• ${i.name || i.productName} × ${i.quantity} — ₹${getPrice(i).toLocaleString()}`).join('\n')}\n\n💳 **Total: ₹${total.toLocaleString()}**\n\nReady to checkout? I can apply coupon codes too!`;
+      }
+    } else if (lc.includes('recommend') || lc.includes('suggest') || lc.includes('best')) {
+      reply = "✨ **Trending Right Now:**\n\n🥇 Premium Smartphone X1 — ₹9,999\n🥈 Wireless Earbuds Pro — ₹2,499\n🥉 Smart Watch Ultra — ₹4,999\n\n🔥 Flash Sale (ends tonight):\n• Sony WH-1000XM5 — 30% OFF\n• iPad Air — ₹4,000 instant discount\n\nWant details on any of these?";
+    } else if (lc.includes('add') && lc.includes('cart')) {
+      if (products?.length > 0) {
+        addToCart(products[0], setError);
+        reply = `✅ Added **${products[0].name}** to your cart!\n\n🛒 Cart: ${cart.length + 1} items\n\nWant to:\n• Continue shopping?\n• View cart?\n• Apply a promo code?`;
+      }
+    } else if (lc.includes('offer') || lc.includes('deal') || lc.includes('discount') || lc.includes('sale')) {
+      reply = "🔥 **Live Deals Today:**\n\n⚡ Flash Sale — Ends in 2:45:30\n• Electronics: Up to 50% OFF\n• Audio: Buy 1 Get 1 Free\n\n🎁 Coupon Codes:\n• SAVE10 — Extra 10% off\n• FIRST50 — 50% on first order\n• TECH200 — ₹200 off on ₹2000+\n\nWhich category interests you?";
+    } else if (lc.includes('delivery') || lc.includes('shipping') || lc.includes('track')) {
+      reply = "🚚 **Delivery Info:**\n\n• Express: Tomorrow by 10 AM ⚡\n• Standard: 2–4 business days\n• Free shipping on orders ₹999+\n\n📦 Track your order:\nGo to Profile → My Orders → Track\n\nNeed help with a specific order?";
+    } else {
+      reply = "🤔 I'm not sure about that, but I can definitely help with:\n\n🔍 **Search** — \"Find me a gaming laptop\"\n💰 **Budget** — \"Headphones under ₹2000\"\n🛒 **Cart** — \"Show my cart\"\n⭐ **Picks** — \"Best rated cameras\"\n🏷️ **Deals** — \"Today's offers\"\n\nTry one of the quick prompts below!";
+    }
+
+    setMessages(prev => [...prev, {
+      role: 'assistant',
+      content: reply,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    }]);
+    setIsTyping(false);
+  };
+
+  return (
+    <div
+      className="fixed bottom-8 right-8 z-50 w-[400px] rounded-2xl overflow-hidden flex flex-col"
+      style={{
+        height: '600px',
+        boxShadow: '0 32px 80px rgba(0,0,0,0.35), 0 0 0 1px rgba(20,184,166,0.25)',
+        transform: animateIn ? 'scale(1) translateY(0)' : 'scale(0.9) translateY(20px)',
+        transformOrigin: 'bottom right',
+        opacity: animateIn ? 1 : 0,
+        transition: 'all 0.35s cubic-bezier(0.34,1.56,0.64,1)',
+        background: '#f0fdfa',
+      }}
+    >
+      {/* Header */}
+      <div
+        className="relative px-5 py-4 flex items-center justify-between shrink-0"
+        style={{
+          background: 'linear-gradient(135deg, #14b8a6 0%, #0891b2 40%, #22d3ee 100%)',
+          borderBottom: '1px solid rgba(255,255,255,0.1)',
+        }}
+      >
+        {/* Animated circuit background */}
+        <div className="absolute inset-0 overflow-hidden opacity-15">
+          {[...Array(6)].map((_, i) => (
+            <div
+              key={i}
+              className="absolute rounded-full border border-white/50"
+              style={{
+                width: `${40 + i * 30}px`,
+                height: `${40 + i * 30}px`,
+                top: `${-10 + i * 5}px`,
+                right: `${-10 + i * 5}px`,
+                animation: `spin ${3 + i}s linear infinite`,
+              }}
+            />
+          ))}
+        </div>
+
+        <div className="flex items-center gap-3 relative z-10">
+          {/* Animated avatar */}
+          <div
+            className="w-12 h-12 rounded-xl flex items-center justify-center relative"
+            style={{ background: 'rgba(255,255,255,0.35)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.2)' }}
+          >
+            <Bot className="w-6 h-6 text-white" strokeWidth={1.5} />
+            <span
+              className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-400 rounded-full border-2 border-teal-600"
+              style={{ animation: 'pulse 2s infinite' }}
+            />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="font-bold text-white text-base">ShopAI Assistant</h3>
+              <span className="text-xs bg-white/20 text-white px-2 py-0.5 rounded-full font-medium">GPT-4</span>
+            </div>
+            <p className="text-cyan-100 text-xs flex items-center gap-1">
+              <span className="w-1.5 h-1.5 bg-green-400 rounded-full inline-block" style={{ animation: 'pulse 2s infinite' }} />
+              Online · Typically replies instantly
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1 relative z-10">
+          <button className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10 transition-colors text-white/70 hover:text-white">
+            <RotateCcw className="w-4 h-4" />
+          </button>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10 transition-colors text-white/70 hover:text-white"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <style>{`
+          @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+          @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+          @keyframes fadeSlideUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+          @keyframes typingDot { 0%, 60%, 100% { transform: translateY(0); opacity: 0.4; } 30% { transform: translateY(-4px); opacity: 1; } }
+        `}</style>
+      </div>
+
+      {/* Messages Area */}
+      <div
+        className="flex-1 overflow-y-auto px-4 py-4 space-y-4"
+        style={{
+          background: 'linear-gradient(180deg, #f0fdfa 0%, #e6fffa 100%)',
+          scrollbarWidth: 'thin',
+          scrollbarColor: 'rgba(20,184,166,0.35) transparent',
+        }}
+      >
+        {/* Welcome state */}
+        {messages.length === 0 && (
+          <div className="flex flex-col items-center text-center pt-6 pb-2" style={{ animation: 'fadeSlideUp 0.5s ease both' }}>
+            <div
+              className="w-20 h-20 rounded-2xl flex items-center justify-center mb-4 relative"
+              style={{
+                background: 'linear-gradient(135deg, rgba(20,184,166,0.25), rgba(14,116,144,0.3))',
+                border: '1px solid rgba(20,184,166,0.35)',
+                boxShadow: '0 0 40px rgba(20,184,166,0.2)',
+              }}
+            >
+              <Sparkles className="w-9 h-9 text-cyan-400" />
+              <div
+                className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-cyan-400 to-teal-500 rounded-full flex items-center justify-center"
+              >
+                <Zap className="w-3 h-3 text-white" />
+              </div>
+            </div>
+            <h4 className="text-teal-900 font-bold text-lg mb-1">Hello, Shopper! 👋</h4>
+            <p className="text-teal-700 text-sm mb-5 max-w-xs leading-relaxed">
+              I'm your AI-powered shopping assistant. Ask me anything about products, deals, or your cart!
+            </p>
+
+            {/* Quick prompts */}
+            <div className="grid grid-cols-2 gap-2 w-full">
+              {quickPrompts.map((q, i) => (
+                <button
+                  key={i}
+                  onClick={() => sendMessage(q.query)}
+                  className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-left transition-all hover:scale-[1.02] group"
+                  style={{
+                    background: 'rgba(20,184,166,0.08)',
+                    border: '1px solid rgba(20,184,166,0.25)',
+                    animation: `fadeSlideUp 0.5s ease ${0.1 * i}s both`,
+                  }}
+                >
+                  <span className="text-lg">{q.icon}</span>
+                  <span className="text-teal-700 text-xs font-medium group-hover:text-teal-600 transition-colors">{q.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Messages */}
+        {messages.map((msg, idx) => (
+          <div
+            key={idx}
+            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} gap-2`}
+            style={{ animation: 'fadeSlideUp 0.3s ease both' }}
+          >
+            {msg.role === 'assistant' && (
+              <div
+                className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-auto"
+                style={{ background: 'linear-gradient(135deg, #14b8a6, #0891b2)', border: '1px solid rgba(20,184,166,0.45)' }}
+              >
+                <Bot className="w-4 h-4 text-white" strokeWidth={1.5} />
+              </div>
+            )}
+            <div className="max-w-[78%] flex flex-col gap-1">
+              <div
+                className="px-4 py-3 rounded-2xl text-sm leading-relaxed"
+                style={msg.role === 'user' ? {
+                  background: 'linear-gradient(135deg, #14b8a6, #0891b2)',
+                  color: 'white',
+                  borderRadius: '18px 18px 4px 18px',
+                  boxShadow: '0 4px 16px rgba(20,184,166,0.3)',
+                } : {
+                  background: 'rgba(20,184,166,0.08)',
+                  border: '1px solid rgba(20,184,166,0.2)',
+                  color: '#0f172a',
+                  borderRadius: '4px 18px 18px 18px',
+                  whiteSpace: 'pre-line',
+                }}
+              >
+                {msg.content}
+              </div>
+              <div className="flex items-center gap-2 px-1">
+                <span className="text-[10px] text-slate-600">{msg.time}</span>
+                {msg.role === 'assistant' && (
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button className="text-slate-600 hover:text-green-400 transition-colors">
+                      <ThumbsUp className="w-3 h-3" />
+                    </button>
+                    <button className="text-slate-600 hover:text-red-400 transition-colors">
+                      <ThumbsDown className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+
+        {/* Typing indicator */}
+        {isTyping && (
+          <div className="flex items-end gap-2" style={{ animation: 'fadeSlideUp 0.3s ease both' }}>
+            <div
+              className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+              style={{ background: 'linear-gradient(135deg, #14b8a6, #0891b2)' }}
+            >
+              <Bot className="w-4 h-4 text-white" strokeWidth={1.5} />
+            </div>
+            <div
+              className="px-4 py-3 rounded-2xl flex items-center gap-1"
+              style={{
+                background: 'rgba(20,184,166,0.08)',
+                border: '1px solid rgba(20,184,166,0.2)',
+                borderRadius: '4px 18px 18px 18px',
+              }}
+            >
+              {[0, 1, 2].map(i => (
+                <div
+                  key={i}
+                  className="w-2 h-2 bg-cyan-400 rounded-full"
+                  style={{ animation: `typingDot 1.2s ease ${i * 0.2}s infinite` }}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+        <div ref={endRef} />
+      </div>
+
+      {/* Input */}
+      <div
+        className="px-4 py-3 shrink-0"
+        style={{
+          background: 'rgba(240,253,250,0.97)',
+          borderTop: '1px solid rgba(255,255,255,0.06)',
+          backdropFilter: 'blur(20px)',
+        }}
+      >
+        {/* Suggestion chips */}
+        {messages.length > 0 && messages.length < 3 && (
+          <div className="flex gap-2 mb-3 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+            {['Best deals today 🔥', 'Track my order 📦', 'Apply coupon 🏷️'].map((chip, i) => (
+              <button
+                key={i}
+                onClick={() => sendMessage(chip.replace(/[^\w\s]/g, '').trim())}
+                className="shrink-0 text-xs px-3 py-1.5 rounded-full transition-all hover:scale-105"
+                style={{
+                  background: 'rgba(20,184,166,0.12)',
+                  border: '1px solid rgba(20,184,166,0.3)',
+                  color: '#0f766e',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {chip}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div
+          className="flex items-end gap-2 p-2 rounded-2xl"
+          style={{
+            background: 'rgba(20,184,166,0.05)',
+            border: '1px solid rgba(20,184,166,0.25)',
+          }}
+        >
+          <textarea
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                if (input.trim() && !isTyping) sendMessage(input.trim());
+              }
+            }}
+            placeholder="Ask me anything..."
+            rows={1}
+            disabled={isTyping}
+            className="flex-1 bg-transparent text-slate-800 placeholder-slate-400 text-sm resize-none focus:outline-none leading-5 py-1 px-1 max-h-28"
+            style={{ scrollbarWidth: 'none' }}
+          />
+          <div className="flex items-center gap-1">
+            <button className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-500 hover:text-cyan-400 transition-colors">
+              <Mic className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => { if (input.trim() && !isTyping) sendMessage(input.trim()); }}
+              disabled={!input.trim() || isTyping}
+              className="w-9 h-9 flex items-center justify-center rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:scale-105"
+              style={{
+                background: input.trim() ? 'linear-gradient(135deg, #14b8a6, #0891b2)' : 'rgba(20,184,166,0.05)',
+                boxShadow: input.trim() ? '0 4px 16px rgba(20,184,166,0.45)' : 'none',
+              }}
+            >
+              <Send className="w-4 h-4 text-white" />
+            </button>
+          </div>
+        </div>
+        <p className="text-center text-[10px] text-slate-600 mt-2">Powered by ShopAI · Responses may not be 100% accurate</p>
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────
+// PRODUCT CARD with hover animations
+// ─────────────────────────────────────────────────────────────────
+const ProductCard = ({ product, index, addToCart, setError }) => {
+  const [hovered, setHovered] = useState(false);
+  const [addedAnim, setAddedAnim] = useState(false);
+  const price = getPrice(product);
+  const rating = getRating(product);
+  const category = getCategoryName(product);
+  const productId = product.id || product._id?.$oid || product._id || index;
+
+  const handleAdd = () => {
+    addToCart(product, setError);
+    setAddedAnim(true);
+    setTimeout(() => setAddedAnim(false), 1200);
+  };
+
+  return (
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className="bg-white rounded-2xl overflow-hidden flex flex-col"
+      style={{
+        boxShadow: hovered
+          ? '0 20px 60px rgba(20,184,166,0.2), 0 4px 20px rgba(0,0,0,0.1)'
+          : '0 2px 12px rgba(0,0,0,0.06)',
+        transform: hovered ? 'translateY(-4px)' : 'translateY(0)',
+        transition: 'all 0.3s cubic-bezier(0.34,1.56,0.64,1)',
+        border: hovered ? '1px solid rgba(20,184,166,0.35)' : '1px solid rgba(226,232,240,1)',
+      }}
+    >
+      {/* Image */}
+      <div className="relative overflow-hidden bg-slate-50" style={{ paddingBottom: '100%' }}>
+        <img
+          src={product.imageUrl || `https://via.placeholder.com/300x300/f0fdff/0e7490?text=${encodeURIComponent(product.name?.slice(0, 8) || 'Product')}`}
+          alt={product.name}
+          className="absolute inset-0 w-full h-full object-contain p-3"
+          style={{
+            transform: hovered ? 'scale(1.07)' : 'scale(1)',
+            transition: 'transform 0.4s ease',
+          }}
+          onError={e => { e.currentTarget.src = 'https://via.placeholder.com/300x300/f0fdff/0e7490?text=Product'; }}
+        />
+
+        {/* Badges */}
+        <div className="absolute top-2.5 left-2.5 flex flex-col gap-1.5">
+          <span className="text-xs font-bold text-white px-2 py-0.5 rounded-full" style={{ background: 'linear-gradient(135deg, #e55a1c, #f97316)' }}>
+            -20%
+          </span>
+          {product.stockQuantity !== undefined && product.stockQuantity <= 5 && product.stockQuantity > 0 && (
+            <span className="text-xs font-semibold text-white px-2 py-0.5 rounded-full bg-amber-500">
+              Only {product.stockQuantity} left
+            </span>
+          )}
+        </div>
+
+        {/* Semantic score */}
+        {product.score && (
+          <div className="absolute top-2.5 right-2.5 text-xs font-bold text-white px-2 py-0.5 rounded-full" style={{ background: 'linear-gradient(135deg, #14b8a6, #0891b2)' }}>
+            {Math.round(product.score * 100)}% match
+          </div>
+        )}
+
+        {/* Hover overlay actions */}
+        <div
+          className="absolute inset-0 flex items-center justify-center gap-3"
+          style={{
+            background: 'rgba(15,23,42,0.45)',
+            opacity: hovered ? 1 : 0,
+            transition: 'opacity 0.25s ease',
+            backdropFilter: hovered ? 'blur(2px)' : 'blur(0px)',
+          }}
+        >
+          <button
+            onClick={() => alert(`${product.name}\n\n₹${price.toLocaleString()}\n${product.description || ''}`)}
+            className="px-4 py-2 bg-white text-slate-900 text-xs font-bold rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105"
+          >
+            Quick View
+          </button>
+        </div>
+      </div>
+
+      {/* Info */}
+      <div className="p-4 flex flex-col flex-1">
+        <p className="text-xs text-cyan-600 font-semibold mb-1">{product.brand || category}</p>
+        <h3 className="text-sm font-semibold text-slate-800 mb-2 line-clamp-2 leading-snug">{product.name}</h3>
+
+        {/* Stars */}
+        {rating && (
+          <div className="flex items-center gap-1.5 mb-2.5">
+            <div className="flex">
+              {[...Array(5)].map((_, i) => (
+                <Star
+                  key={i}
+                  className="w-3 h-3"
+                  fill={i < Math.floor(rating) ? '#f59e0b' : 'none'}
+                  stroke={i < Math.floor(rating) ? '#f59e0b' : '#d1d5db'}
+                />
+              ))}
+            </div>
+            <span className="text-xs text-slate-500">({product.reviewCount || 0})</span>
+          </div>
+        )}
+
+        {/* Price */}
+        <div className="mb-3 mt-auto">
+          <div className="flex items-baseline gap-2">
+            <span className="text-lg font-extrabold text-slate-900">₹{price.toLocaleString()}</span>
+          </div>
+          <span className="text-xs text-slate-500 line-through">₹{(price * 1.2).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+          <span className="text-xs text-green-600 font-semibold ml-2">Save ₹{(price * 0.2).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+        </div>
+
+        {/* Add to cart */}
+        <button
+          onClick={handleAdd}
+          disabled={product.stockQuantity === 0}
+          className="w-full py-2.5 text-sm font-bold rounded-xl transition-all relative overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed"
+          style={{
+            background: addedAnim
+              ? 'linear-gradient(135deg, #059669, #10b981)'
+              : 'linear-gradient(135deg, #14b8a6, #0891b2)',
+            color: 'white',
+            boxShadow: hovered && !addedAnim ? '0 6px 20px rgba(20,184,166,0.45)' : 'none',
+            transform: addedAnim ? 'scale(0.97)' : 'scale(1)',
+          }}
+        >
+          {product.stockQuantity === 0 ? 'Out of Stock' : addedAnim ? '✓ Added!' : 'Add to Cart'}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────
+// MAIN PAGE
+// ─────────────────────────────────────────────────────────────────
 const ProductsPage = ({
-  user,
-  products,
-  cart,
-  searchQuery,
-  setSearchQuery,
-  setCurrentPage,
-  handleLogout,
-  addToCart,
-  error,
-  setError
+  user, products, cart, searchQuery, setSearchQuery, setCurrentPage,
+  handleLogout, addToCart, error, setError
 }) => {
   const [chatOpen, setChatOpen] = useState(false);
-  const [chatMessages, setChatMessages] = useState([]);
-  const [currentMessage, setCurrentMessage] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
-  const [showSuggestions, setShowSuggestions] = useState(false);
   const [currentBanner, setCurrentBanner] = useState(0);
-  const chatEndRef = useRef(null);
-
-  // ── Semantic search state ──
-  const [semanticSuggestions, setSemanticSuggestions] = useState([]); // dropdown items
-  const [semanticResults, setSemanticResults] = useState([]);          // full results grid
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [semanticSuggestions, setSemanticSuggestions] = useState([]);
+  const [semanticResults, setSemanticResults] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
-  const [isSemanticMode, setIsSemanticMode] = useState(false);        // true when showing AI results
+  const [isSemanticMode, setIsSemanticMode] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const debounceTimer = useRef(null);
-  const abortController = useRef(null); // cancel stale requests
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chatMessages]);
+    const onScroll = () => setScrolled(window.scrollY > 40);
+    window.addEventListener('scroll', onScroll);
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
-  // Auto-rotate banner
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentBanner(prev => (prev + 1) % 3);
-    }, 5000);
+    const timer = setInterval(() => setCurrentBanner(p => (p + 1) % 3), 5000);
     return () => clearInterval(timer);
   }, []);
 
-  // ─────────────────────────────────────────────────────────────────
-  // SEMANTIC SEARCH — Suggestions (fires while typing, debounced)
-  // Waits 300ms after user stops typing, then fetches top 6 suggestions
-  // ─────────────────────────────────────────────────────────────────
   useEffect(() => {
     const query = searchQuery.trim();
-
     if (!query || query.length < 2) {
       setSemanticSuggestions([]);
       setShowSuggestions(false);
-      // If user cleared the search, go back to showing all products
-      if (!query) {
-        setIsSemanticMode(false);
-        setSemanticResults([]);
-      }
+      if (!query) { setIsSemanticMode(false); setSemanticResults([]); }
       return;
     }
-
     clearTimeout(debounceTimer.current);
     debounceTimer.current = setTimeout(async () => {
-      // Cancel previous in-flight request
-      if (abortController.current) {
-        abortController.current.abort();
-      }
-
       setSearchLoading(true);
       try {
         const response = await productsAPI.search(query, 6);
-          const results = response?.data?.results || []; 
+        const results = response?.data?.results || [];
         setSemanticSuggestions(results);
         setShowSuggestions(results.length > 0);
-      } catch (err) {
-        if (err.name !== 'AbortError') {
-          console.warn('Semantic suggestion failed, falling back silently:', err.message);
-          setSemanticSuggestions([]);
-        }
+      } catch {
+        setSemanticSuggestions([]);
       } finally {
         setSearchLoading(false);
       }
     }, 300);
-
     return () => clearTimeout(debounceTimer.current);
   }, [searchQuery]);
 
-  // ─────────────────────────────────────────────────────────────────
-  // SEMANTIC SEARCH — Full Results (fires on Enter or Search button)
-  // ─────────────────────────────────────────────────────────────────
   const handleFullSearch = useCallback(async (queryOverride) => {
     const query = (queryOverride || searchQuery).trim();
     if (!query) return;
-
     setShowSuggestions(false);
     setSearchLoading(true);
     setIsSemanticMode(true);
-
     try {
       const response = await productsAPI.search(query, 20);
-      const results = response?.data?.results || []; 
-      setSemanticResults(results);
-    } catch (err) {
-      console.error('Semantic full search error:', err);
+      setSemanticResults(response?.data?.results || []);
+    } catch {
       setSemanticResults([]);
       setError('Search failed. Showing all products instead.');
       setIsSemanticMode(false);
@@ -149,661 +676,444 @@ const ProductsPage = ({
     }
   }, [searchQuery]);
 
-  // ─────────────────────────────────────────────────────────────────
-  // Products to display in grid:
-  // - If user has done a full search → show semanticResults
-  // - If no search → show all products (client-side, no filter needed)
-  // ─────────────────────────────────────────────────────────────────
-  const displayedProducts = isSemanticMode
-    ? semanticResults
-    : (products || []);
-
-  // Extract unique categories from ALL products (for nav bar + dropdown)
-  const uniqueCategories = Array.from(
-    new Set(
-      (products || []).map(p => getCategoryName(p)).filter(Boolean)
-    )
-  ).slice(0, 20);
+  const displayedProducts = isSemanticMode ? semanticResults : (products || []);
+  const uniqueCategories = Array.from(new Set((products || []).map(p => getCategoryName(p)).filter(Boolean))).slice(0, 20);
 
   const applyCategory = async (cat) => {
-    if (!cat) {
-      setSearchQuery('');
-      setIsSemanticMode(false);
-      setSemanticResults([]);
-      return;
-    }
+    if (!cat) { setSearchQuery(''); setIsSemanticMode(false); setSemanticResults([]); return; }
     setSearchQuery(cat);
     await handleFullSearch(cat);
-  };
-
-  const quickView = (p) => {
-    const price = getPrice(p);
-    const category = getCategoryName(p);
-    alert(`${p.name}\n\n${p.brand || ''}\n${category}\n\n₹${price.toLocaleString()}\n\n${p.description || ''}`);
-  };
-
-  // ─────────────────────────────────────────────────────────────────
-  // AI Chat (unchanged from your original — kept as-is)
-  // ─────────────────────────────────────────────────────────────────
-  const sendMessageToAgent = async (message) => {
-    setIsTyping(true);
-    const userMsg = { role: 'user', content: message };
-    setChatMessages(prev => [...prev, userMsg]);
-    setCurrentMessage('');
-
-    setTimeout(() => {
-      let agentResponse = '';
-      const lowerMsg = message.toLowerCase();
-
-      if (lowerMsg.includes('hi') || lowerMsg.includes('hello')) {
-        agentResponse = "Hello! I'm your AI shopping assistant. I can help you find products, add items to cart, or answer questions about your orders. What are you looking for today?";
-      } else if (lowerMsg.includes('smartphone') || lowerMsg.includes('phone')) {
-        const phones = (products || []).filter(p => getCategoryName(p).toLowerCase().includes('phone') || getCategoryName(p).toLowerCase().includes('electronic'));
-        if (lowerMsg.includes('under') || lowerMsg.includes('below')) {
-          agentResponse = "I found some great smartphones under ₹10,000! Here's the best option:\n\n📱 Premium Smartphone X1 by TechBrand\nPrice: ₹9,999\nRating: 4.5/5 (1,250 reviews)\nFeatures: 6GB RAM, 128GB Storage, 48MP Camera\n\nWould you like me to add this to your cart?";
-        } else {
-          agentResponse = `I found ${phones.length} smartphones for you! The Premium Smartphone X1 is our top pick with excellent camera and battery life. Would you like more details?`;
-        }
-      } else if (lowerMsg.includes('add') && lowerMsg.includes('cart')) {
-        if ((products || []).length > 0) {
-          addToCart(products[0], setError);
-          agentResponse = `Great choice! I've added ${products[0].name} to your cart. Your cart now has ${cart.length + 1} items. Would you like to continue shopping or proceed to checkout?`;
-        }
-      } else if (lowerMsg.includes('cart') || lowerMsg.includes('show')) {
-        if (cart.length === 0) {
-          agentResponse = "Your cart is currently empty. Would you like me to help you find some products?";
-        } else {
-          const total = cart.reduce((sum, item) => sum + (getPrice(item) * item.quantity), 0);
-          agentResponse = `You have ${cart.length} items in your cart:\n\n${cart.map(item => `• ${item.productName || item.name} - ₹${getPrice(item)} x ${item.quantity}`).join('\n')}\n\nTotal: ₹${total.toLocaleString()}\n\nReady to checkout?`;
-        }
-      } else if (lowerMsg.includes('recommend') || lowerMsg.includes('suggest')) {
-        agentResponse = "Based on popular choices, I recommend:\n\n1. Premium Smartphone X1 - Best value for money\n2. Wireless Earbuds Pro - Great audio quality\n3. Smart Watch Ultra - Perfect for fitness tracking\n\nWhich category interests you most?";
-      } else if (lowerMsg.includes('checkout') || lowerMsg.includes('buy')) {
-        agentResponse = "Perfect! To proceed with checkout, I'll need to confirm your shipping address. You have saved addresses. Would you like to use them, or add a new one?";
-      } else {
-        agentResponse = "I can help you with:\n• Finding products by category or budget\n• Adding items to your cart\n• Checking order status\n• Product recommendations\n\nWhat would you like to do?";
-      }
-
-      setChatMessages(prev => [...prev, { role: 'assistant', content: agentResponse }]);
-      setIsTyping(false);
-    }, 1000 + Math.random() * 1000);
   };
 
   const banners = [
     {
       title: "Summer Sale 2026",
-      subtitle: "Up to 50% OFF on Electronics",
-      description: "Free shipping on orders above ₹999",
-      bg: "from-teal-500 via-cyan-500 to-blue-500"
+      sub: "Up to 50% OFF on Electronics",
+      desc: "Free shipping on orders above ₹999",
+      gradient: "linear-gradient(135deg, #0f766e 0%, #14b8a6 40%, #0891b2 80%, #22d3ee 100%)",
+      accent: "#67e8f9",
+      tag: "🔥 LIMITED TIME",
     },
     {
       title: "New Arrivals",
-      subtitle: "Latest Smartphones & Gadgets",
-      description: "Shop the newest tech at best prices",
-      bg: "from-purple-600 via-pink-500 to-rose-500"
+      sub: "Latest Smartphones & Gadgets",
+      desc: "Shop the newest tech at best prices",
+      gradient: "linear-gradient(135deg, #4c1d95 0%, #7c3aed 40%, #a855f7 80%, #d946ef 100%)",
+      accent: "#d946ef",
+      tag: "✨ JUST IN",
     },
     {
       title: "Special Offer",
-      subtitle: "Buy 2 Get 1 Free",
-      description: "On selected audio & wearables",
-      bg: "from-orange-500 via-amber-500 to-yellow-500"
-    }
+      sub: "Buy 2 Get 1 Free",
+      desc: "On selected audio & wearables",
+      gradient: "linear-gradient(135deg, #7c2d12 0%, #c2410c 40%, #f97316 80%, #fbbf24 100%)",
+      accent: "#fbbf24",
+      tag: "🎁 EXCLUSIVE",
+    },
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen" style={{ background: '#f8fafc', fontFamily: "'Outfit', 'DM Sans', sans-serif" }}>
+      <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
 
       {/* ── HEADER ── */}
-      <header className="bg-gradient-to-r from-teal-600 to-cyan-600 text-white sticky top-0 z-40 shadow-lg">
+      <header
+        className="sticky top-0 z-40 transition-all duration-300"
+        style={{
+          background: scrolled
+            ? 'rgba(7,35,55,0.97)'
+            : 'linear-gradient(180deg, #0f2d2b 0%, #134e4a 100%)',
+          backdropFilter: 'blur(20px)',
+          borderBottom: '1px solid rgba(20,184,166,0.2)',
+          boxShadow: scrolled ? '0 4px 30px rgba(0,0,0,0.3)' : 'none',
+        }}
+      >
+        <div className="max-w-[1600px] mx-auto px-5 py-3 flex items-center gap-5">
+          {/* Logo */}
+          <div className="flex items-center gap-2.5 cursor-pointer shrink-0">
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center"
+              style={{ background: 'linear-gradient(135deg, #14b8a6, #0891b2)', boxShadow: '0 4px 16px rgba(20,184,166,0.45)' }}
+            >
+              <ShoppingBag className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <div className="text-white font-extrabold text-lg leading-none">ShopAI</div>
+              <div className="text-cyan-400 text-[10px] font-medium">.marketplace</div>
+            </div>
+          </div>
 
-        {/* Top Bar */}
-        <div className="bg-slate-900">
-          <div className="max-w-[1500px] mx-auto px-4 py-2 flex items-center justify-between">
+          {/* Category select */}
+          <select
+            className="hidden md:block bg-white/10 text-white text-sm px-3 py-2.5 rounded-xl border border-white/10 focus:outline-none focus:border-cyan-400/50 shrink-0"
+            style={{ maxWidth: '140px' }}
+            onChange={(e) => applyCategory(e.target.value)}
+          >
+            <option value="" style={{ color: '#0f172a' }}>All Categories</option>
+            {uniqueCategories.map((cat, i) => (
+              <option key={i} value={cat} style={{ color: '#0f172a' }}>{cat}</option>
+            ))}
+          </select>
 
-            {/* Logo */}
-            <div className="flex items-center gap-2 cursor-pointer">
-              <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-cyan-600 rounded-lg flex items-center justify-center">
-                <ShoppingBag className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold">ShopAI</h1>
-                <p className="text-[10px] text-teal-300">.marketplace</p>
-              </div>
+          {/* Search */}
+          <div className="flex-1 max-w-2xl relative">
+            <div
+              className="flex items-center rounded-xl overflow-hidden transition-all"
+              style={{
+                background: 'rgba(255,255,255,0.08)',
+                border: '1px solid rgba(20,184,166,0.35)',
+                boxShadow: '0 0 0 0 rgba(6,182,212,0)',
+              }}
+            >
+              <Search className="w-4 h-4 text-cyan-400 ml-4 shrink-0" />
+              <input
+                value={searchQuery}
+                onChange={e => {
+                  setSearchQuery(e.target.value);
+                  if (!e.target.value.trim()) { setIsSemanticMode(false); setSemanticResults([]); }
+                }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') handleFullSearch();
+                  if (e.key === 'Escape') setShowSuggestions(false);
+                }}
+                onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                onFocus={() => semanticSuggestions.length > 0 && setShowSuggestions(true)}
+                placeholder="Search with AI — try 'wireless earbuds under ₹2000'..."
+                className="flex-1 bg-transparent text-white placeholder-slate-400 px-3 py-3 text-sm focus:outline-none"
+              />
+              {searchLoading ? (
+                <div className="w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin mr-3" />
+              ) : (
+                <button
+                  onClick={() => handleFullSearch()}
+                  className="px-4 py-3 text-white text-sm font-semibold transition-all hover:bg-cyan-500/20 flex items-center gap-1.5"
+                  style={{ borderLeft: '1px solid rgba(20,184,166,0.25)' }}
+                >
+                  <Sparkles className="w-4 h-4 text-cyan-400" />
+                  <span className="text-white hidden lg:block">AI Search</span>
+                </button>
+              )}
             </div>
 
-            {/* ── SEARCH BAR (Semantic) ── */}
-            <div className="hidden md:flex flex-1 max-w-3xl mx-4 relative">
-              <select
-                className="bg-white text-slate-800 px-3 py-2.5 rounded-l-lg border-r border-slate-200 text-sm focus:outline-none font-medium"
-                onChange={(e) => applyCategory(e.target.value)}
+            {/* Suggestions dropdown */}
+            {showSuggestions && semanticSuggestions.length > 0 && (
+              <div
+                className="absolute top-full left-0 right-0 mt-2 rounded-2xl overflow-hidden z-50"
+                style={{
+                  background: 'rgba(15,118,110,0.97)',
+                  border: '1px solid rgba(20,184,166,0.3)',
+                  boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
+                  backdropFilter: 'blur(20px)',
+                }}
               >
-                <option value="">All</option>
-                {uniqueCategories.map((cat, i) => (
-                  <option key={i} value={cat}>{cat}</option>
+                <div className="px-4 py-2.5 flex items-center gap-2" style={{ borderBottom: '1px solid rgba(20,184,166,0.2)' }}>
+                  <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                  <span className="text-xs font-semibold text-cyan-400">AI Suggestions</span>
+                </div>
+                {semanticSuggestions.map((item, idx) => (
+                  <div
+                    key={item.id || item._id || idx}
+                    onMouseDown={() => { setSearchQuery(item.name); setShowSuggestions(false); handleFullSearch(item.name); }}
+                    className="px-4 py-3 cursor-pointer flex items-center justify-between gap-4 transition-all"
+                    style={{ borderBottom: idx < semanticSuggestions.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(20,184,166,0.1)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-white font-medium truncate">{item.name}</p>
+                      <p className="text-xs text-slate-500">{item.brand || getCategoryName(item)}</p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="text-sm font-bold text-cyan-400">₹{getPrice(item).toLocaleString()}</p>
+                      {item.score && <p className="text-[10px] text-slate-600">{Math.round(item.score * 100)}% match</p>}
+                    </div>
+                  </div>
                 ))}
-              </select>
-
-              <div className="relative flex-1">
-                <input
-                  aria-label="Search products"
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value);
-                    // If user clears the box, exit semantic mode
-                    if (!e.target.value.trim()) {
-                      setIsSemanticMode(false);
-                      setSemanticResults([]);
-                    }
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      handleFullSearch();
-                    }
-                    if (e.key === 'Escape') {
-                      setShowSuggestions(false);
-                    }
-                  }}
-                  onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                  onFocus={() => semanticSuggestions.length > 0 && setShowSuggestions(true)}
-                  placeholder="Search for products... (AI-powered)"
-                  className="w-full px-4 py-2.5 text-slate-900 focus:outline-none"
-                />
-
-                {/* Loading indicator inside input */}
-                {searchLoading && (
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                    <div className="w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
-                  </div>
-                )}
-
-                {/* ── Suggestions Dropdown ── */}
-                {showSuggestions && semanticSuggestions.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 bg-white border border-slate-200 shadow-xl z-50 max-h-96 overflow-y-auto mt-1 rounded-lg">
-
-                    {/* Label */}
-                    <div className="px-4 py-2 bg-teal-50 border-b border-slate-100 flex items-center gap-2">
-                      <span className="text-xs font-semibold text-teal-700">🤖 AI Suggestions</span>
-                    </div>
-
-                    {semanticSuggestions.map((item, idx) => {
-                      const price = getPrice(item);
-                      const category = getCategoryName(item);
-                      const score = item.score ? `${Math.round(item.score * 100)}% match` : '';
-
-                      return (
-                        <div
-                          key={item.id || item._id || idx}
-                          onMouseDown={() => {
-                            setSearchQuery(item.name);
-                            setShowSuggestions(false);
-                            handleFullSearch(item.name);
-                          }}
-                          className="px-4 py-3 cursor-pointer hover:bg-teal-50 flex justify-between items-center border-b border-slate-100 last:border-0"
-                        >
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-slate-900 truncate">{item.name}</p>
-                            <p className="text-xs text-slate-500">{item.brand || category}</p>
-                          </div>
-                          <div className="flex flex-col items-end ml-3 shrink-0">
-                            <span className="text-sm font-bold text-teal-600">₹{price.toLocaleString()}</span>
-                            {score && (
-                              <span className="text-xs text-slate-400">{score}</span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-
-                    {/* "See all results" footer */}
-                    <div
-                      onMouseDown={() => {
-                        setShowSuggestions(false);
-                        handleFullSearch();
-                      }}
-                      className="px-4 py-2.5 text-center text-sm text-teal-600 font-semibold hover:bg-teal-50 cursor-pointer border-t border-slate-100"
-                    >
-                      See all results for "{searchQuery}" →
-                    </div>
-                  </div>
-                )}
+                <div
+                  onMouseDown={() => { setShowSuggestions(false); handleFullSearch(); }}
+                  className="px-4 py-2.5 text-center text-sm text-cyan-400 font-semibold cursor-pointer transition-all"
+                  style={{ borderTop: '1px solid rgba(20,184,166,0.2)' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(20,184,166,0.1)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  See all results for "{searchQuery}" →
+                </div>
               </div>
+            )}
+          </div>
 
-              {/* Search Button */}
-              <button
-                onClick={() => handleFullSearch()}
-                className="bg-gradient-to-r from-cyan-400 to-cyan-500 hover:from-cyan-500 hover:to-cyan-600 px-6 py-2.5 rounded-r-lg transition-all"
-              >
-                <Search className="w-5 h-5 text-white" />
-              </button>
-            </div>
-
-            {/* Right Side Icons */}
-            <div className="flex items-center gap-6">
-              <button onClick={() => setCurrentPage('profile')} className="hover:bg-white/10 px-4 py-2.5 rounded-lg transition-all group">
-                <div className="text-xs text-teal-100 group-hover:text-white">Hello, {user?.name || 'User'}</div>
-                <div className="font-bold text-sm flex items-center gap-2 group-hover:text-teal-200">
-                  <UserCircle className="w-5 h-5" />
-                  Account
-                </div>
-              </button>
-
-              <button onClick={() => setCurrentPage('cart')} className="flex items-center gap-3 hover:bg-white/10 px-5 py-2.5 rounded-lg transition-all group relative">
-                <div className="relative">
-                  <ShoppingCart className="w-7 h-7 group-hover:scale-110 transition-transform" />
-                  {cart.length > 0 && (
-                    <span className="absolute -top-3 -right-3 bg-gradient-to-r from-orange-400 to-orange-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg">
-                      {cart.length}
-                    </span>
-                  )}
-                </div>
-                <div className="hidden lg:flex flex-col items-start">
-                  <span className="text-xs text-teal-100 group-hover:text-white">My Cart</span>
-                  <span className="font-bold text-sm group-hover:text-teal-200">{cart.length} items</span>
-                </div>
-              </button>
-            </div>
+          {/* Right */}
+          <div className="flex items-center gap-3 shrink-0">
+            <button onClick={() => setCurrentPage('profile')} className="flex items-center gap-2 text-white hover:text-cyan-300 transition-colors px-2 py-1.5 rounded-lg hover:bg-white/5">
+              <UserCircle className="w-6 h-6" />
+              <span className="hidden lg:block text-sm font-medium">{user?.name?.split(' ')[0] || 'User'}</span>
+            </button>
+            <button
+              onClick={() => setCurrentPage('cart')}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl relative transition-all hover:scale-[1.02]"
+              style={{ background: 'linear-gradient(135deg, #14b8a6, #0891b2)', boxShadow: '0 4px 16px rgba(20,184,166,0.4)' }}
+            >
+              <ShoppingCart className="w-5 h-5 text-white" />
+              <span className="text-white text-sm font-bold hidden lg:block">Cart</span>
+              {cart.length > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-orange-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-lg">
+                  {cart.length}
+                </span>
+              )}
+            </button>
           </div>
         </div>
 
-        {/* Navigation Bar */}
-        <div className="bg-gradient-to-r from-teal-700 to-cyan-700">
-          <div className="max-w-[1500px] mx-auto px-4 py-2.5 flex items-center gap-6 text-sm overflow-x-auto">
+        {/* Nav bar */}
+        <div
+          className="overflow-x-auto"
+          style={{ background: 'rgba(0,0,0,0.2)', borderTop: '1px solid rgba(255,255,255,0.04)' }}
+        >
+          <div className="max-w-[1600px] mx-auto px-5 py-2 flex items-center gap-1">
             <button
               onClick={() => applyCategory('')}
-              className="flex items-center gap-2 hover:bg-white/10 px-3 py-1.5 rounded-lg whitespace-nowrap transition-all"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all text-slate-300 hover:text-white hover:bg-white/10 whitespace-nowrap"
             >
-              <Package className="w-4 h-4" />
-              All
+              <TrendingUp className="w-3.5 h-3.5" />
+              All Products
             </button>
-            {uniqueCategories.slice(0, 8).map((cat, i) => (
+            {uniqueCategories.slice(0, 9).map((cat, i) => (
               <button
                 key={i}
                 onClick={() => applyCategory(cat)}
-                className={`hover:bg-white/10 px-3 py-1.5 rounded-lg whitespace-nowrap transition-all ${searchQuery === cat ? 'bg-white/20' : ''}`}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap"
+                style={{
+                  color: searchQuery === cat ? 'white' : '#94a3b8',
+                  background: searchQuery === cat ? 'rgba(20,184,166,0.25)' : 'transparent',
+                  border: searchQuery === cat ? '1px solid rgba(20,184,166,0.4)' : '1px solid transparent',
+                }}
               >
                 {cat}
               </button>
             ))}
-            <button onClick={() => setChatOpen(!chatOpen)} className="flex items-center gap-2 hover:bg-white/10 px-3 py-1.5 rounded-lg ml-auto whitespace-nowrap transition-all">
-              <MessageCircle className="w-4 h-4" />
+            <div className="flex-1" />
+            <button onClick={() => setChatOpen(c => !c)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-cyan-400 hover:bg-cyan-400/10 transition-all whitespace-nowrap">
+              <Bot className="w-3.5 h-3.5" />
               AI Help
             </button>
-            <button onClick={handleLogout} className="hover:bg-white/10 px-3 py-1.5 rounded-lg whitespace-nowrap transition-all">
-              <LogOut className="w-4 h-4 inline mr-1" />
+            <button onClick={handleLogout} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-500 hover:text-white hover:bg-white/10 transition-all whitespace-nowrap">
+              <LogOut className="w-3.5 h-3.5" />
               Logout
             </button>
           </div>
         </div>
       </header>
 
-      {/* Mobile Search */}
-      <div className="md:hidden bg-white p-3 border-b shadow-sm">
-        <div className="flex items-center gap-2 bg-slate-100 rounded-lg px-3 py-2.5">
+      {/* Mobile search */}
+      <div className="md:hidden bg-white border-b border-slate-200 px-4 py-3">
+        <div className="flex items-center gap-2 bg-slate-100 rounded-xl px-3 py-2.5">
           <Search className="w-4 h-4 text-slate-500" />
           <input
-            aria-label="Search products"
             value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              if (!e.target.value.trim()) {
-                setIsSemanticMode(false);
-                setSemanticResults([]);
-              }
-            }}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleFullSearch(); }}
-            placeholder="Search products (AI-powered)..."
-            className="flex-1 bg-transparent text-sm focus:outline-none"
+            onChange={e => { setSearchQuery(e.target.value); if (!e.target.value.trim()) { setIsSemanticMode(false); setSemanticResults([]); } }}
+            onKeyDown={e => e.key === 'Enter' && handleFullSearch()}
+            placeholder="AI-powered search..."
+            className="flex-1 bg-transparent text-sm focus:outline-none text-slate-700"
           />
-          {searchLoading && (
-            <div className="w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
-          )}
         </div>
       </div>
 
-      <div className="max-w-[1500px] mx-auto px-3">
+      <div className="max-w-[1600px] mx-auto px-4 md:px-5">
         {error && (
-          <div className="mt-4 bg-red-50 border-l-4 border-red-500 text-red-800 px-4 py-3 mb-4 rounded-r-lg">
-            <p className="text-sm font-medium">{error}</p>
+          <div className="mt-4 bg-red-50 border-l-4 border-red-500 text-red-700 px-4 py-3 rounded-r-xl text-sm font-medium">
+            {error}
           </div>
         )}
 
-        {/* ── Hero Banner Carousel (unchanged) ── */}
-        <div className="relative h-[350px] overflow-hidden mt-4 mb-6 bg-white rounded-xl shadow-lg">
-          <div className="absolute inset-0 flex transition-transform duration-500" style={{ transform: `translateX(-${currentBanner * 100}%)` }}>
-            {banners.map((banner, idx) => (
-              <div key={idx} className="min-w-full h-full relative">
-                <div className={`absolute inset-0 bg-gradient-to-r ${banner.bg}`}>
-                  <div className="max-w-2xl h-full flex flex-col justify-center px-12 text-white">
-                    <h2 className="text-5xl font-extrabold mb-4">{banner.title}</h2>
-                    <p className="text-2xl font-semibold mb-2">{banner.subtitle}</p>
-                    <p className="text-lg mb-6 text-white/90">{banner.description}</p>
-                    <button
-                      onClick={() => { setSearchQuery(''); setIsSemanticMode(false); setSemanticResults([]); }}
-                      className="w-fit px-8 py-3 bg-white text-slate-900 font-bold rounded-lg hover:shadow-xl transition-all hover:scale-105"
-                    >
-                      Shop Now →
-                    </button>
-                  </div>
-                </div>
+        {/* ── Hero Banner ── */}
+        <div className="relative mt-5 mb-6 rounded-2xl overflow-hidden" style={{ height: '360px' }}>
+          {banners.map((banner, idx) => (
+            <div
+              key={idx}
+              className="absolute inset-0 transition-all duration-700"
+              style={{
+                background: banner.gradient,
+                opacity: currentBanner === idx ? 1 : 0,
+                transform: currentBanner === idx ? 'scale(1)' : 'scale(1.02)',
+              }}
+            >
+              {/* Decorative circles */}
+              <div className="absolute right-0 top-0 w-96 h-96 rounded-full opacity-20" style={{ background: banner.accent, transform: 'translate(30%, -30%)', filter: 'blur(60px)' }} />
+              <div className="absolute right-40 bottom-0 w-64 h-64 rounded-full opacity-15" style={{ background: banner.accent, transform: 'translate(0, 40%)', filter: 'blur(40px)' }} />
+
+              {/* Geometric grid */}
+              <div className="absolute inset-0 opacity-5" style={{
+                backgroundImage: 'linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)',
+                backgroundSize: '40px 40px',
+              }} />
+
+              <div className="relative h-full flex flex-col justify-center px-10 md:px-16 max-w-xl">
+                <span className="inline-flex items-center gap-2 text-xs font-bold px-3 py-1 rounded-full mb-4 w-fit" style={{ background: 'rgba(255,255,255,0.35)', color: banner.accent, border: `1px solid ${banner.accent}40` }}>
+                  {banner.tag}
+                </span>
+                <h2 className="text-4xl md:text-5xl font-extrabold text-white mb-2 leading-tight">{banner.title}</h2>
+                <p className="text-xl font-semibold mb-1" style={{ color: banner.accent }}>{banner.sub}</p>
+                <p className="text-white/75 text-sm mb-7">{banner.desc}</p>
+                <button
+                  onClick={() => { setSearchQuery(''); setIsSemanticMode(false); setSemanticResults([]); }}
+                  className="w-fit flex items-center gap-2 px-7 py-3 bg-white font-bold text-sm rounded-xl transition-all hover:shadow-2xl hover:scale-105"
+                  style={{ color: '#14b8a6' }}
+                >
+                  Shop Now <span>→</span>
+                </button>
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
+
+          {/* Controls */}
           <button
-            onClick={() => setCurrentBanner(prev => (prev - 1 + banners.length) % banners.length)}
-            className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white p-2.5 rounded-full shadow-lg transition-all"
+            onClick={() => setCurrentBanner(p => (p - 1 + 3) % 3)}
+            className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center rounded-full bg-white/15 hover:bg-white/25 backdrop-blur-sm transition-all border border-white/20"
           >
-            <ChevronLeft className="w-5 h-5 text-slate-900" />
+            <ChevronLeft className="w-5 h-5 text-white" />
           </button>
           <button
-            onClick={() => setCurrentBanner(prev => (prev + 1) % banners.length)}
-            className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white p-2.5 rounded-full shadow-lg transition-all"
+            onClick={() => setCurrentBanner(p => (p + 1) % 3)}
+            className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center rounded-full bg-white/15 hover:bg-white/25 backdrop-blur-sm transition-all border border-white/20"
           >
-            <ChevronRight className="w-5 h-5 text-slate-900" />
+            <ChevronRight className="w-5 h-5 text-white" />
           </button>
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
-            {banners.map((_, idx) => (
+          <div className="absolute bottom-5 left-1/2 -translate-x-1/2 flex gap-2">
+            {banners.map((_, i) => (
               <button
-                key={idx}
-                onClick={() => setCurrentBanner(idx)}
-                className={`h-2 rounded-full transition-all ${currentBanner === idx ? 'bg-white w-8' : 'bg-white/50 w-2'}`}
+                key={i}
+                onClick={() => setCurrentBanner(i)}
+                className="rounded-full transition-all"
+                style={{
+                  width: currentBanner === i ? '28px' : '8px',
+                  height: '8px',
+                  background: currentBanner === i ? 'white' : 'rgba(255,255,255,0.4)',
+                }}
               />
             ))}
           </div>
         </div>
 
-        {/* ── Category Cards (unchanged) ── */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white p-5 rounded-lg shadow-md hover:shadow-xl transition-all">
-            <h3 className="text-lg font-bold mb-3 text-slate-900">Trending Electronics</h3>
-            <div className="grid grid-cols-2 gap-2 mb-3">
-              {['Smartphones', 'Laptops', 'Tablets', 'Accessories'].map(sub => (
-                <div key={sub}>
-                  <div className="aspect-square bg-gradient-to-br from-slate-100 to-slate-200 rounded-lg mb-2"></div>
-                  <p className="text-xs text-slate-600">{sub}</p>
-                </div>
-              ))}
+        {/* ── Category Cards ── */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          {[
+            { title: 'Trending Electronics', subs: ['Smartphones', 'Laptops', 'Tablets', 'Accessories'], cat: 'Electronics', gradient: 'from-cyan-50 to-teal-50', accent: '#14b8a6' },
+            { title: 'Audio & Wearables', subs: ['Headphones', 'Smart Watches', 'Earbuds', 'Speakers'], cat: 'Audio', gradient: 'from-purple-50 to-violet-50', accent: '#7c3aed' },
+            { title: 'Home Appliances', subs: ['Air Purifiers', 'Vacuum', 'Microwaves', 'Washers'], cat: 'Appliances', gradient: 'from-orange-50 to-amber-50', accent: '#c2410c' },
+            { title: 'Deals Under ₹999', subs: ['Cables', 'Cases', 'Chargers', 'More'], cat: '', gradient: 'from-green-50 to-emerald-50', accent: '#059669' },
+          ].map((card, i) => (
+            <div
+              key={i}
+              onClick={() => applyCategory(card.cat)}
+              className={`bg-gradient-to-br ${card.gradient} p-5 rounded-2xl cursor-pointer transition-all hover:shadow-lg hover:-translate-y-1 border border-white`}
+            >
+              <h3 className="text-sm font-bold text-slate-900 mb-3">{card.title}</h3>
+              <div className="grid grid-cols-2 gap-1.5 mb-3">
+                {card.subs.map(sub => (
+                  <div key={sub} className="bg-white/60 rounded-lg px-2 py-1.5">
+                    <p className="text-xs text-slate-600 font-medium">{sub}</p>
+                  </div>
+                ))}
+              </div>
+              <span className="text-xs font-semibold" style={{ color: card.accent }}>Explore →</span>
             </div>
-            <button onClick={() => applyCategory('Electronics')} className="text-sm text-teal-600 hover:text-teal-700 font-medium">Explore all →</button>
-          </div>
-          <div className="bg-white p-5 rounded-lg shadow-md hover:shadow-xl transition-all">
-            <h3 className="text-lg font-bold mb-3 text-slate-900">Audio & Wearables</h3>
-            <div className="grid grid-cols-2 gap-2 mb-3">
-              {['Headphones', 'Smart Watches', 'Earbuds', 'Speakers'].map(sub => (
-                <div key={sub}>
-                  <div className="aspect-square bg-gradient-to-br from-slate-100 to-slate-200 rounded-lg mb-2"></div>
-                  <p className="text-xs text-slate-600">{sub}</p>
-                </div>
-              ))}
-            </div>
-            <button onClick={() => applyCategory('Audio')} className="text-sm text-teal-600 hover:text-teal-700 font-medium">See more →</button>
-          </div>
-          <div className="bg-white p-5 rounded-lg shadow-md hover:shadow-xl transition-all">
-            <h3 className="text-lg font-bold mb-3 text-slate-900">Home Appliances</h3>
-            <div className="grid grid-cols-2 gap-2 mb-3">
-              {['Air Purifiers', 'Vacuum Cleaners', 'Microwaves', 'Washers'].map(sub => (
-                <div key={sub}>
-                  <div className="aspect-square bg-gradient-to-br from-slate-100 to-slate-200 rounded-lg mb-2"></div>
-                  <p className="text-xs text-slate-600">{sub}</p>
-                </div>
-              ))}
-            </div>
-            <button onClick={() => applyCategory('Appliances')} className="text-sm text-teal-600 hover:text-teal-700 font-medium">View all →</button>
-          </div>
-          <div className="bg-white p-5 rounded-lg shadow-md hover:shadow-xl transition-all">
-            <h3 className="text-lg font-bold mb-3 text-slate-900">Deals Under ₹999</h3>
-            <div className="grid grid-cols-2 gap-2 mb-3">
-              {['Cables', 'Cases', 'Chargers', 'More'].map(sub => (
-                <div key={sub}>
-                  <div className="aspect-square bg-gradient-to-br from-slate-100 to-slate-200 rounded-lg mb-2"></div>
-                  <p className="text-xs text-slate-600">{sub}</p>
-                </div>
-              ))}
-            </div>
-            <a href="#" className="text-sm text-teal-600 hover:text-teal-700 font-medium">Browse →</a>
-          </div>
+          ))}
         </div>
 
-        {/* ── Filter & Sort + Result Count ── */}
-        <div className="bg-white p-4 mb-4 rounded-lg shadow-md flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        {/* ── Filter Bar ── */}
+        <div className="bg-white rounded-2xl px-5 py-3.5 mb-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 shadow-sm border border-slate-100">
           <div className="flex items-center gap-3">
-            <span className="text-sm font-semibold text-slate-700">Sort:</span>
-            <select className="text-sm border border-slate-300 rounded-lg px-4 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500">
-              <option value="">Featured</option>
-              <option value="price-asc">Price: Low to High</option>
-              <option value="price-desc">Price: High to Low</option>
-              <option value="rating-desc">Top Rated</option>
+            <span className="text-sm font-semibold text-slate-600">Sort by:</span>
+            <select className="text-sm border border-slate-200 rounded-xl px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-cyan-400 text-slate-700">
+              <option>Featured</option>
+              <option>Price: Low to High</option>
+              <option>Price: High to Low</option>
+              <option>Top Rated</option>
+              <option>Newest First</option>
             </select>
           </div>
           <div className="flex items-center gap-3">
             {isSemanticMode && (
-              <span className="text-xs bg-teal-100 text-teal-700 px-3 py-1 rounded-full font-semibold">
-                🤖 AI Search Results for "{searchQuery}"
+              <span className="text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1.5" style={{ background: 'rgba(20,184,166,0.12)', color: '#14b8a6', border: '1px solid rgba(20,184,166,0.3)' }}>
+                <Sparkles className="w-3 h-3" />
+                AI Results for "{searchQuery}"
               </span>
             )}
             {isSemanticMode && (
               <button
                 onClick={() => { setSearchQuery(''); setIsSemanticMode(false); setSemanticResults([]); }}
-                className="text-xs text-slate-500 hover:text-slate-700 underline"
+                className="text-xs text-slate-500 hover:text-slate-600 flex items-center gap-1 transition-colors"
               >
-                Clear search
+                <X className="w-3 h-3" /> Clear
               </button>
             )}
-            <div className="text-sm text-slate-600">
+            <span className="text-sm text-slate-500">
               <span className="font-bold text-slate-900">{displayedProducts.length}</span> products
-            </div>
+            </span>
           </div>
         </div>
 
         {/* ── Products Grid ── */}
-        <div className="pb-8">
+        <div className="pb-12">
           {searchLoading && isSemanticMode ? (
-            // Skeleton loading while AI search is running
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {[...Array(10)].map((_, i) => (
-                <div key={i} className="bg-white p-4 rounded-lg border border-slate-200 animate-pulse">
-                  <div className="aspect-square bg-slate-200 rounded-lg mb-3"></div>
-                  <div className="h-4 bg-slate-200 rounded mb-2"></div>
-                  <div className="h-3 bg-slate-200 rounded w-2/3 mb-3"></div>
-                  <div className="h-6 bg-slate-200 rounded mb-2"></div>
-                  <div className="h-10 bg-slate-200 rounded"></div>
+                <div key={i} className="bg-white p-4 rounded-2xl border border-slate-100 animate-pulse">
+                  <div className="aspect-square bg-slate-100 rounded-xl mb-3" />
+                  <div className="h-3 bg-slate-100 rounded mb-2" />
+                  <div className="h-3 bg-slate-100 rounded w-2/3 mb-3" />
+                  <div className="h-8 bg-slate-100 rounded-xl" />
                 </div>
               ))}
             </div>
           ) : displayedProducts.length === 0 ? (
-            <div className="bg-white p-12 text-center rounded-xl shadow-md">
-              <Search className="w-16 h-16 mx-auto text-slate-300 mb-4" />
+            <div className="bg-white rounded-2xl p-16 text-center shadow-sm border border-slate-100">
+              <div className="w-20 h-20 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-5">
+                <Search className="w-9 h-9 text-slate-300" />
+              </div>
               <h3 className="text-xl font-bold text-slate-900 mb-2">No products found</h3>
-              <p className="text-slate-600 mb-6">
-                {isSemanticMode
-                  ? `No matches for "${searchQuery}". Try different keywords.`
-                  : 'Try different keywords or browse all products'}
+              <p className="text-slate-500 text-sm mb-7">
+                {isSemanticMode ? `No matches for "${searchQuery}". Try different keywords.` : 'Try searching something'}
               </p>
               <button
                 onClick={() => { setSearchQuery(''); setIsSemanticMode(false); setSemanticResults([]); }}
-                className="px-6 py-3 bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 text-white font-semibold rounded-lg transition-all"
+                className="px-6 py-2.5 text-white text-sm font-bold rounded-xl transition-all hover:scale-105"
+                style={{ background: 'linear-gradient(135deg, #14b8a6, #0891b2)', boxShadow: '0 4px 16px rgba(20,184,166,0.45)' }}
               >
                 View All Products
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-              {displayedProducts.map((product, index) => {
-                const price = getPrice(product);
-                const rating = getRating(product);
-                const category = getCategoryName(product);
-                const productId = product.id || product._id?.$oid || product._id || index;
-
-                return (
-                  <div
-                    key={productId}
-                    className="bg-white p-4 hover:shadow-xl transition-all rounded-lg border border-slate-200 flex flex-col group"
-                  >
-                    {/* Product Image */}
-                    <div className="relative mb-3 bg-slate-50 rounded-lg overflow-hidden aspect-square">
-                      <img
-                        src={product.imageUrl || 'https://via.placeholder.com/300x300/f1f5f9/94a3b8?text=Product'}
-                        alt={product.name}
-                        className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
-                        onError={(e) => {
-                          e.currentTarget.src = 'https://via.placeholder.com/300x300/f1f5f9/94a3b8?text=Product';
-                        }}
-                      />
-                      {/* Semantic match score badge */}
-                      {isSemanticMode && product.score && (
-                        <div className="absolute top-2 right-2 bg-teal-600 text-white text-xs font-bold px-2 py-1 rounded-md">
-                          {Math.round(product.score * 100)}% match
-                        </div>
-                      )}
-                      {product.stockQuantity !== undefined && product.stockQuantity <= 5 && product.stockQuantity > 0 && (
-                        <div className="absolute top-2 left-2 bg-orange-500 text-white text-xs font-bold px-2 py-1 rounded-md">
-                          Only {product.stockQuantity} left
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Product Info */}
-                    <div className="flex-1 flex flex-col">
-                      <h3 className="text-sm font-medium text-slate-900 mb-1 line-clamp-2 group-hover:text-teal-600 cursor-pointer transition-colors">
-                        {product.name}
-                      </h3>
-
-                      {/* Rating */}
-                      {rating && (
-                        <div className="flex items-center gap-1 mb-2">
-                          <div className="flex items-center">
-                            {[...Array(5)].map((_, i) => (
-                              <span key={i} className="text-amber-400 text-xs">
-                                {i < Math.floor(rating) ? '★' : '☆'}
-                              </span>
-                            ))}
-                          </div>
-                          <span className="text-xs text-slate-600">({product.reviewCount || 0})</span>
-                        </div>
-                      )}
-
-                      {/* Price */}
-                      <div className="mb-3">
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-xs font-semibold text-orange-500 bg-orange-50 px-2 py-0.5 rounded">-20%</span>
-                          <span className="text-xl font-bold text-slate-900">₹{price.toLocaleString()}</span>
-                        </div>
-                        <div className="text-xs text-slate-500 mt-0.5">
-                          M.R.P: <span className="line-through">₹{(price * 1.2).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                        </div>
-                      </div>
-
-                      {/* Brand / Category */}
-                      <p className="text-xs text-slate-600 mb-3">{product.brand || category}</p>
-
-                      {/* Action Buttons */}
-                      <div className="mt-auto space-y-2">
-                        <button
-                          onClick={() => addToCart(product, setError)}
-                          disabled={product.stockQuantity === 0}
-                          className="w-full px-4 py-2.5 bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 text-white text-sm font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                        >
-                          {product.stockQuantity === 0 ? 'Out of Stock' : 'Add to Cart'}
-                        </button>
-                        <button
-                          onClick={() => quickView(product)}
-                          className="w-full px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-900 text-sm font-medium rounded-lg transition-all"
-                        >
-                          Quick View
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              {displayedProducts.map((product, index) => (
+                <ProductCard
+                  key={product.id || product._id?.$oid || product._id || index}
+                  product={product}
+                  index={index}
+                  addToCart={addToCart}
+                  setError={setError}
+                />
+              ))}
             </div>
           )}
         </div>
       </div>
 
-      {/* ── AI Chat Widget (unchanged logic, same UI) ── */}
-      {chatOpen && (
-        <div className="fixed bottom-6 right-6 w-96 bg-white rounded-xl shadow-2xl flex flex-col border border-slate-200 z-50 max-h-[600px]">
-          <div className="bg-gradient-to-r from-teal-600 to-cyan-600 text-white p-4 flex justify-between items-center rounded-t-xl">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-                <span className="text-lg">🤖</span>
-              </div>
-              <div>
-                <h3 className="font-bold">ShopAI Assistant</h3>
-                <p className="text-xs text-teal-100">Online</p>
-              </div>
-            </div>
-            <button aria-label="Close chat" onClick={() => setChatOpen(false)} className="hover:bg-white/20 p-2 rounded-lg transition-all">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50 min-h-[300px] max-h-[400px]">
-            {chatMessages.length === 0 && (
-              <div className="text-center text-slate-500 mt-8">
-                <p className="font-semibold mb-2">Hi! How can I help?</p>
-                <div className="flex flex-wrap gap-2 justify-center mt-4">
-                  <button onClick={() => sendMessageToAgent('Show me smartphones')} className="text-xs bg-white border border-slate-200 px-3 py-1.5 rounded-full hover:bg-slate-100 transition-all">📱 Smartphones</button>
-                  <button onClick={() => sendMessageToAgent('Best budget products')} className="text-xs bg-white border border-slate-200 px-3 py-1.5 rounded-full hover:bg-slate-100 transition-all">💰 Budget</button>
-                </div>
-              </div>
-            )}
-            {chatMessages.map((msg, idx) => (
-              <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-xs px-3 py-2 rounded-lg text-sm ${msg.role === 'user' ? 'bg-gradient-to-r from-teal-500 to-cyan-600 text-white' : 'bg-white text-slate-900 border border-slate-200'}`}>
-                  {msg.content}
-                </div>
-              </div>
-            ))}
-            {isTyping && (
-              <div className="flex items-center gap-2 text-slate-600">
-                <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center border border-slate-200">
-                  <div className="flex gap-1">
-                    <div className="w-1.5 h-1.5 bg-teal-500 rounded-full animate-bounce"></div>
-                    <div className="w-1.5 h-1.5 bg-teal-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                    <div className="w-1.5 h-1.5 bg-teal-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
-                  </div>
-                </div>
-                <span className="text-xs">Typing...</span>
-              </div>
-            )}
-            <div ref={chatEndRef} />
-          </div>
-
-          <div className="border-t border-slate-200 p-3 bg-white rounded-b-xl flex gap-2">
-            <input
-              type="text"
-              value={currentMessage}
-              onChange={(e) => setCurrentMessage(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && currentMessage.trim() && !isTyping) sendMessageToAgent(currentMessage.trim()); }}
-              placeholder="Type your message..."
-              disabled={isTyping}
-              className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:opacity-50"
-            />
-            <button
-              onClick={() => { if (currentMessage.trim() && !isTyping) sendMessageToAgent(currentMessage.trim()); }}
-              disabled={!currentMessage.trim() || isTyping}
-              className="bg-gradient-to-r from-orange-400 to-orange-500 hover:from-orange-500 hover:to-orange-600 text-white p-3 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-            >
-              <Send className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Floating Chat Button */}
-      {!chatOpen && (
-        <button
+      {/* Chat widget or floating button */}
+      {chatOpen ? (
+        <ChatWidget
+          onClose={() => setChatOpen(false)}
+          products={products}
+          cart={cart}
+          addToCart={addToCart}
+          setError={setError}
+        />
+      ) : (
+        <ChatBotIcon
+          hasMessages={false}
+          messageCount={0}
           onClick={() => setChatOpen(true)}
-          className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-br from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 text-white rounded-full shadow-xl flex items-center justify-center z-40 transition-all hover:scale-110"
-        >
-          <MessageCircle className="w-6 h-6" />
-          {chatMessages.length > 0 && (
-            <span className="absolute -top-1 -right-1 w-5 h-5 bg-orange-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
-              {Math.min(chatMessages.length, 9)}
-            </span>
-          )}
-        </button>
+        />
       )}
     </div>
   );
