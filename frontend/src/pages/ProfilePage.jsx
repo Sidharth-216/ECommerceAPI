@@ -18,15 +18,19 @@ const ProfilePage = ({
   const [editMode, setEditMode] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(false);
 
+  // FIX #2: Gate both fetches on `user` being available.
+  // Add `user` as a dependency so this re-runs once the user is rehydrated from
+  // localStorage (the race condition where fetchAddresses fired before user was set).
   useEffect(() => {
+    if (!user) return;
     fetchAddresses();
     fetchProfile();
-  }, []);
+  }, [user]);
 
+  // FIX #2: Same guard for orders — no fetch until user is confirmed.
   useEffect(() => {
-    if (user) {
-      fetchOrders();
-    }
+    if (!user) return;
+    fetchOrders();
   }, [user]);
 
   const fetchProfile = async () => {
@@ -34,7 +38,7 @@ const ProfilePage = ({
       setLoadingProfile(true);
       const res = await authAPI.getProfile();
       const data = res.data;
-      
+
       setProfileData({
         fullName: data.fullName || user?.name || '',
         email: data.email || user?.email || '',
@@ -62,14 +66,16 @@ const ProfilePage = ({
     try {
       let res;
       let currentUserId = null;
-      
+
       try {
         const profileRes = await authAPI.getProfile();
         currentUserId = profileRes.data?.id || profileRes.data?.userId || profileRes.data?.Id;
       } catch (err) {
-        console.error('Failed to get user profile:', err);
+        console.error('Failed to get user profile for ID extraction:', err);
+        // Fall back to the user object already in state
+        currentUserId = user?.id || user?.userId;
       }
-      
+
       if (typeof addressAPI?.getAll === 'function') {
         res = await addressAPI.getAll();
       } else if (typeof authAPI?.getProfile === 'function') {
@@ -80,11 +86,12 @@ const ProfilePage = ({
         return;
       }
 
-      const rawAddresses = Array.isArray(res.data) 
-        ? res.data 
+      const rawAddresses = Array.isArray(res.data)
+        ? res.data
         : (res.data?.addresses || res.data?.addressList || []);
 
-      const userAddresses = currentUserId 
+      // Filter to current user's addresses only (cross-user contamination guard)
+      const userAddresses = currentUserId
         ? rawAddresses.filter(a => {
             const addrUserId = a.userId || a.UserId || a.user_id || a.UserID;
             return addrUserId === currentUserId || addrUserId === String(currentUserId);
@@ -119,7 +126,6 @@ const ProfilePage = ({
       });
 
       setProfileData(prev => ({ ...prev, addresses: normalized }));
-      
     } catch (err) {
       console.error('Failed to fetch addresses for profile page', err);
       setProfileData(prev => ({ ...prev, addresses: [] }));
@@ -141,13 +147,18 @@ const ProfilePage = ({
         await authAPI.updateProfile(payload);
       }
 
-      const userData = JSON.parse(sessionStorage.getItem('user') || '{}');
-      sessionStorage.setItem('user', JSON.stringify({
+      // Read from sessionStorage first (tab-scoped), fall back to localStorage
+      const raw = sessionStorage.getItem('user') || localStorage.getItem('user');
+      const userData = JSON.parse(raw || '{}');
+      const updatedUser = {
         ...userData,
         fullName: profileData.fullName,
         mobile: profileData.mobile,
         gender: profileData.gender
-      }));
+      };
+      // Write back to whichever storages hold this tab's session
+      if (sessionStorage.getItem('user')) sessionStorage.setItem('user', JSON.stringify(updatedUser));
+      if (localStorage.getItem('user'))   localStorage.setItem('user', JSON.stringify(updatedUser));
 
       setEditMode(false);
       alert('✅ Profile updated successfully!');
@@ -387,7 +398,9 @@ const ProfilePage = ({
                         const line1 = window.prompt('📍 Address Line 1');
                         if (!line1) return;
 
-                        const userData = JSON.parse(sessionStorage.getItem('user') || '{}');
+                        // Read from sessionStorage first (tab-scoped), fall back to localStorage
+                        const raw = sessionStorage.getItem('user') || localStorage.getItem('user');
+                        const userData = JSON.parse(raw || '{}');
                         const userId = userData.id || userData.userId || userData.Id;
 
                         if (!userId) {

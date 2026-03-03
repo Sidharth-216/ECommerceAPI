@@ -19,29 +19,20 @@ using ECommerceAPI.Infrastructure.Repositories;
 using ECommerceAPI.Infrastructure.Repositories.Interfaces;
 using ECommerceAPI.Infrastructure.Repositories.Implementations;
 
-// NOTE: Do NOT add "using Application.Interfaces;" — always use the full namespace above
-
 namespace ECommerceAPI.API
 {
     public class Startup
     {
-        public Startup(IConfiguration configuration)
-        {
-            Configuration = configuration;
-        }
-
+        public Startup(IConfiguration configuration) { Configuration = configuration; }
         public IConfiguration Configuration { get; }
 
         public void ConfigureServices(IServiceCollection services)
         {
             services.AddControllers();
-
-            // ================= JWT =================
             services.AddScoped<JwtHelper>();
 
             var jwtKey = Configuration["Jwt:SecretKey"];
-            if (string.IsNullOrWhiteSpace(jwtKey))
-                throw new Exception("JWT SecretKey missing");
+            if (string.IsNullOrWhiteSpace(jwtKey)) throw new Exception("JWT SecretKey missing");
 
             services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 .AddJwtBearer(options =>
@@ -54,40 +45,34 @@ namespace ECommerceAPI.API
                         ValidateIssuerSigningKey = true,
                         ValidIssuer              = Configuration["Jwt:Issuer"],
                         ValidAudience            = Configuration["Jwt:Audience"],
-                        IssuerSigningKey         = new SymmetricSecurityKey(
-                                                       Encoding.UTF8.GetBytes(jwtKey)),
+                        IssuerSigningKey         = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
                         NameClaimType            = ClaimTypes.NameIdentifier,
                         RoleClaimType            = ClaimTypes.Role
                     };
                 });
 
-            // ================= CORS =================
             services.AddCors(options =>
             {
                 options.AddPolicy("AllowAll", builder =>
-                    builder.AllowAnyOrigin()
-                           .AllowAnyHeader()
-                           .AllowAnyMethod());
+                    builder
+                        .AllowAnyOrigin()
+                        .AllowAnyHeader()
+                        .AllowAnyMethod()
+                        // CRITICAL: Without this line, the browser cannot read the
+                        // X-Server-Boot-Id response header even though it is present.
+                        // The CORS spec blocks custom headers unless explicitly exposed.
+                        // This was why bootId was always null on the frontend.
+                        .WithExposedHeaders("X-Server-Boot-Id"));
             });
 
-            // ================= MongoDB =================
-            services.Configure<MongoDbSettings>(
-                Configuration.GetSection("MongoDbSettings"));
-
-            var mongoSettings = Configuration
-                .GetSection("MongoDbSettings")
-                .Get<MongoDbSettings>();
-
-            services.AddSingleton<IMongoClient>(
-                _ => new MongoClient(mongoSettings.ConnectionString));
-
-            services.AddScoped<IMongoDatabase>(sp =>
-            {
+            services.Configure<MongoDbSettings>(Configuration.GetSection("MongoDbSettings"));
+            var mongoSettings = Configuration.GetSection("MongoDbSettings").Get<MongoDbSettings>();
+            services.AddSingleton<IMongoClient>(_ => new MongoClient(mongoSettings.ConnectionString));
+            services.AddScoped<IMongoDatabase>(sp => {
                 var client = sp.GetRequiredService<IMongoClient>();
                 return client.GetDatabase(mongoSettings.DatabaseName);
             });
 
-            // ================= MongoDB Repositories =================
             services.AddScoped<IMongoUserRepository,      MongoUserRepository>();
             services.AddScoped<IMongoOtpRepository,       MongoOtpRepository>();
             services.AddScoped<IMongoEmailOtpRepository,  MongoEmailOtpRepository>();
@@ -96,7 +81,6 @@ namespace ECommerceAPI.API
             services.AddScoped<IMongoOrderRepository,     MongoOrderRepository>();
             services.AddScoped<IAddressMongoRepository,   AddressMongoRepository>();
 
-            // ================= MongoDB Services =================
             services.AddScoped<MongoAuthService>();
             services.AddScoped<IMongoOtpService,          MongoOtpService>();
             services.AddScoped<IMongoEmailOtpService,     MongoEmailOtpService>();
@@ -108,14 +92,10 @@ namespace ECommerceAPI.API
             services.AddScoped<IMongoOrderService,        MongoOrderService>();
             services.AddScoped<IMongoAdminService,        MongoAdminService>();
 
-            // ================= AI / Semantic Search =================
-            // Timeout increased to 30s — ngrok + cold start can be slow
-            services.AddHttpClient<ISemanticSearchService, SemanticSearchService>(client =>
-            {
-                client.Timeout = TimeSpan.FromSeconds(30);  // ← was 10, increased to 30
+            services.AddHttpClient<ISemanticSearchService, SemanticSearchService>(client => {
+                client.Timeout = TimeSpan.FromSeconds(30);
             });
 
-            // ================= Swagger =================
             services.AddSwaggerGen();
         }
 
@@ -129,17 +109,12 @@ namespace ECommerceAPI.API
             }
 
             app.UseMiddleware<ErrorHandlerMiddleware>();
-
             app.UseHttpsRedirection();
             app.UseRouting();
             app.UseCors("AllowAll");
             app.UseAuthentication();
             app.UseAuthorization();
-
-            app.UseEndpoints(endpoints =>
-            {
-                endpoints.MapControllers();
-            });
+            app.UseEndpoints(endpoints => { endpoints.MapControllers(); });
         }
     }
 }

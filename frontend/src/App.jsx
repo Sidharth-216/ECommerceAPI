@@ -3,185 +3,105 @@ import { useAuth } from './hooks/useAuth';
 import { useCart } from './hooks/useCart';
 import { useProducts } from './hooks/useProducts';
 
-// Pages
-import HomePage from './pages/HomePage';
-import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
-import ProductsPage from './pages/ProductsPage';
-import CartPage from './pages/CartPage';
-import CheckoutPage from './pages/CheckoutPage';
-import OrdersPage from './pages/OrdersPage';
-import ProfilePage from './pages/ProfilePage';
+import HomePage       from './pages/HomePage';
+import LoginPage      from './pages/LoginPage';
+import RegisterPage   from './pages/RegisterPage';
+import ProductsPage   from './pages/ProductsPage';
+import CartPage       from './pages/CartPage';
+import CheckoutPage   from './pages/CheckoutPage';
+import OrdersPage     from './pages/OrdersPage';
+import ProfilePage    from './pages/ProfilePage';
 import AdminDashboard from './pages/admin/AdminDashboard';
 
 const App = () => {
-  const [currentPage, setCurrentPage] = useState('home');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [appReady, setAppReady] = useState(false);
+  const [currentPage,  setCurrentPage]  = useState('home');
+  const [searchQuery,  setSearchQuery]  = useState('');
+  const [error,        setError]        = useState('');
+  const [loading,      setLoading]      = useState(false);
 
-  // Custom hooks
-  const auth = useAuth();
-  const cartHook = useCart(auth.user);
+  const auth         = useAuth();
+  const cartHook     = useCart(auth.user);
   const productsHook = useProducts();
 
-  // Initialize app on mount
+  // ── After rehydration finishes, restore the correct page ───────────────
+  // We wait for isInitializing=false so we KNOW whether the session is valid
+  // or was cleared (server restart / different user). Only then do we read
+  // currentPage from storage — this prevents restoring a page that belongs
+  // to a cleared session.
   useEffect(() => {
-    initializeApp();
-  }, []);
+    if (auth.isInitializing) return;
 
-  // Save currentPage to localStorage whenever it changes (only after app is ready)
-  useEffect(() => {
-    if (appReady) {
-      localStorage.setItem('currentPage', currentPage);
-    }
-  }, [currentPage, appReady]);
+    const saved =
+      sessionStorage.getItem('currentPage') ||
+      localStorage.getItem('currentPage')   ||
+      'home';
 
-  // Reload data when user changes
-  useEffect(() => {
-    if (auth.user) {
-      loadUserData();
+    if (!auth.user) {
+      const publicPages = ['home', 'login', 'register'];
+      setCurrentPage(publicPages.includes(saved) ? saved : 'home');
+      return;
     }
+
+    if (auth.user.role === 'Admin') {
+      const adminPages = ['admin', 'products'];
+      setCurrentPage(adminPages.includes(saved) ? saved : 'admin');
+    } else {
+      // Customer — block admin page
+      setCurrentPage(saved === 'admin' ? 'products' : saved);
+    }
+  }, [auth.isInitializing]); // runs exactly once when auth check completes
+
+  // ── Persist currentPage ─────────────────────────────────────────────────
+  useEffect(() => {
+    if (auth.isInitializing) return;
+    sessionStorage.setItem('currentPage', currentPage);
+    localStorage.setItem('currentPage',   currentPage);
+  }, [currentPage, auth.isInitializing]);
+
+  // ── Load data when user becomes available ───────────────────────────────
+  useEffect(() => {
+    if (auth.user) loadUserData();
   }, [auth.user]);
-
-  const clearSession = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    localStorage.removeItem('cart');
-    localStorage.removeItem('currentPage');
-    setCurrentPage('home');
-  };
-
-  const validateToken = async (token) => {
-    try {
-      const response = await fetch('/api/mongo/auth/validate', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      return response.ok;
-    } catch (err) {
-      console.warn('⚠️ Token validation failed (server may be down):', err.message);
-      return false;
-    }
-  };
-
-  const initializeApp = async () => {
-    try {
-      console.log('🚀 Initializing ShopAI...');
-
-      const token = localStorage.getItem('token');
-      const userData = localStorage.getItem('user');
-      const savedPage = localStorage.getItem('currentPage');
-
-      if (token && userData) {
-        console.log('🔍 Validating token with server...');
-        const isValid = await validateToken(token);
-
-        if (!isValid) {
-          console.warn('⚠️ Token invalid or server restarted — clearing session');
-          clearSession();
-          return;
-        }
-
-        try {
-          const parsedUser = JSON.parse(userData);
-          console.log('✅ Found valid session for:', parsedUser.email);
-
-          auth.setUser(parsedUser);
-
-          if (parsedUser.role === 'Admin') {
-            const adminPages = ['admin', 'products'];
-            setCurrentPage(savedPage && adminPages.includes(savedPage) ? savedPage : 'admin');
-          } else {
-            const customerPages = ['products', 'cart', 'checkout', 'orders', 'profile'];
-            setCurrentPage(savedPage && customerPages.includes(savedPage) ? savedPage : 'products');
-          }
-
-        } catch (err) {
-          console.error('❌ Error parsing user data:', err);
-          clearSession();
-        }
-      } else {
-        console.log('ℹ️ No existing session found');
-        localStorage.removeItem('currentPage');
-        setCurrentPage('home');
-      }
-
-      console.log('✅ App initialized');
-    } catch (err) {
-      console.error('❌ App initialization error:', err);
-      clearSession();
-    } finally {
-      setAppReady(true);
-    }
-  };
 
   const loadUserData = async () => {
     if (!auth.user) return;
-
     try {
-      console.log('📂 Loading user data...');
-
       await Promise.all([
-        productsHook.loadProducts().catch(err => {
-          console.warn('⚠️ Failed to load products:', err);
-          return [];
-        }),
-        cartHook.loadCart().catch(err => {
-          console.warn('⚠️ Failed to load cart:', err);
-          return [];
-        }),
-        auth.loadProfile().catch(err => {
-          console.warn('⚠️ Failed to load profile:', err);
-        }),
-        auth.loadOrders().catch(err => {
-          console.warn('⚠️ Failed to load orders:', err);
-          return [];
-        })
+        productsHook.loadProducts().catch(e => console.warn('⚠️ products:', e)),
+        cartHook.loadCart().catch(e =>         console.warn('⚠️ cart:', e)),
+        auth.loadProfile().catch(e =>          console.warn('⚠️ profile:', e)),
+        auth.loadOrders().catch(e =>           console.warn('⚠️ orders:', e))
       ]);
-
-      console.log('✅ User data loaded');
-    } catch (err) {
-      console.error('❌ Error loading user data:', err);
-    }
+    } catch (e) { console.error('❌ loadUserData:', e); }
   };
 
-  // Common props for all pages
   const pageProps = {
-    currentPage,
-    setCurrentPage,
-    searchQuery,
-    setSearchQuery,
-    error,
-    setError,
-    loading,
-    setLoading,
-    user: auth.user,
-    setUser: auth.setUser,
-    cart: cartHook.cart,
-    setCart: cartHook.setCart,
-    products: productsHook.products,
-    setProducts: productsHook.setProducts,
-    orders: auth.orders,
-    setOrders: auth.setOrders,
-    handleLogout: auth.handleLogout,
-    addToCart: cartHook.addToCart,
+    currentPage, setCurrentPage,
+    searchQuery, setSearchQuery,
+    error, setError,
+    loading, setLoading,
+    user:               auth.user,
+    setUser:            auth.setUser,
+    cart:               cartHook.cart,
+    setCart:            cartHook.setCart,
+    products:           productsHook.products,
+    setProducts:        productsHook.setProducts,
+    orders:             auth.orders,
+    setOrders:          auth.setOrders,
+    handleLogout:       auth.handleLogout,
+    addToCart:          cartHook.addToCart,
     updateCartQuantity: cartHook.updateCartQuantity,
-    removeFromCart: cartHook.removeFromCart,
-    clearCart: cartHook.clearCart,
-    profileData: auth.profileData,
-    setProfileData: auth.setProfileData,
-    loadProducts: productsHook.loadProducts,
-    loadOrders: auth.loadOrders,
-    loadProfile: auth.loadProfile
+    removeFromCart:     cartHook.removeFromCart,
+    clearCart:          cartHook.clearCart,
+    profileData:        auth.profileData,
+    setProfileData:     auth.setProfileData,
+    loadProducts:       productsHook.loadProducts,
+    loadOrders:         auth.loadOrders,
+    loadProfile:        auth.loadProfile
   };
 
-  // Show spinner until session check is complete
-  if (!appReady) {
+  // Spinner while session check runs
+  if (auth.isInitializing) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
@@ -192,35 +112,23 @@ const App = () => {
     );
   }
 
-  // Route to appropriate page
   if (!auth.user) {
-    if (currentPage === 'login') {
-      return <LoginPage {...pageProps} />;
-    }
-    if (currentPage === 'register') {
-      return <RegisterPage {...pageProps} />;
-    }
+    if (currentPage === 'login')    return <LoginPage    {...pageProps} />;
+    if (currentPage === 'register') return <RegisterPage {...pageProps} />;
     return <HomePage {...pageProps} />;
   }
 
-  // Authenticated routes
   if (auth.user.role === 'Admin' && currentPage === 'admin') {
     return <AdminDashboard {...pageProps} />;
   }
 
   switch (currentPage) {
-    case 'products':
-      return <ProductsPage {...pageProps} />;
-    case 'cart':
-      return <CartPage {...pageProps} />;
-    case 'checkout':
-      return <CheckoutPage {...pageProps} />;
-    case 'orders':
-      return <OrdersPage {...pageProps} />;
-    case 'profile':
-      return <ProfilePage {...pageProps} />;
-    default:
-      return <ProductsPage {...pageProps} />;
+    case 'products': return <ProductsPage  {...pageProps} />;
+    case 'cart':     return <CartPage      {...pageProps} />;
+    case 'checkout': return <CheckoutPage  {...pageProps} />;
+    case 'orders':   return <OrdersPage    {...pageProps} />;
+    case 'profile':  return <ProfilePage   {...pageProps} />;
+    default:         return <ProductsPage  {...pageProps} />;
   }
 };
 
