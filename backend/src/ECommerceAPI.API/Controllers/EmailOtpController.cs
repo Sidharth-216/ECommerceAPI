@@ -1,7 +1,7 @@
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using ECommerceAPI.Application.Interfaces;
-using ECommerceAPI.Application.DTOs.Auth;  // ← add this
+using ECommerceAPI.Application.DTOs.Auth;  
 
 namespace ECommerceAPI.API.Controllers
 {
@@ -49,6 +49,6 @@ namespace ECommerceAPI.API.Controllers
 
             return Ok(new { success = true, message = "OTP verified successfully." });
         }
-        // ← NO local DTO classes here
+        
     }
 }
