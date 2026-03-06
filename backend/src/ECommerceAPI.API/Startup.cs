@@ -58,10 +58,6 @@ namespace ECommerceAPI.API
                         .AllowAnyOrigin()
                         .AllowAnyHeader()
                         .AllowAnyMethod()
-                        // CRITICAL: Without this line, the browser cannot read the
-                        // X-Server-Boot-Id response header even though it is present.
-                        // The CORS spec blocks custom headers unless explicitly exposed.
-                        // This was why bootId was always null on the frontend.
                         .WithExposedHeaders("X-Server-Boot-Id"));
             });
 
@@ -73,6 +69,7 @@ namespace ECommerceAPI.API
                 return client.GetDatabase(mongoSettings.DatabaseName);
             });
 
+            // ── Repositories ──────────────────────────────────────────────────
             services.AddScoped<IMongoUserRepository,      MongoUserRepository>();
             services.AddScoped<IMongoOtpRepository,       MongoOtpRepository>();
             services.AddScoped<IMongoEmailOtpRepository,  MongoEmailOtpRepository>();
@@ -81,16 +78,16 @@ namespace ECommerceAPI.API
             services.AddScoped<IMongoOrderRepository,     MongoOrderRepository>();
             services.AddScoped<IAddressMongoRepository,   AddressMongoRepository>();
 
+            // ── Services ──────────────────────────────────────────────────────
             services.AddScoped<MongoAuthService>();
             services.AddScoped<IMongoOtpService,          MongoOtpService>();
-            services.AddScoped<IMongoEmailOtpService,     MongoEmailOtpService>();
-            services.AddScoped<IMongoEmailOtpRepository,  MongoEmailOtpRepository>();
             services.AddScoped<IMongoEmailOtpService,     MongoEmailOtpService>();
             services.AddScoped<IProductMongoService,      ProductMongoService>();
             services.AddScoped<IMongoAddressService,      MongoAddressService>();
             services.AddScoped<IMongoCartService,         MongoCartService>();
             services.AddScoped<IMongoOrderService,        MongoOrderService>();
             services.AddScoped<IMongoAdminService,        MongoAdminService>();
+            services.AddScoped<IMongoOrderEmailService,   MongoOrderEmailService>(); // ← ADDED
 
             services.AddHttpClient<ISemanticSearchService, SemanticSearchService>(client => {
                 client.Timeout = TimeSpan.FromSeconds(30);

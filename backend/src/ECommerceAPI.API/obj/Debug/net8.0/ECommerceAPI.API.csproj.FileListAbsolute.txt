@@ -1,3 +1,11 @@
+/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/obj/Debug/net8.0/ECommerceAPI.API.csproj.AssemblyReference.cache
+/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/obj/Debug/net8.0/ECommerceAPI.API.GeneratedMSBuildEditorConfig.editorconfig
+/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/obj/Debug/net8.0/ECommerceAPI.API.AssemblyInfoInputs.cache
+/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/obj/Debug/net8.0/ECommerceAPI.API.AssemblyInfo.cs
+/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/obj/Debug/net8.0/ECommerceAPI.API.csproj.CoreCompileInputs.cache
+/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/obj/Debug/net8.0/ECommerceAPI.API.MvcApplicationPartsAssemblyInfo.cs
+/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/obj/Debug/net8.0/ECommerceAPI.API.MvcApplicationPartsAssemblyInfo.cache
+/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/obj/Debug/net8.0/ECommerceAPI.API.sourcelink.json
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/bin/Debug/net8.0/appsettings.Development.json
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/bin/Debug/net8.0/appsettings.json
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/bin/Debug/net8.0/ECommerceAPI.API
@@ -128,14 +136,6 @@
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/bin/Debug/net8.0/ECommerceAPI.Domain.pdb
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/bin/Debug/net8.0/ECommerceAPI.Application.pdb
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/bin/Debug/net8.0/ECommerceAPI.Infrastructure.pdb
-/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/obj/Debug/net8.0/ECommerceAPI.API.csproj.AssemblyReference.cache
-/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/obj/Debug/net8.0/ECommerceAPI.API.GeneratedMSBuildEditorConfig.editorconfig
-/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/obj/Debug/net8.0/ECommerceAPI.API.AssemblyInfoInputs.cache
-/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/obj/Debug/net8.0/ECommerceAPI.API.AssemblyInfo.cs
-/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/obj/Debug/net8.0/ECommerceAPI.API.csproj.CoreCompileInputs.cache
-/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/obj/Debug/net8.0/ECommerceAPI.API.MvcApplicationPartsAssemblyInfo.cs
-/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/obj/Debug/net8.0/ECommerceAPI.API.MvcApplicationPartsAssemblyInfo.cache
-/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/obj/Debug/net8.0/ECommerceAPI.API.sourcelink.json
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/obj/Debug/net8.0/staticwebassets.build.json
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/obj/Debug/net8.0/staticwebassets.development.json
 /home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/obj/Debug/net8.0/staticwebassets/msbuild.ECommerceAPI.API.Microsoft.AspNetCore.StaticWebAssets.props

@@ -13,32 +13,39 @@ using Microsoft.Extensions.Logging;
 namespace ECommerceAPI.Application.Services
 {
     /// <summary>
-    /// Pure MongoDB Order Service - FIXED with proper UpdateOrderStatusAsync
+    /// Pure MongoDB Order Service — with order confirmation / cancellation / status emails
     /// </summary>
     public class MongoOrderService : IMongoOrderService
     {
-        private readonly IMongoOrderRepository _mongoOrderRepository;
-        private readonly ICartMongoRepository _mongoCartRepository;
-        private readonly IProductMongoRepository _mongoProductRepository;
-        private readonly IMongoUserRepository _mongoUserRepository;
-        private readonly IAddressMongoRepository _mongoAddressRepository;
+        private readonly IMongoOrderRepository    _mongoOrderRepository;
+        private readonly ICartMongoRepository     _mongoCartRepository;
+        private readonly IProductMongoRepository  _mongoProductRepository;
+        private readonly IMongoUserRepository     _mongoUserRepository;
+        private readonly IAddressMongoRepository  _mongoAddressRepository;
+        private readonly IMongoOrderEmailService  _orderEmailService;   // ← ADDED
         private readonly ILogger<MongoOrderService> _logger;
 
         public MongoOrderService(
-            IMongoOrderRepository mongoOrderRepository,
-            ICartMongoRepository mongoCartRepository,
-            IProductMongoRepository mongoProductRepository,
-            IMongoUserRepository mongoUserRepository,
-            IAddressMongoRepository mongoAddressRepository,
+            IMongoOrderRepository    mongoOrderRepository,
+            ICartMongoRepository     mongoCartRepository,
+            IProductMongoRepository  mongoProductRepository,
+            IMongoUserRepository     mongoUserRepository,
+            IAddressMongoRepository  mongoAddressRepository,
+            IMongoOrderEmailService  orderEmailService,                 // ← ADDED
             ILogger<MongoOrderService> logger)
         {
-            _mongoOrderRepository = mongoOrderRepository;
-            _mongoCartRepository = mongoCartRepository;
+            _mongoOrderRepository   = mongoOrderRepository;
+            _mongoCartRepository    = mongoCartRepository;
             _mongoProductRepository = mongoProductRepository;
-            _mongoUserRepository = mongoUserRepository;
+            _mongoUserRepository    = mongoUserRepository;
             _mongoAddressRepository = mongoAddressRepository;
-            _logger = logger;
+            _orderEmailService      = orderEmailService;                // ← ADDED
+            _logger                 = logger;
         }
+
+        // ─────────────────────────────────────────────────────────────────────
+        // CREATE ORDER
+        // ─────────────────────────────────────────────────────────────────────
 
         public async Task<OrderDto> CreateOrderAsync(string mongoUserId, CreateOrderDto createDto)
         {
@@ -84,14 +91,14 @@ namespace ECommerceAPI.Application.Services
                 Console.WriteLine($"✅ Cart found with {cart.Items.Count} items");
 
                 // 5️⃣ Validate stock and prepare order items
-                var orderItems = new List<MongoOrderItem>();
+                var orderItems  = new List<MongoOrderItem>();
                 decimal totalAmount = 0;
 
                 Console.WriteLine($"📦 Validating stock for {cart.Items.Count} items...");
                 foreach (var cartItem in cart.Items)
                 {
                     Console.WriteLine($"   Checking product: {cartItem.ProductId}");
-                    
+
                     var product = await _mongoProductRepository.GetByIdAsync(cartItem.ProductId);
                     if (product == null)
                     {
@@ -112,11 +119,11 @@ namespace ECommerceAPI.Application.Services
 
                     orderItems.Add(new MongoOrderItem
                     {
-                        ProductId = product.Id,
-                        ProductName = product.Name,
-                        Quantity = cartItem.Quantity,
-                        Price = product.Price,
-                        ImageUrl = product.ImageUrl,
+                        ProductId    = product.Id,
+                        ProductName  = product.Name,
+                        Quantity     = cartItem.Quantity,
+                        Price        = product.Price,
+                        ImageUrl     = product.ImageUrl,
                         SqlProductId = null
                     });
 
@@ -131,7 +138,7 @@ namespace ECommerceAPI.Application.Services
                     throw new InvalidOperationException("Shipping address ID is required");
                 }
 
-                if (!ObjectId.TryParse(createDto.ShippingAddressId, out var addressObjectId))
+                if (!ObjectId.TryParse(createDto.ShippingAddressId, out _))
                 {
                     Console.WriteLine($"❌ Invalid address ObjectId format: {createDto.ShippingAddressId}");
                     throw new InvalidOperationException(
@@ -160,14 +167,14 @@ namespace ECommerceAPI.Application.Services
 
                 var mongoOrder = new MongoOrder
                 {
-                    UserId = user.Id,
-                    OrderNumber = orderNumber,
-                    TotalAmount = totalAmount,
-                    Status = OrderStatus.Pending.ToString(),
+                    UserId            = user.Id,
+                    OrderNumber       = orderNumber,
+                    TotalAmount       = totalAmount,
+                    Status            = OrderStatus.Pending.ToString(),
                     ShippingAddressId = createDto.ShippingAddressId,
-                    CreatedAt = DateTime.UtcNow,
-                    Items = orderItems,
-                    SqlId = null
+                    CreatedAt         = DateTime.UtcNow,
+                    Items             = orderItems,
+                    SqlId             = null
                 };
 
                 await _mongoOrderRepository.AddAsync(mongoOrder);
@@ -177,7 +184,7 @@ namespace ECommerceAPI.Application.Services
                 Console.WriteLine($"📉 Deducting stock from MongoDB products...");
                 foreach (var cartItem in cart.Items)
                 {
-                    var product = await _mongoProductRepository.GetByIdAsync(cartItem.ProductId);
+                    var product  = await _mongoProductRepository.GetByIdAsync(cartItem.ProductId);
                     var oldStock = product.StockQuantity;
                     product.StockQuantity -= cartItem.Quantity;
                     await _mongoProductRepository.UpdateAsync(product.Id.ToString(), product);
@@ -193,9 +200,29 @@ namespace ECommerceAPI.Application.Services
                     Console.WriteLine($"✅ Cart cleared");
                 }
 
-                // 🔟 Return DTO
+                // 🔟 Build DTO
                 var orderDto = MapMongoToDto(mongoOrder);
                 Console.WriteLine($"✅ Order creation completed successfully!");
+
+                // 📧 Send confirmation email (awaited — errors surface in terminal, never block order)
+                Console.WriteLine($"📧 Sending order confirmation email to: {user.Email}");
+                try
+                {
+                    var emailSent = await _orderEmailService.SendOrderConfirmationAsync(
+                        user.Email,
+                        user.FullName ?? "Valued Customer",
+                        orderDto);
+
+                    Console.WriteLine(emailSent
+                        ? $"✅ Confirmation email sent to {user.Email}"
+                        : $"⚠️ Confirmation email returned false for {user.Email}");
+                }
+                catch (Exception emailEx)
+                {
+                    Console.WriteLine($"⚠️ Confirmation email failed (order still created): {emailEx.Message}");
+                    Console.WriteLine($"   Stack: {emailEx.StackTrace}");
+                }
+
                 return orderDto;
             }
             catch (Exception ex)
@@ -207,14 +234,17 @@ namespace ECommerceAPI.Application.Services
 
         public async Task<OrderDto> CreateOrderAsync(int sqlUserId, CreateOrderDto createDto)
         {
-            throw new NotSupportedException(
-                "SQL-based order creation is not supported in pure MongoDB mode.");
+            throw new NotSupportedException("SQL-based order creation is not supported in pure MongoDB mode.");
         }
+
+        // ─────────────────────────────────────────────────────────────────────
+        // GET ORDERS
+        // ─────────────────────────────────────────────────────────────────────
 
         public async Task<IEnumerable<OrderDto>> GetUserOrdersAsync(string mongoUserId)
         {
             Console.WriteLine($"📜 Getting orders for MongoDB user: {mongoUserId}");
-            
+
             if (!ObjectId.TryParse(mongoUserId, out _))
             {
                 Console.WriteLine($"❌ Invalid MongoDB User ID: {mongoUserId}");
@@ -223,14 +253,12 @@ namespace ECommerceAPI.Application.Services
 
             var orders = await _mongoOrderRepository.GetByUserIdAsync(mongoUserId);
             Console.WriteLine($"✅ Found {orders.Count()} orders");
-            
             return orders.Select(MapMongoToDto);
         }
 
         public async Task<IEnumerable<OrderDto>> GetUserOrdersAsync(int sqlUserId)
         {
-            throw new NotSupportedException(
-                "SQL-based order retrieval is not supported in pure MongoDB mode.");
+            throw new NotSupportedException("SQL-based order retrieval is not supported in pure MongoDB mode.");
         }
 
         public async Task<OrderDto> GetOrderByMongoIdAsync(string mongoId, string mongoUserId)
@@ -253,8 +281,7 @@ namespace ECommerceAPI.Application.Services
 
         public async Task<OrderDto> GetOrderByMongoIdAsync(string mongoId, int sqlUserId)
         {
-            throw new NotSupportedException(
-                "SQL-based order retrieval is not supported in pure MongoDB mode.");
+            throw new NotSupportedException("SQL-based order retrieval is not supported in pure MongoDB mode.");
         }
 
         public async Task<OrderDto> GetOrderByOrderNumberAsync(string orderNumber, string mongoUserId)
@@ -277,9 +304,12 @@ namespace ECommerceAPI.Application.Services
 
         public async Task<OrderDto> GetOrderByOrderNumberAsync(string orderNumber, int sqlUserId)
         {
-            throw new NotSupportedException(
-                "SQL-based order retrieval is not supported in pure MongoDB mode.");
+            throw new NotSupportedException("SQL-based order retrieval is not supported in pure MongoDB mode.");
         }
+
+        // ─────────────────────────────────────────────────────────────────────
+        // CANCEL ORDER
+        // ─────────────────────────────────────────────────────────────────────
 
         public async Task CancelOrderAsync(string mongoId, string mongoUserId)
         {
@@ -320,13 +350,11 @@ namespace ECommerceAPI.Application.Services
                     order.Status != OrderStatus.Confirmed.ToString())
                 {
                     Console.WriteLine($"❌ Cannot cancel order in {order.Status} status");
-                    throw new InvalidOperationException(
-                        $"Cannot cancel order in {order.Status} status.");
+                    throw new InvalidOperationException($"Cannot cancel order in {order.Status} status.");
                 }
 
-                order.Status = OrderStatus.Cancelled.ToString();
+                order.Status    = OrderStatus.Cancelled.ToString();
                 order.UpdatedAt = DateTime.UtcNow;
-                
                 await _mongoOrderRepository.UpdateAsync(order);
                 Console.WriteLine($"✅ Order status updated to Cancelled");
 
@@ -336,7 +364,6 @@ namespace ECommerceAPI.Application.Services
                     foreach (var item in order.Items)
                     {
                         if (string.IsNullOrEmpty(item.ProductId)) continue;
-
                         try
                         {
                             var product = await _mongoProductRepository.GetByIdAsync(item.ProductId);
@@ -353,6 +380,29 @@ namespace ECommerceAPI.Application.Services
                     }
                 }
 
+                // 📧 Send cancellation email
+                Console.WriteLine($"📧 Sending cancellation email...");
+                try
+                {
+                    var cancelUser = await _mongoUserRepository.GetByIdAsync(order.UserId);
+                    if (cancelUser != null && !string.IsNullOrWhiteSpace(cancelUser.Email))
+                    {
+                        var cancelDto = MapMongoToDto(order);
+                        var emailSent = await _orderEmailService.SendOrderCancellationAsync(
+                            cancelUser.Email,
+                            cancelUser.FullName ?? "Valued Customer",
+                            cancelDto);
+
+                        Console.WriteLine(emailSent
+                            ? $"✅ Cancellation email sent to {cancelUser.Email}"
+                            : $"⚠️ Cancellation email returned false for {cancelUser.Email}");
+                    }
+                }
+                catch (Exception emailEx)
+                {
+                    Console.WriteLine($"⚠️ Cancellation email failed (order still cancelled): {emailEx.Message}");
+                }
+
                 Console.WriteLine($"✅ ORDER CANCELLATION COMPLETED");
             }
             catch (Exception ex)
@@ -364,9 +414,12 @@ namespace ECommerceAPI.Application.Services
 
         public async Task CancelOrderAsync(string mongoId, int sqlUserId)
         {
-            throw new NotSupportedException(
-                "SQL-based order cancellation is not supported in pure MongoDB mode.");
+            throw new NotSupportedException("SQL-based order cancellation is not supported in pure MongoDB mode.");
         }
+
+        // ─────────────────────────────────────────────────────────────────────
+        // ADMIN
+        // ─────────────────────────────────────────────────────────────────────
 
         public async Task<IEnumerable<OrderDto>> GetAllOrdersAsync()
         {
@@ -376,53 +429,55 @@ namespace ECommerceAPI.Application.Services
 
         public async Task<bool> OrderExistsAsync(string mongoId)
         {
-            if (!ObjectId.TryParse(mongoId, out _))
-                return false;
-
+            if (!ObjectId.TryParse(mongoId, out _)) return false;
             return await _mongoOrderRepository.ExistsAsync(mongoId);
         }
 
-        /// <summary>
-        /// Update order status - ADMIN ONLY - FIXED VERSION
-        /// </summary>
         public async Task<bool> UpdateOrderStatusAsync(string orderId, string newStatus)
         {
             try
             {
                 _logger.LogInformation($"✏️ [MongoOrderService] Updating order {orderId} status to {newStatus}");
 
-                if (string.IsNullOrEmpty(orderId))
-                {
-                    _logger.LogWarning("⚠️ Order ID is required");
-                    return false;
-                }
+                if (string.IsNullOrEmpty(orderId)) return false;
 
                 var validStatuses = new[] { "Pending", "Processing", "Shipped", "Delivered", "Cancelled" };
-                if (!validStatuses.Contains(newStatus))
-                {
-                    _logger.LogWarning($"⚠️ Invalid status: {newStatus}");
-                    return false;
-                }
+                if (!validStatuses.Contains(newStatus)) return false;
 
                 var order = await _mongoOrderRepository.GetByIdAsync(orderId);
-                if (order == null)
-                {
-                    _logger.LogWarning($"⚠️ Order not found: {orderId}");
-                    return false;
-                }
+                if (order == null) return false;
 
-                if (order.Status == "Delivered" || order.Status == "Cancelled")
-                {
-                    _logger.LogWarning($"⚠️ Cannot change order status from {order.Status}");
-                    return false;
-                }
+                if (order.Status == "Delivered" || order.Status == "Cancelled") return false;
 
-                order.Status = newStatus;
+                var previousStatus = order.Status;
+                order.Status    = newStatus;
                 order.UpdatedAt = DateTime.UtcNow;
-
                 await _mongoOrderRepository.UpdateAsync(order);
-
                 _logger.LogInformation($"✅ Order {orderId} status updated to {newStatus}");
+
+                // 📧 Send status update email
+                try
+                {
+                    var orderUser = await _mongoUserRepository.GetByIdAsync(order.UserId);
+                    if (orderUser != null && !string.IsNullOrWhiteSpace(orderUser.Email))
+                    {
+                        var updatedDto = MapMongoToDto(order);
+                        var emailSent  = await _orderEmailService.SendOrderStatusUpdateAsync(
+                            orderUser.Email,
+                            orderUser.FullName ?? "Valued Customer",
+                            updatedDto,
+                            previousStatus);
+
+                        _logger.LogInformation(emailSent
+                            ? $"✅ Status update email sent to {orderUser.Email}"
+                            : $"⚠️ Status update email returned false for {orderUser.Email}");
+                    }
+                }
+                catch (Exception emailEx)
+                {
+                    _logger.LogWarning($"⚠️ Status update email failed (non-critical): {emailEx.Message}");
+                }
+
                 return true;
             }
             catch (Exception ex)
@@ -432,23 +487,26 @@ namespace ECommerceAPI.Application.Services
             }
         }
 
-        #region Helper Methods
+        // ─────────────────────────────────────────────────────────────────────
+        // HELPERS
+        // ─────────────────────────────────────────────────────────────────────
 
         private OrderDto MapMongoToDto(MongoOrder order)
         {
             return new OrderDto
             {
-                Id = order.Id,
+                Id          = order.Id,
+                UserId      = order.UserId,
                 OrderNumber = order.OrderNumber,
                 TotalAmount = order.TotalAmount,
-                Status = order.Status,
-                CreatedAt = order.CreatedAt,
-                Items = order.Items?.Select(item => new OrderItemDto
+                Status      = order.Status,
+                CreatedAt   = order.CreatedAt,
+                Items       = order.Items?.Select(item => new OrderItemDto
                 {
-                    ProductId = item.ProductId,
+                    ProductId   = item.ProductId,
                     ProductName = item.ProductName,
-                    Quantity = item.Quantity,
-                    Price = item.Price
+                    Quantity    = item.Quantity,
+                    Price       = item.Price
                 }).ToList() ?? new List<OrderItemDto>()
             };
         }
@@ -457,7 +515,5 @@ namespace ECommerceAPI.Application.Services
         {
             return $"ORD-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString().Substring(0, 8).ToUpper()}";
         }
-
-        #endregion
     }
 }
