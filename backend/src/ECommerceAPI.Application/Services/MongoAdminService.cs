@@ -22,18 +22,21 @@ namespace ECommerceAPI.Application.Services
         private readonly IMongoUserRepository _userRepository;
         private readonly IMongoOrderRepository _orderRepository;
         private readonly IProductMongoRepository _productRepository;
+        private readonly IAddressMongoRepository _addressRepository;
         private readonly ILogger<MongoAdminService> _logger;
 
         public MongoAdminService(
             IMongoUserRepository userRepository,
             IMongoOrderRepository orderRepository,
             IProductMongoRepository productRepository,
+            IAddressMongoRepository addressRepository,              // ← ADD THIS
             ILogger<MongoAdminService> logger)
         {
-            _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
-            _orderRepository = orderRepository ?? throw new ArgumentNullException(nameof(orderRepository));
+            _userRepository    = userRepository    ?? throw new ArgumentNullException(nameof(userRepository));
+            _orderRepository   = orderRepository   ?? throw new ArgumentNullException(nameof(orderRepository));
             _productRepository = productRepository ?? throw new ArgumentNullException(nameof(productRepository));
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _addressRepository = addressRepository ?? throw new ArgumentNullException(nameof(addressRepository)); // ← ADD
+            _logger            = logger            ?? throw new ArgumentNullException(nameof(logger));
         }
 
         #region User Management
@@ -115,16 +118,56 @@ namespace ECommerceAPI.Application.Services
             try
             {
                 _logger.LogInformation("📦 [MongoAdminService] Fetching all orders from MongoDB");
-                
+
                 var orders = await _orderRepository.GetAllAsync();
-                
+
                 if (orders == null || !orders.Any())
                 {
                     _logger.LogWarning("⚠️ No orders found in MongoDB");
                     return new List<OrderDto>();
                 }
 
-                var orderDtos = orders.Select(MapOrderToDto).ToList();
+                // ── User lookup map ──────────────────────────────────────────────────
+                var userIds = orders
+                    .Select(o => o.UserId)
+                    .Where(id => !string.IsNullOrEmpty(id))
+                    .Distinct();
+
+                var userMap = new Dictionary<string, MongoUser>();
+                foreach (var uid in userIds)
+                {
+                    try
+                    {
+                        var u = await _userRepository.GetByIdAsync(uid);
+                        if (u != null) userMap[uid] = u;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, $"Could not load user {uid} for order mapping");
+                    }
+                }
+
+                // ── Address lookup map ───────────────────────────────────────────────
+                var addressIds = orders
+                    .Select(o => o.ShippingAddressId)
+                    .Where(id => !string.IsNullOrEmpty(id))
+                    .Distinct();
+
+                var addressMap = new Dictionary<string, AddressMongo>();
+                foreach (var aid in addressIds)
+                {
+                    try
+                    {
+                        var a = await _addressRepository.GetByIdAsync(aid);
+                        if (a != null) addressMap[aid] = a;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, $"Could not load address {aid} for order mapping");
+                    }
+                }
+
+                var orderDtos = orders.Select(o => MapOrderToDto(o, userMap, addressMap)).ToList();
 
                 _logger.LogInformation($"✅ Retrieved {orderDtos.Count} orders from MongoDB");
                 return orderDtos;
@@ -688,24 +731,57 @@ namespace ECommerceAPI.Application.Services
 
         #region Helper Methods
 
-        private OrderDto MapOrderToDto(MongoOrder order)
+    private OrderDto MapOrderToDto(
+        MongoOrder order,
+        Dictionary<string, MongoUser> userMap = null,
+        Dictionary<string, AddressMongo> addressMap = null)
+    {
+        // Resolve user
+        MongoUser user = null;
+        userMap?.TryGetValue(order.UserId ?? "", out user);
+
+        // Resolve shipping address — entity is AddressMongo, fields match exactly
+        AddressMongo addr = null;
+        addressMap?.TryGetValue(order.ShippingAddressId ?? "", out addr);
+
+        ShippingAddressDto shippingDto = addr != null ? new ShippingAddressDto
         {
-            return new OrderDto
+            AddressLine1 = addr.AddressLine1 ?? "",
+            AddressLine2 = addr.AddressLine2 ?? "",
+            City         = addr.City         ?? "",
+            State        = addr.State        ?? "",
+            PostalCode   = addr.PostalCode   ?? "",
+            Country      = addr.Country      ?? ""
+        } : null;
+
+        return new OrderDto
+        {
+            Id            = order.Id,
+            UserId        = order.UserId,
+            OrderNumber   = order.OrderNumber ?? "N/A",
+            Status        = order.Status      ?? "Unknown",
+            TotalAmount   = order.TotalAmount,
+            CreatedAt     = order.CreatedAt,
+            PaymentMethod = "N/A",  // MongoOrder has no PaymentMethod field — omit or extend later
+
+            // ✅ Customer info from user lookup
+            CustomerName  = user?.FullName ?? "Unknown Customer",
+            CustomerEmail = user?.Email    ?? "N/A",
+            CustomerPhone = user?.Mobile   ?? "N/A",
+
+            // ✅ Shipping address from address lookup
+            ShippingAddress = shippingDto,
+
+            Items = (order.Items ?? new List<MongoOrderItem>()).Select(i => new OrderItemDto
             {
-                Id = order.Id, // MongoDB ObjectId as string
-                OrderNumber = order.OrderNumber ?? "N/A",
-                Status = order.Status ?? "Unknown",
-                TotalAmount = order.TotalAmount,
-                CreatedAt = order.CreatedAt,
-                Items = (order.Items ?? new List<MongoOrderItem>()).Select(i => new OrderItemDto
-                {
-                    ProductId = i.ProductId ?? "",
-                    ProductName = i.ProductName ?? "Unknown Product",
-                    Price = i.Price,
-                    Quantity = i.Quantity
-                }).ToList()
-            };
-        }
+                ProductId   = i.ProductId   ?? "",
+                ProductName = i.ProductName ?? "Unknown Product",
+                Price       = i.Price,
+                Quantity    = i.Quantity
+            }).ToList()
+        };
+    }
+
 
         #endregion
     }

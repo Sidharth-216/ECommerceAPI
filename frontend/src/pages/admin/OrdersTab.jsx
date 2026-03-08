@@ -44,21 +44,52 @@ const OrdersTab = () => {
       const orders = response.data || [];
       
       console.log('📦 Fetched orders:', orders);
+      // 🔍 Log first order raw so we can see the exact shape
+      if (orders.length > 0) {
+        console.log('📦 First order raw shape:', JSON.stringify(orders[0], null, 2));
+      }
       
       // Normalize order data
-      const normalizedOrders = orders.map(order => ({
-        id: order._id || order.id,
-        orderNumber: order.orderNumber || `ORD-${(order._id || order.id || '').slice(-8)}`,
-        customerName: order.customerName || 'Unknown Customer',
-        customerEmail: order.customer?.email || order.customerEmail || 'N/A',
-        customerPhone: order.customer?.phone || order.customerPhone || 'N/A',
-        totalAmount: order.totalAmount || order.amount || 0,
-        status: order.status || 'Pending',
-        orderDate: order.orderDate || order.createdAt || new Date().toISOString(),
-        items: order.items || [],
-        shippingAddress: order.shippingAddress || null,
-        paymentMethod: order.paymentMethod || 'COD'
-      }));
+      // Customer info can live at multiple levels depending on how the backend
+      // populates the order document. Check every known location in priority order.
+      const normalizedOrders = orders.map(order => {
+        const customer = order.customer || order.user || order.userId || {};
+
+        const customerName =
+          order.customerName ||
+          customer.fullName  ||
+          customer.name      ||
+          (customer.firstName
+            ? `${customer.firstName} ${customer.lastName || ''}`.trim()
+            : null) ||
+          'Unknown Customer';
+
+        const customerEmail =
+          order.customerEmail ||
+          customer.email      ||
+          'N/A';
+
+        const customerPhone =
+          order.customerPhone    ||
+          customer.phone         ||
+          customer.mobile        ||
+          customer.phoneNumber   ||
+          'N/A';
+
+        return {
+          id: order._id || order.id,
+          orderNumber: order.orderNumber || `ORD-${(order._id || order.id || '').slice(-8)}`,
+          customerName,
+          customerEmail,
+          customerPhone,
+          totalAmount: order.totalAmount || order.amount || 0,
+          status: order.status || 'Pending',
+          orderDate: order.orderDate || order.createdAt || new Date().toISOString(),
+          items: order.items || [],
+          shippingAddress: order.shippingAddress || null,
+          paymentMethod: order.paymentMethod || 'COD'
+        };
+      });
       
       setAllOrders(normalizedOrders);
       setFilteredOrders(normalizedOrders);
@@ -150,13 +181,14 @@ const OrdersTab = () => {
   const exportOrders = () => {
     try {
       const csv = [
-        ['Order ID', 'Order Number', 'Date', 'Customer', 'Email', 'Amount', 'Status', 'Items'],
+        ['Order ID', 'Order Number', 'Date', 'Customer', 'Email', 'Phone', 'Amount', 'Status', 'Items'],
         ...filteredOrders.map(o => [
           o.id,
           o.orderNumber,
           new Date(o.orderDate).toLocaleDateString(),
           o.customerName,
           o.customerEmail,
+          o.customerPhone,
           `₹${o.totalAmount.toLocaleString()}`,
           o.status,
           o.items.length
@@ -406,6 +438,7 @@ const OrdersTab = () => {
                       <div>
                         <p className="text-sm font-semibold text-slate-900">{order.customerName}</p>
                         <p className="text-xs text-slate-500">{order.customerEmail}</p>
+                        <p className="text-xs text-slate-400">{order.customerPhone}</p>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-center">
