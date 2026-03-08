@@ -77,7 +77,7 @@ namespace ECommerceAPI.API
             services.AddScoped<ICartMongoRepository,      CartMongoRepository>();
             services.AddScoped<IMongoOrderRepository,     MongoOrderRepository>();
             services.AddScoped<IAddressMongoRepository,   AddressMongoRepository>();
-
+            services.AddScoped<IQRPaymentRepository,      QRPaymentRepository>();
             // ── Services ──────────────────────────────────────────────────────
             services.AddScoped<MongoAuthService>();
             services.AddScoped<IMongoOtpService,          MongoOtpService>();
@@ -88,7 +88,7 @@ namespace ECommerceAPI.API
             services.AddScoped<IMongoOrderService,        MongoOrderService>();
             services.AddScoped<IMongoAdminService,        MongoAdminService>();
             services.AddScoped<IMongoOrderEmailService,   MongoOrderEmailService>(); // ← ADDED
-
+            services.AddScoped<IQRPaymentService,         QRPaymentService>();
             services.AddHttpClient<ISemanticSearchService, SemanticSearchService>(client => {
                 client.Timeout = TimeSpan.FromSeconds(30);
             });
@@ -107,11 +107,63 @@ namespace ECommerceAPI.API
 
             app.UseMiddleware<ErrorHandlerMiddleware>();
             app.UseHttpsRedirection();
+            app.UseStaticFiles();
             app.UseRouting();
             app.UseCors("AllowAll");
             app.UseAuthentication();
             app.UseAuthorization();
             app.UseEndpoints(endpoints => { endpoints.MapControllers(); });
         }
+
+        // ─────────────────────────────────────────────────────────────────────────────
+        // Optional: Background hosted service (paste into a new file if you want it)
+        // ─────────────────────────────────────────────────────────────────────────────
+
+        /*
+        using Microsoft.Extensions.DependencyInjection;
+        using Microsoft.Extensions.Hosting;
+        using Microsoft.Extensions.Logging;
+        using System;
+        using System.Threading;
+        using System.Threading.Tasks;
+        using ECommerceAPI.Application.Interfaces;
+
+        public class QRPaymentExpiryJob : BackgroundService
+        {
+            private readonly IServiceScopeFactory _scopeFactory;
+            private readonly ILogger<QRPaymentExpiryJob> _logger;
+            private static readonly TimeSpan _interval = TimeSpan.FromMinutes(5);
+
+            public QRPaymentExpiryJob(IServiceScopeFactory scopeFactory, ILogger<QRPaymentExpiryJob> logger)
+            {
+                _scopeFactory = scopeFactory;
+                _logger = logger;
+            }
+
+            protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+            {
+                _logger.LogInformation("⏰ QRPaymentExpiryJob started.");
+
+                while (!stoppingToken.IsCancellationRequested)
+                {
+                    try
+                    {
+                        using var scope = _scopeFactory.CreateScope();
+                        var svc = scope.ServiceProvider.GetRequiredService<IQRPaymentService>();
+                        var expired = await svc.MarkExpiredSessionsAsync();
+                        if (expired > 0)
+                            _logger.LogInformation("⏰ Expired {Count} QR sessions.", expired);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "❌ QRPaymentExpiryJob error");
+                    }
+
+                    await Task.Delay(_interval, stoppingToken);
+                }
+            }
+        }
+        */
+
     }
 }

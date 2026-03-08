@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { ShoppingBag, LogOut, Package, BarChart3, Users, ShoppingCart, TrendingUp, FileText, Menu, X, Bell, Search, Calendar, DollarSign, ArrowUp, ArrowDown, Activity } from 'lucide-react';
+import { ShoppingBag, LogOut, Package, BarChart3, Users, ShoppingCart, TrendingUp, FileText, Menu, X, Bell, Search, QrCode } from 'lucide-react';
 import OverviewTab from './OverviewTab';
 import CustomersTab from './CustomersTab';
 import ProductsTab from './ProductsTab';
 import OrdersTab from './OrdersTab';
 import StockAnalysisTab from './StockAnalysisTab';
 import SalesReportTab from './SalesReportTab';
+import AdminQRPaymentsTab from './Adminqrpaymentstab';
 
 const AdminDashboard = (props) => {
   const { user, handleLogout, setCurrentPage } = props;
@@ -13,19 +14,39 @@ const AdminDashboard = (props) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const tabs = [
-    { id: 'overview', label: 'Overview', icon: BarChart3, color: 'teal' },
-    { id: 'customers', label: 'Customers', icon: Users, color: 'purple' },
-    { id: 'orders', label: 'Orders', icon: ShoppingCart, color: 'coral' },
-    { id: 'products', label: 'Products', icon: Package, color: 'emerald' },
+    { id: 'overview',       label: 'Overview',       icon: BarChart3,  color: 'teal' },
+    { id: 'customers',      label: 'Customers',      icon: Users,      color: 'purple' },
+    { id: 'orders',         label: 'Orders',         icon: ShoppingCart, color: 'coral' },
+    { id: 'products',       label: 'Products',       icon: Package,    color: 'emerald' },
     { id: 'stock-analysis', label: 'Stock Analysis', icon: TrendingUp, color: 'amber' },
-    { id: 'sales-report', label: 'Sales Report', icon: FileText, color: 'blue' }
+    { id: 'sales-report',   label: 'Sales Report',   icon: FileText,   color: 'blue' },
+    { id: 'qr-payments',    label: 'QR Payments',    icon: QrCode,     color: 'violet' },
   ];
-    const getTabColorClasses = (tab, isActive) => {
+
+  const getTabColorClasses = (tab, isActive) => {
+    if (tab.id === 'qr-payments') {
       return isActive
-        ? 'bg-teal-500 text-white'
-        : 'text-slate-700 hover:bg-teal-50';
-    };
-    
+        ? 'bg-violet-600 text-white'
+        : 'text-slate-700 hover:bg-violet-50 hover:text-violet-700';
+    }
+    return isActive
+      ? 'bg-teal-500 text-white'
+      : 'text-slate-700 hover:bg-teal-50';
+  };
+
+  const getSubtitle = () => {
+    switch (activeTab) {
+      case 'overview':       return 'Your business metrics at a glance';
+      case 'customers':      return 'Manage and view customer information';
+      case 'orders':         return 'Track and manage all orders';
+      case 'products':       return 'Manage your product inventory';
+      case 'stock-analysis': return 'Monitor stock levels and trends';
+      case 'sales-report':   return 'Analyze sales performance';
+      case 'qr-payments':    return 'Verify and confirm QR / UPI payments';
+      default:               return '';
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 flex">
       {/* Sidebar */}
@@ -62,11 +83,22 @@ const AdminDashboard = (props) => {
                 title={!sidebarOpen ? tab.label : ''}
               >
                 <Icon className="w-5 h-5 flex-shrink-0" />
-                {sidebarOpen && <span className="text-sm">{tab.label}</span>}
+                {sidebarOpen && (
+                  <span className="text-sm flex items-center gap-2">
+                    {tab.label}
+                    {/* Badge on QR Payments to draw attention */}
+                    {tab.id === 'qr-payments' && (
+                      <span className="ml-auto text-[10px] font-black uppercase px-1.5 py-0.5 bg-violet-100 text-violet-700 rounded-md">
+                        New
+                      </span>
+                    )}
+                  </span>
+                )}
               </button>
             );
           })}
         </nav>
+
         {/* Logout Button */}
         <div className="p-4 border-t border-slate-200">
           <button
@@ -81,6 +113,7 @@ const AdminDashboard = (props) => {
             {sidebarOpen && <span className="text-sm">Logout</span>}
           </button>
         </div>
+
         {/* Sidebar Toggle */}
         <div className="p-4 border-t border-slate-200">
           <button
@@ -103,14 +136,7 @@ const AdminDashboard = (props) => {
               <h2 className="text-2xl font-bold text-slate-900">
                 {tabs.find(t => t.id === activeTab)?.label || 'Dashboard'}
               </h2>
-              <p className="text-sm text-slate-500 mt-1">
-                {activeTab === 'overview' && 'Your business metrics at a glance'}
-                {activeTab === 'customers' && 'Manage and view customer information'}
-                {activeTab === 'orders' && 'Track and manage all orders'}
-                {activeTab === 'products' && 'Manage your product inventory'}
-                {activeTab === 'stock-analysis' && 'Monitor stock levels and trends'}
-                {activeTab === 'sales-report' && 'Analyze sales performance'}
-              </p>
+              <p className="text-sm text-slate-500 mt-1">{getSubtitle()}</p>
             </div>
 
             {/* Right Side Actions */}
@@ -128,7 +154,7 @@ const AdminDashboard = (props) => {
               {/* Notifications */}
               <button className="relative p-2 hover:bg-slate-100 rounded-lg transition-all">
                 <Bell className="w-5 h-5 text-slate-600" />
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-coral-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
                   7
                 </span>
               </button>
@@ -156,7 +182,7 @@ const AdminDashboard = (props) => {
               {/* Logout */}
               <button
                 onClick={handleLogout}
-                className="flex items-center gap-2 bg-gradient-to-r from-coral-500 to-orange-500 hover:from-coral-600 hover:to-orange-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition-all"
+                className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition-all"
               >
                 <LogOut className="w-4 h-4" />
                 <span className="hidden sm:inline">Logout</span>
@@ -167,12 +193,13 @@ const AdminDashboard = (props) => {
 
         {/* Tab Content */}
         <main className="p-8">
-          {activeTab === 'overview' && <OverviewTab {...props} />}
-          {activeTab === 'customers' && <CustomersTab {...props} />}
-          {activeTab === 'orders' && <OrdersTab {...props} />}
-          {activeTab === 'products' && <ProductsTab {...props} />}
-          {activeTab === 'stock-analysis' && <StockAnalysisTab {...props} />}
-          {activeTab === 'sales-report' && <SalesReportTab {...props} />}
+          {activeTab === 'overview'       && <OverviewTab        {...props} />}
+          {activeTab === 'customers'      && <CustomersTab       {...props} />}
+          {activeTab === 'orders'         && <OrdersTab          {...props} />}
+          {activeTab === 'products'       && <ProductsTab        {...props} />}
+          {activeTab === 'stock-analysis' && <StockAnalysisTab   {...props} />}
+          {activeTab === 'sales-report'   && <SalesReportTab     {...props} />}
+          {activeTab === 'qr-payments'    && <AdminQRPaymentsTab {...props} />}
         </main>
       </div>
     </div>

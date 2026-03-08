@@ -1,0 +1,45 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# .dockerignore — place at backend/.dockerignore
+# Prevents unnecessary files from being copied into the Docker image
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Build output — always excluded (rebuilt inside Docker)
+**/bin/
+**/obj/
+
+# Local secrets — NEVER include in Docker image
+# These values are set as environment variables on Railway/Render
+**/appsettings.Development.json
+**/.env
+**/*.user
+**/*.pfx
+**/*.p12
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# IDE
+.vs/
+.vscode/
+*.suo
+*.user
+.idea/
+
+# Docker files themselves
+Dockerfile
+.dockerignore
+
+# Logs
+*.log
+logs/
+
+# Test projects (not needed in production image)
+**/tests/
+**/*.Tests/
+**/*.Test/
+
+# Node (if frontend lives in same repo)
+**/node_modules/
+**/frontend/

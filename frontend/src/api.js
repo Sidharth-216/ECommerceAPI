@@ -315,6 +315,84 @@ export const ordersAPI = {
   }
 };
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Add this block to your existing api.js file (after the ordersAPI section)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ===================== QR PAYMENT API =====================
+export const qrPaymentAPI = {
+  /**
+   * Initiate a QR payment session for a given order.
+   * POST /api/mongo/qr-payment/initiate
+   * @param {string} orderId - MongoDB ObjectId of the order
+   * @returns {Promise} QRPaymentResponseDto
+   */
+  initiate: (orderId) => {
+    if (!orderId) return Promise.reject(new Error('Order ID is required'));
+    console.log('💳 QR Payment API - Initiate:', orderId);
+    return api.post('/mongo/qr-payment/initiate', { orderId });
+  },
+
+  /**
+   * Poll the status of a QR session for an order.
+   * GET /api/mongo/qr-payment/status/{orderId}
+   */
+  getStatus: (orderId) => {
+    if (!orderId) return Promise.reject(new Error('Order ID is required'));
+    return api.get(`/mongo/qr-payment/status/${orderId}`);
+  },
+
+  /**
+   * Customer marks they have completed the UPI transfer.
+   * POST /api/mongo/qr-payment/{paymentId}/mark-received
+   * @param {string} paymentId - QR Payment session ObjectId
+   * @param {string} [utr]     - Optional UTR / transaction reference
+   */
+  markReceived: (paymentId, utr = '') => {
+    if (!paymentId) return Promise.reject(new Error('Payment ID is required'));
+    console.log('📲 QR Payment API - Mark Received:', { paymentId, utr });
+    return api.post(`/mongo/qr-payment/${paymentId}/mark-received`, { utr });
+  },
+
+  // ── Admin ────────────────────────────────────────────────────────────────
+
+  /**
+   * Admin: get all sessions awaiting confirmation.
+   * GET /api/mongo/qr-payment/admin/pending
+   */
+  adminGetPending: () => {
+    console.log('🔔 QR Payment API - Admin Get Pending');
+    return api.get('/mongo/qr-payment/admin/pending');
+  },
+
+  /**
+   * Admin: get full QR payment history.
+   * GET /api/mongo/qr-payment/admin/all
+   */
+  adminGetAll: () => api.get('/mongo/qr-payment/admin/all'),
+
+  /**
+   * Admin: confirm a payment → order moves to Pending.
+   * POST /api/mongo/qr-payment/admin/{paymentId}/confirm
+   */
+  adminConfirm: (paymentId, note = '') => {
+    if (!paymentId) return Promise.reject(new Error('Payment ID is required'));
+    console.log('✅ QR Payment API - Admin Confirm:', paymentId);
+    return api.post(`/mongo/qr-payment/admin/${paymentId}/confirm`, { confirm: true, note });
+  },
+
+  /**
+   * Admin: reject a payment session.
+   * POST /api/mongo/qr-payment/admin/{paymentId}/reject
+   */
+  adminReject: (paymentId, note = '') => {
+    if (!paymentId) return Promise.reject(new Error('Payment ID is required'));
+    console.log('❌ QR Payment API - Admin Reject:', paymentId);
+    return api.post(`/mongo/qr-payment/admin/${paymentId}/reject`, { confirm: false, note });
+  },
+};
+
 // ===================== RECOMMENDATIONS API (MONGODB) =====================
 export const recommendationsAPI = {
   getForUser: (userId) => {
