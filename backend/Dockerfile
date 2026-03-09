@@ -4,17 +4,6 @@
 # FILE LOCATION: backend/Dockerfile
 # (same folder as ECommerceAPI.sln)
 #
-# Project structure this is built for:
-#   backend/
-#   ├── ECommerceAPI.sln          ← solution file
-#   ├── Dockerfile                ← this file
-#   ├── .dockerignore
-#   └── src/
-#       ├── ECommerceAPI.API/
-#       ├── ECommerceAPI.Application/
-#       ├── ECommerceAPI.Domain/
-#       └── ECommerceAPI.Infrastructure/
-#
 # NOTE: appsettings.json is in .gitignore and NOT pushed to GitHub.
 #       A minimal empty appsettings.json is created inline during build
 #       so compilation succeeds. All real values are injected at runtime
@@ -42,39 +31,75 @@ RUN dotnet restore ECommerceAPI.sln
 COPY . .
 
 # appsettings.json is in .gitignore so it is never pushed to GitHub.
-# Create a minimal one here so dotnet publish does not fail.
-# All empty values below are overridden at runtime by Render environment variables.
+# Create a minimal one here with correct key names so dotnet publish succeeds.
+# All empty values are overridden at runtime by Render environment variables.
 RUN printf '{\n\
+  "ConnectionStrings": {\n\
+    "DefaultConnection": ""\n\
+  },\n\
+  "Jwt": {\n\
+    "SecretKey": "",\n\
+    "Issuer": "ECommerceAPI",\n\
+    "Audience": "ECommerceClient",\n\
+    "ExpiryInMinutes": 60\n\
+  },\n\
+  "AIService": {\n\
+    "BaseUrl": "https://sidharth-216-ai-agent.hf.space"\n\
+  },\n\
+  "AIAgent": {\n\
+    "ServiceUrl": "https://sidharth-216-ai-agent.hf.space",\n\
+    "ApiKey": "agent-secret-key-12345"\n\
+  },\n\
   "Logging": {\n\
     "LogLevel": {\n\
       "Default": "Information",\n\
-      "Microsoft.AspNetCore": "Warning"\n\
+      "Microsoft": "Warning",\n\
+      "Microsoft.Hosting.Lifetime": "Information"\n\
     }\n\
   },\n\
-  "AllowedHosts": "*",\n\
-  "MongoDbSettings": {\n\
-    "ConnectionString": "",\n\
-    "DatabaseName": ""\n\
+  "Razorpay": {\n\
+    "KeyId": "",\n\
+    "KeySecret": "",\n\
+    "WebhookSecret": ""\n\
   },\n\
-  "JwtSettings": {\n\
-    "SecretKey": "",\n\
-    "Issuer": "ShopAI",\n\
-    "Audience": "ShopAI",\n\
-    "ExpiryMinutes": 60\n\
+  "Payment": {\n\
+    "CallbackUrl": "",\n\
+    "Currency": "INR"\n\
   },\n\
-  "AIService": {\n\
-    "BaseUrl": ""\n\
-  },\n\
-  "AIAgent": {\n\
-    "ServiceUrl": "",\n\
-    "ApiKey": ""\n\
+  "OtpSettings": {\n\
+    "Length": 6,\n\
+    "ValidityMinutes": 5,\n\
+    "MaxAttempts": 3,\n\
+    "SmsGateway": "Twilio",\n\
+    "TwilioAccountSid": "",\n\
+    "TwilioAuthToken": "",\n\
+    "TwilioPhoneNumber": ""\n\
   },\n\
   "EmailSettings": {\n\
-    "SmtpHost": "",\n\
-    "SmtpPort": 587,\n\
-    "SenderEmail": "",\n\
-    "SenderPassword": ""\n\
-  }\n\
+    "SmtpHost": "smtp.gmail.com",\n\
+    "SmtpPort": "587",\n\
+    "SmtpUsername": "",\n\
+    "SmtpPassword": "",\n\
+    "FromEmail": "",\n\
+    "FromName": "ShopAI",\n\
+    "EnableSsl": "true"\n\
+  },\n\
+  "MongoDbSettings": {\n\
+    "ConnectionString": "",\n\
+    "DatabaseName": "ECommerceDB",\n\
+    "ProductsCollectionName": "products",\n\
+    "CartsCollectionName": "carts"\n\
+  },\n\
+  "FeatureFlags": {\n\
+    "UseMongoForProducts": true,\n\
+    "DualWriteProducts": true,\n\
+    "UseMongoForCarts": true,\n\
+    "DualWriteCarts": false,\n\
+    "UseMongoForAddresses": true,\n\
+    "UseMongoForOrders": false,\n\
+    "UseMongoForOTPs": true\n\
+  },\n\
+  "AllowedHosts": "*"\n\
 }\n' > src/ECommerceAPI.API/appsettings.json
 
 # Publish the API project in Release mode
