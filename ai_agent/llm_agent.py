@@ -1,18 +1,15 @@
 """
-llm_agent.py  (v3 — LLM-Ready Edition)
-=======================================
+llm_agent.py  (v4 — Groq Edition)
+===================================
 Two clear modes:
   MODE A (current)  — rule-based extraction + template responses. Works now.
-  MODE B (future)   — swap two methods for real LLM calls. Nothing else changes.
-
-To switch to MODE B:
-  1. pip install ollama   (or openai / anthropic / mistralai)
-  2. Set LLM_PROVIDER in .env  ("ollama" | "openai" | "anthropic")
-  3. Set LLM_MODEL in .env     (e.g. "mistral" | "gpt-4o-mini" | "claude-haiku-4-5-20251001")
-  4. The two methods marked  ← SWAP THIS  are the only ones you replace.
-
-All API interaction, orchestration, and response shaping live in other files
-and are completely untouched by the LLM upgrade.
+  MODE B (active)   — real LLM calls via Groq (or openai / anthropic / ollama).
+To activate Groq (recommended):
+  1. pip install groq
+  2. Set LLM_PROVIDER=groq  in .env
+  3. Set LLM_MODEL=llama-3.1-8b-instant  in .env
+  4. Set GROQ_API_KEY=gsk_...  in .env  (free at console.groq.com)
+Other supported providers: ollama | openai | anthropic
 """
 
 import re
@@ -26,9 +23,10 @@ logger = logging.getLogger(__name__)
 # ─────────────────────────────────────────────────────────────────
 # LLM configuration (read from .env — ignored until MODE B)
 # ─────────────────────────────────────────────────────────────────
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "none")   # "none" | "ollama" | "openai" | "anthropic"
-LLM_MODEL    = os.getenv("LLM_MODEL", "mistral")
-LLM_BASE_URL = os.getenv("LLM_BASE_URL", "http://localhost:11434")
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "none")   # "none" | "groq" | "ollama" | "openai" | "anthropic"
+LLM_MODEL    = os.getenv("LLM_MODEL", "llama-3.1-8b-instant")
+LLM_BASE_URL = os.getenv("LLM_BASE_URL", "http://localhost:11434")   # Ollama only
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 
 # ─────────────────────────────────────────────────────────────────
 # Intent schema (used both for rule-based and LLM JSON output)
@@ -56,9 +54,7 @@ INTENT_SCHEMA = {
 INTENT_SYSTEM_PROMPT = f"""You are an intent extractor for a shopping assistant.
 Your job is to analyse the user's latest message and output ONLY a JSON object
 matching this schema — no prose, no markdown, no backticks:
-
 {json.dumps(INTENT_SCHEMA, indent=2)}
-
 Rules:
 - Always output valid JSON.
 - If the user asks to search or find products, use search_product.
@@ -75,7 +71,6 @@ Rules:
 # ─────────────────────────────────────────────────────────────────
 RESPONSE_SYSTEM_PROMPT = """You are ShopAI, a friendly and knowledgeable Indian e-commerce assistant.
 You help users find products, manage their cart, and place orders.
-
 Tone guidelines:
 - Warm, concise, and confident. Never robotic.
 - Use ₹ for prices. Use emojis sparingly (max 2 per response).
@@ -83,7 +78,6 @@ Tone guidelines:
 - Always end with a clear next-step question or call-to-action.
 - If an API call failed, apologise briefly and suggest an alternative.
 - Keep responses under 150 words unless comparing products.
-
 Formatting:
 - Use **bold** for product names and prices.
 - Never fabricate product details — only use what is in the API result.
@@ -96,7 +90,6 @@ class LLMAgent:
     Two responsibilities:
       1. extract_intent(message, history) → { intent, parameters }
       2. generate_response(intent_data, api_result) → str
-
     MODE A: Both methods use rules/templates (works immediately, no GPU needed).
     MODE B: Both methods call a real LLM. Switch by changing LLM_PROVIDER in .env.
     """
@@ -112,7 +105,12 @@ class LLMAgent:
         Called once at startup if LLM_PROVIDER is set.
         """
         try:
-            if LLM_PROVIDER == "ollama":
+            if LLM_PROVIDER == "groq":
+                from groq import Groq
+                self._llm = Groq(api_key=GROQ_API_KEY)
+                logger.info(f"✅ LLM initialised: Groq / {LLM_MODEL}")
+
+            elif LLM_PROVIDER == "ollama":
                 import ollama
                 self._llm = ollama
                 logger.info(f"✅ LLM initialised: Ollama / {LLM_MODEL}")
@@ -195,19 +193,21 @@ class LLMAgent:
 
     def _llm_generate_response(self, intent_data: Dict, api_result: Dict) -> str:
         """
-        ← SWAP THIS for MODE B.
-        Calls the configured LLM to generate a natural-language response.
+        Calls Groq to generate a natural-language response.
+        Data is aggressively trimmed BEFORE sending to stay under the 6k TPM limit.
         """
         intent = intent_data.get("intent", "other")
         params = intent_data.get("parameters", {})
 
-        # Build a compact context string for the LLM
+        # Trim API data to only what the LLM needs
+        trimmed_data = self._trim_for_llm(intent, api_result.get("data"))
+
         context = json.dumps({
-            "intent":     intent,
-            "parameters": params,
+            "intent":      intent,
+            "parameters":  params,
             "api_success": api_result.get("success", False),
             "api_message": api_result.get("message", ""),
-            "api_data":    api_result.get("data"),   # could be large — LLM handles it
+            "data":        trimmed_data,
         }, ensure_ascii=False, default=str)
 
         messages = [
@@ -216,20 +216,115 @@ class LLMAgent:
                 "role": "user",
                 "content": (
                     f"Intent: {intent}\n"
-                    f"Context (API result):\n{context}\n\n"
-                    "Generate the assistant reply now."
+                    f"API result:\n{context}\n\n"
+                    "Write a short, helpful reply (max 80 words)."
                 )
             }
         ]
 
-        return self._call_llm(messages, max_tokens=400, temperature=0.7)
+        return self._call_llm(messages, max_tokens=300, temperature=0.7)
+
+    def _trim_for_llm(self, intent: str, data: Any) -> Any:
+        """
+        Strips heavy fields (description, imageUrl, specifications) from API data
+        so the Groq prompt stays well under 6000 tokens.
+        """
+        if data is None:
+            return None
+
+        # Product list (search / compare)
+        if intent in ("search_product", "compare_products"):
+            items = data if isinstance(data, list) else data.get("products", [])
+            slim = []
+            for p in items[:5]:
+                slim.append({
+                    "id":            p.get("id"),
+                    "name":          p.get("name"),
+                    "brand":         p.get("brand"),
+                    "price":         p.get("price"),
+                    "rating":        p.get("rating"),
+                    "stockQuantity": p.get("stockQuantity"),
+                    "isAvailable":   p.get("isAvailable"),
+                    "category":      p.get("category"),
+                })
+            if isinstance(data, dict) and "highlights" in data:
+                return {"products": slim, "highlights": data["highlights"]}
+            return slim
+
+        # Cart
+        if intent == "view_cart":
+            if not isinstance(data, dict):
+                return data
+            items = data.get("items", [])
+            slim_items = [
+                {
+                    "productName": i.get("productName"),
+                    "quantity":    i.get("quantity"),
+                    "price":       i.get("price"),
+                    "subtotal":    i.get("subtotal"),
+                }
+                for i in items[:10]
+            ]
+            return {
+                "isEmpty":    data.get("isEmpty", not bool(items)),
+                "totalItems": data.get("totalItems", len(items)),
+                "total":      data.get("total"),
+                "items":      slim_items,
+            }
+
+        # Orders
+        if intent in ("order_history", "cancel_order", "place_order"):
+            if isinstance(data, list):
+                return [
+                    {
+                        "orderNumber": o.get("orderNumber"),
+                        "status":      o.get("status"),
+                        "totalAmount": o.get("totalAmount"),
+                        "createdAt":   o.get("createdAt"),
+                        "itemCount":   len(o.get("items", [])),
+                    }
+                    for o in data[:5]
+                ]
+            if isinstance(data, dict):
+                return {
+                    "orderNumber": data.get("orderNumber"),
+                    "status":      data.get("status"),
+                    "totalAmount": data.get("totalAmount"),
+                    "createdAt":   data.get("createdAt"),
+                }
+
+        # Context
+        if intent == "get_context":
+            if isinstance(data, dict):
+                return {
+                    "userName":   data.get("userName"),
+                    "cartEmpty":  data.get("cart", {}).get("isEmpty", True),
+                    "cartItems":  data.get("cart", {}).get("totalItems", 0),
+                    "orderCount": len(data.get("recentOrders", [])),
+                    "hasAddress": bool(data.get("defaultAddress")),
+                }
+
+        # Default: cap at 1500 chars
+        raw = json.dumps(data, default=str)
+        if len(raw) > 1500:
+            return raw[:1500] + "...[truncated]"
+        return data
 
     def _call_llm(self, messages: list, max_tokens: int = 400, temperature: float = 0.7) -> str:
         """
         Provider-agnostic LLM call.
         Returns the text content of the response.
         """
-        if LLM_PROVIDER == "ollama":
+        if LLM_PROVIDER == "groq":
+            resp = self._llm.chat.completions.create(
+                model=LLM_MODEL,
+                messages=messages,
+                max_tokens=max_tokens,
+                temperature=temperature
+            )
+            return resp.choices[0].message.content.strip()
+
+        elif LLM_PROVIDER == "ollama":
             resp = self._llm.chat(
                 model=LLM_MODEL,
                 messages=messages,

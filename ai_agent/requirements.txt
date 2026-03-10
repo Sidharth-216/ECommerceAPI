@@ -6,7 +6,7 @@ pymongo==4.7.2
 python-dotenv==1.0.1
 requests==2.32.3
 pydantic==2.7.1
-
+groq>=0.9.0
 # ── LLM providers (install only the one you need) ────────────────
 # Ollama  (local models — Mistral, LLaMA 3, Gemma, etc.)
 # pip install ollama

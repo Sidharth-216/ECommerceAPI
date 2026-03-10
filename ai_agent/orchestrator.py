@@ -2,7 +2,6 @@
 orchestrator.py  (v3)
 =====================
 Coordinates LLMAgent ↔ APIClient ↔ AIChatController (/api/ai/*).
-
 Key change from v2: jwt_token comes from ChatRequest and is forwarded
 to APIClient so every .NET call is authenticated as the correct user.
 No userId plumbing needed — the .NET controller reads the user from the JWT.
@@ -24,7 +23,6 @@ API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:5033/api")
 class ShoppingAgentOrchestrator:
     """
     Entry point for every chat message.
-
     Flow:
       1. Build APIClient with the user's JWT (from request.jwt_token)
       2. Extract intent via LLMAgent
@@ -40,6 +38,13 @@ class ShoppingAgentOrchestrator:
     async def process_message(self, request: ChatRequest) -> ChatResponse:
         # Build per-request API client with the user's token
         token      = request.jwt_token or ""
+
+        # JWT diagnostics
+        if not token:
+            logger.warning("⚠️  NO JWT TOKEN received — /api/ai/* calls will return 401")
+        else:
+            logger.info(f"🔑 JWT received: ...{token[-12:]} (last 12 chars)")
+
         api_client = APIClient(API_BASE_URL, token)
 
         # Convert Message objects to plain dicts for the LLM agent
@@ -51,6 +56,13 @@ class ShoppingAgentOrchestrator:
 
         # 2. Execute intent
         api_result = await self._execute_intent(intent_data, api_client)
+
+        # API result diagnostics
+        logger.info(
+            f"📦 API result: success={api_result.get('success')} | "
+            f"message={str(api_result.get('message', ''))[:80]} | "
+            f"data_preview={str(api_result.get('data'))[:150]}"
+        )
 
         # 3. Generate reply
         response_text = self.llm_agent.generate_response(intent_data, api_result)

@@ -1,14 +1,10 @@
 """
-main.py
-FastAPI entry point for the AI Shopping Agent.
-
-This file is intentionally thin — it only:
-  1. Creates the FastAPI app
-  2. Loads shared services at startup (model + DB, once only)
-  3. Defines routes and delegates to the right service
-
-Run with:
-    uvicorn main:app --reload --port 8000
+main.py  (v2)
+FastAPI entry point for the ShopAI agent.
+Thin by design — only wires up services and routes.
+Run locally:
+    uvicorn main:app --reload --port 7860
+On HF Spaces: started automatically via Dockerfile CMD.
 """
 
 import os
@@ -18,10 +14,9 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
-# Load .env before importing services (they read env vars at import time)
 load_dotenv()
 
-from models import ChatRequest, ChatResponse, SearchRequest, SearchResponse
+from models       import ChatRequest, ChatResponse, SearchRequest, SearchResponse
 from orchestrator import ShoppingAgentOrchestrator
 from semantic_search import SemanticSearchService
 
@@ -33,39 +28,45 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ─────────────────────────────────────────────────────────────────────────────
-# App init
-# ─────────────────────────────────────────────────────────────────────────────
 app = FastAPI(
-    title="AI Shopping Agent",
+    title="ShopAI Agent",
     version="2.0.0",
     description="Conversational shopping assistant + semantic vector search"
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],      # Tighten this in production to your frontend domain
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Startup — load heavy resources ONCE so every request is instant
+# Startup — load heavy resources ONCE
 # ─────────────────────────────────────────────────────────────────────────────
-orchestrator: ShoppingAgentOrchestrator = None
-search_service: SemanticSearchService = None
+orchestrator:   ShoppingAgentOrchestrator = None
+search_service: SemanticSearchService     = None
 
 @app.on_event("startup")
 async def startup():
     global orchestrator, search_service
-    logger.info("Starting AI Shopping Agent...")
 
-    logger.info("Initialising LLM orchestrator...")
-    orchestrator = ShoppingAgentOrchestrator()
+    logger.info("Starting ShopAI...")
+    logger.info(f"API_BASE_URL = {os.getenv('API_BASE_URL', 'NOT SET')}")
+    logger.info(f"MONGO_URI = {'SET' if os.getenv('MONGO_URI') else 'NOT SET'}")
+    logger.info(f"DB_NAME = {os.getenv('DB_NAME', 'NOT SET')}")
 
-    logger.info("Initialising semantic search service (loading model + DB)...")
+    logger.info("Initialising semantic search service...")
     search_service = SemanticSearchService()
 
-    logger.info("✅ AI Shopping Agent ready")
+    logger.info("Initialising orchestrator...")
+    try:
+        orchestrator = ShoppingAgentOrchestrator()
+        logger.info("✅ Orchestrator ready")
+    except Exception as e:
+        logger.error(f"❌ Orchestrator failed: {e}")
+
+    logger.info(f"✅ Service ready on port {os.getenv('PORT', '7860')}")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -75,12 +76,14 @@ async def startup():
 @app.get("/")
 async def root():
     return {
-        "service": "AI Shopping Agent",
+        "service": "ShopAI Agent",
         "version": "2.0.0",
+        "status":  "running",
         "endpoints": {
-            "chat":   "POST /chat   — conversational shopping assistant",
-            "search": "POST /search — semantic product search",
-            "health": "GET  /health — service health check"
+            "chat":   "POST /chat",
+            "search": "POST /search",
+            "health": "GET  /health",
+            "docs":   "GET  /docs",
         }
     }
 
@@ -88,11 +91,11 @@ async def root():
 @app.get("/health")
 async def health():
     return {
-        "status": "healthy",
+        "status":    "healthy",
         "timestamp": datetime.now().isoformat(),
         "services": {
-            "orchestrator":    orchestrator is not None,
-            "semantic_search": search_service is not None
+            "orchestrator":    orchestrator    is not None,
+            "semantic_search": search_service  is not None,
         }
     }
 
@@ -100,12 +103,11 @@ async def health():
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     """
-    Conversational shopping assistant.
-    Accepts a user message + conversation history, returns an AI response.
-    The agent can search products, add to cart, place orders, etc.
+    Main chat endpoint. Accepts user message + history, returns AI response.
+    jwt_token in the body is forwarded to .NET for authenticated API calls.
     """
     if orchestrator is None:
-        raise HTTPException(status_code=503, detail="Service not ready yet")
+        raise HTTPException(status_code=503, detail="Orchestrator not ready")
     try:
         return await orchestrator.process_message(request)
     except Exception as e:
@@ -116,23 +118,11 @@ async def chat(request: ChatRequest):
 @app.post("/search", response_model=SearchResponse)
 async def semantic_search(request: SearchRequest):
     """
-    Semantic vector search powered by MongoDB Atlas.
-
-    - Embeds the query using all-MiniLM-L6-v2
-    - Runs $vectorSearch aggregation in Atlas
-    - Returns top-K products ranked by cosine similarity score
-
-    Called by: .NET backend → SearchController → this endpoint
-    Also used by the AI chat agent internally for product search.
-
-    Body:
-        { "query": "comfortable running shoes", "top_k": 5 }
-
-    Response:
-        { "results": [...], "query": "...", "total": 5 }
+    Semantic vector search via MongoDB Atlas.
+    Called by the .NET SearchController as well as the chat agent internally.
     """
     if search_service is None:
-        raise HTTPException(status_code=503, detail="Search service not ready yet")
+        raise HTTPException(status_code=503, detail="Search service not ready")
     if not request.query or not request.query.strip():
         raise HTTPException(status_code=400, detail="Query cannot be empty")
     try:
