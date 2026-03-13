@@ -7,8 +7,11 @@ which returns a consistent { success, message, data } wrapper.
 To plug in a real base URL, set API_BASE_URL in your .env file.
 """
 
+import logging
 import requests
 from typing import List, Dict, Any, Optional
+
+logger = logging.getLogger(__name__)
 
 
 class APIClient:
@@ -25,38 +28,60 @@ class APIClient:
             'Authorization': f'Bearer {jwt_token}',
             'Content-Type': 'application/json'
         }
-        self.timeout = 15   # seconds — generous for cold-start
+        self.timeout = 20   # seconds — generous for Render.com cold-start
 
     # ── Internal HTTP Helpers ─────────────────────────────────────────────────
 
     def _get(self, path: str, params: dict = None) -> Dict[str, Any]:
+        url = f"{self.base_url}{path}"
         try:
-            resp = requests.get(
-                f"{self.base_url}{path}",
-                params=params,
-                headers=self.headers,
-                timeout=self.timeout
-            )
-            resp.raise_for_status()
-            return resp.json()          # already { success, message, data }
-        except requests.exceptions.HTTPError as e:
-            return {'success': False, 'message': str(e), 'data': None}
+            resp = requests.get(url, params=params, headers=self.headers, timeout=self.timeout)
+            logger.info(f"GET {path} → {resp.status_code}")
+            if not resp.ok:
+                logger.error(f"GET {path} FAILED {resp.status_code}: {resp.text[:500]}")
+                try:
+                    err_body = resp.json()
+                    msg = (err_body.get('message') or err_body.get('title') or
+                           err_body.get('detail') or str(err_body))
+                except Exception:
+                    msg = resp.text[:300]
+                return {'success': False, 'message': f"[{resp.status_code}] {msg}", 'data': None}
+            return resp.json()
+        except requests.exceptions.Timeout:
+            logger.error(f"GET {path} TIMEOUT after {self.timeout}s")
+            return {'success': False, 'message': f'Request timed out. Please try again.', 'data': None}
         except requests.exceptions.RequestException as e:
+            logger.error(f"GET {path} ERROR: {e}")
             return {'success': False, 'message': str(e), 'data': None}
 
     def _post(self, path: str, payload: dict = None) -> Dict[str, Any]:
+        url = f"{self.base_url}{path}"
         try:
             resp = requests.post(
-                f"{self.base_url}{path}",
+                url,
                 json=payload or {},
                 headers=self.headers,
                 timeout=self.timeout
             )
-            resp.raise_for_status()
+            logger.info(f"POST {path} → {resp.status_code}")
+            if not resp.ok:
+                # Log full response body so we can see the .NET error message
+                logger.error(f"POST {path} FAILED {resp.status_code}: {resp.text[:500]}")
+                try:
+                    err_body = resp.json()
+                    msg = (err_body.get('message') or
+                           err_body.get('title') or
+                           err_body.get('detail') or
+                           str(err_body))
+                except Exception:
+                    msg = resp.text[:300]
+                return {'success': False, 'message': f"[{resp.status_code}] {msg}", 'data': None}
             return resp.json()
-        except requests.exceptions.HTTPError as e:
-            return {'success': False, 'message': str(e), 'data': None}
+        except requests.exceptions.Timeout:
+            logger.error(f"POST {path} TIMEOUT after {self.timeout}s")
+            return {'success': False, 'message': f'Request timed out ({self.timeout}s). Please try again.', 'data': None}
         except requests.exceptions.RequestException as e:
+            logger.error(f"POST {path} ERROR: {e}")
             return {'success': False, 'message': str(e), 'data': None}
 
     def _put(self, path: str, params: dict = None) -> Dict[str, Any]:
@@ -191,13 +216,54 @@ class APIClient:
     def place_order(self, shipping_address_id: Optional[str] = None) -> Dict[str, Any]:
         """
         POST /ai/orders/place
-        Body: { shippingAddressId: '...' }  ← optional; uses default if omitted
-        data: { orderId, orderNumber, status, totalAmount, ... }
+        IMPORTANT: Do NOT retry this call — CreateOrderAsync is not idempotent.
+        A timeout means Render is slow, not that the order failed.
+        Timeout = 90s to survive Render cold-start (~60s).
         """
         payload = {}
         if shipping_address_id:
             payload['shippingAddressId'] = shipping_address_id
-        return self._post('/ai/orders/place', payload)
+        url = f"{self.base_url}/ai/orders/place"
+        logger.info(f"place_order → {url} | address={shipping_address_id}")
+        try:
+            resp = requests.post(url, json=payload, headers=self.headers, timeout=90)
+            logger.info(f"POST /ai/orders/place → {resp.status_code}")
+
+            if not resp.ok:
+                logger.error(f"POST /ai/orders/place FAILED {resp.status_code}: {resp.text[:500]}")
+                try:
+                    err = resp.json()
+                    msg = err.get('message') or err.get('title') or err.get('detail') or str(err)
+                except Exception:
+                    msg = resp.text[:300]
+                # Special case: cart empty after timeout means order was already placed
+                if 'cart' in msg.lower() and 'empty' in msg.lower():
+                    return {
+                        'success': True,
+                        'message': 'Your order was placed successfully! (Cart has been cleared)',
+                        'data': {'orderNumber': 'Check Orders page', 'status': 'Pending'}
+                    }
+                return {'success': False, 'message': msg, 'data': None}
+
+            return resp.json()
+
+        except requests.exceptions.Timeout:
+            logger.error("place_order TIMED OUT after 90s — order may have been placed on server")
+            # Do NOT retry — the order may have been created even though we timed out.
+            # Tell user to check their Orders page.
+            return {
+                'success': True,
+                'message': (
+                    "Your order is being processed! Render took longer than expected to respond. "
+                    "Please check your **Orders** page in a moment to confirm."
+                ),
+                'data': {'orderNumber': 'Check Orders page', 'status': 'Processing'}
+            }
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"place_order ERROR: {e}")
+            return {'success': False, 'message': str(e), 'data': None}
+
 
     def cancel_order(self, order_id: str) -> Dict[str, Any]:
         """POST /ai/orders/{orderId}/cancel"""

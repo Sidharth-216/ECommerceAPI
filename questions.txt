@@ -1,0 +1,321 @@
+.NET CORE INTERVIEW QUESTIONS - ECommerceAPI Project
+=====================================================
+
+1. What is .NET Core?
+Answer:
+.NET Core is a cross-platform, open-source framework used to build modern web applications and APIs. It supports Windows, Linux, and macOS. It is lightweight and optimized for cloud environments.
+
+Real-Time Example from ECommerceAPI:
+I used .NET Core to develop the ECommerceAPI backend with multiple controllers (MongoProductsController, MongoOrderController, MongoCartController) that handle RESTful API requests for an e-commerce platform deployed on cloud infrastructure.
+
+
+2. Explain .NET Core Architecture in your project.
+Answer:
+.NET Core architecture includes CLR, Base Class Library, middleware pipeline, and built-in dependency injection. It processes requests using middleware components. It supports scalable application development.
+
+Real-Time Example from ECommerceAPI:
+Implemented authentication and logging middleware in the ECommerceAPI. The Middleware folder contains ErrorHandlerMiddleware.cs for global exception handling and JwtMiddleware.cs for secure token validation across all API endpoints.
+
+
+3. What is Dependency Injection and how did you use it?
+Answer:
+Dependency Injection allows injecting services instead of creating objects manually. It reduces tight coupling and improves testability. It supports Singleton, Scoped, and Transient lifetimes.
+
+Real-Time Example from ECommerceAPI:
+Injected repository services inside API controllers. For example, in MongoProductsController, I injected IProductMongoService to fetch product data, and in MongoAuthController, I injected IAuthService for authentication operations. Services are registered in Program.cs.
+
+
+4. What is Entity Framework Core and how is it used in your project?
+Answer:
+EF Core is an ORM tool that allows database operations using C# classes. It supports Code First and Database First approaches. It simplifies data access.
+
+Real-Time Example from ECommerceAPI:
+Although ECommerceAPI uses MongoDB instead of SQL databases, the Infrastructure layer follows repository pattern principles. The data access is abstracted through IMongoAddressService, IMongoCartService interfaces, making it database-agnostic and following ORM principles.
+
+
+5. How did you implement JWT Authentication in your project?
+Answer:
+JWT is token-based authentication. It allows secure and stateless user validation. Tokens are passed in headers.
+
+Real-Time Example from ECommerceAPI:
+Implemented JWT login system in MongoAuthController using IAuthService. The JwtHelper.cs in the Helpers folder generates and validates JWT tokens. The JwtMiddleware.cs validates tokens on protected endpoints. Users authenticate through /api/auth endpoints and receive tokens for subsequent API calls.
+
+
+6. Explain how you handled exceptions globally.
+Answer:
+Global exception handling is implemented using middleware. It catches unhandled exceptions and logs them. It ensures consistent error responses.
+
+Real-Time Example from ECommerceAPI:
+Created ErrorHandlerMiddleware.cs in the Middleware folder to catch all unhandled exceptions across the application. This middleware logs error details and returns consistent error responses in JSON format, ensuring production errors are handled gracefully.
+
+
+7. What is Middleware and how did you use it?
+Answer:
+Middleware handles HTTP requests and responses in a pipeline. Each middleware component can process or modify requests. It is configured in the Startup file.
+
+Real-Time Example from ECommerceAPI:
+Configured two custom middleware components: JwtMiddleware for token validation and ErrorHandlerMiddleware for exception handling. These are registered in Program.cs and process every incoming request in sequence.
+
+
+8. How did you structure your API Controllers?
+Answer:
+Controllers handle HTTP requests and delegate business logic to services. Each controller maps to a specific resource.
+
+Real-Time Example from ECommerceAPI:
+Created specialized controllers for different features:
+- MongoProductsController: Handles product listing and details
+- MongoCartController: Manages shopping cart operations
+- MongoOrderController: Processes orders
+- MongoAuthController: Handles authentication
+- MongoAdminController: Admin operations
+- AIChatController: AI-powered chat features
+
+
+9. Explain your application's Data Access Layer architecture.
+Answer:
+Data Access Layer abstracts database interactions from business logic. It uses repositories and interfaces for loose coupling.
+
+Real-Time Example from ECommerceAPI:
+The Infrastructure layer contains repositories for MongoDB operations. Services in ECommerceAPI.Application (MongoProductsService, MongoCartService, MongoOrderService) implement interfaces defined in IServices folder, abstracting MongoDB operations from controllers.
+
+
+10. How did you implement async/await in your project?
+Answer:
+Async and await allow non-blocking operations. It improves performance and scalability. It is useful for database or API calls.
+
+Real-Time Example from ECommerceAPI:
+All service methods use async/await for database and API operations. For example, MongoProductsController async methods call IProductMongoService methods that perform async MongoDB queries, allowing the API to handle multiple concurrent requests efficiently.
+
+
+REACT INTERVIEW QUESTIONS - ECommerceAPI Frontend
+==================================================
+
+11. How did you structure your React application?
+Answer:
+React applications should be organized by features or modules with clear separation of concerns.
+
+Real-Time Example from ECommerceAPI Frontend:
+Organized the structure as:
+- pages/: HomePage, ProductsPage, CartPage, CheckoutPage, OrdersPage, ProfilePage, LoginPage
+- components/: Reusable components like Header, ChatWidget, QRPaymentModal
+- hooks/: Custom hooks (useAuth, useProducts, useCart, useAdmin)
+- services/: API communication and business logic
+This ensures maintainability and scalability.
+
+
+12. How did you manage global state in your React application?
+Answer:
+Global state can be managed using Context API or Redux to avoid prop drilling.
+
+Real-Time Example from ECommerceAPI Frontend:
+Used custom hooks for state management:
+- useAuth(): Manages authentication state (login, user info, token)
+- useCart(): Manages shopping cart items and quantities
+- useProducts(): Manages product data and filters
+- useAdmin(): Manages admin dashboard state
+These hooks encapsulate state logic and are used across multiple pages.
+
+
+13. How did you integrate React with .NET Core backend?
+Answer:
+React integrates with backend using HTTP requests (fetch or Axios) inside useEffect.
+
+Real-Time Example from ECommerceAPI Frontend:
+- Created api.js file with Axios instance pointing to backend API
+- Used useEffect in pages to fetch data (products, orders, user profile)
+- Sent POST requests for login, registration, and checkout
+- Handled JWT token storage and included it in request headers
+- Managed API errors and loading states in components
+
+
+14. Explain your authentication flow in React.
+Answer:
+Authentication involves login, token storage, token validation, and protected routes.
+
+Real-Time Example from ECommerceAPI Frontend:
+Implemented authentication in LoginPage and useAuth hook:
+1. User submits credentials via LoginPage form
+2. API sends request to /api/auth/login endpoint
+3. Backend returns JWT token
+4. Token stored in state/localStorage
+5. Included token in Authorization header for subsequent requests
+6. Protected routes check authentication status
+
+
+15. How did you implement shopping cart functionality?
+Answer:
+Shopping cart manages product selection, quantity updates, and price calculations.
+
+Real-Time Example from ECommerceAPI Frontend:
+useCart hook manages:
+- Add to cart: POST request to MongoCartController
+- Update quantity: PUT request with updated quantity
+- Remove item: DELETE request for cart item
+- Fetch cart: GET request to retrieve cart items
+CartPage displays items and integrates with CheckoutPage for order placement.
+
+
+MONGODB & SQL INTERVIEW QUESTIONS - ECommerceAPI
+=================================================
+
+16. How did you design the database schema for e-commerce?
+Answer:
+Database schema should have separate collections/tables for users, products, orders, and payments with proper relationships.
+
+Real-Time Example from ECommerceAPI:
+MongoDB collections designed:
+- Users: Stores customer information (email, password, profile)
+- Products: Contains product details (name, price, category, stock)
+- Orders: Maintains order history (orderID, userID, items, total, status)
+- Cart: Temporary shopping cart (userID, productID, quantity)
+- Payments: Payment transaction records with QR codes
+- Addresses: User delivery addresses
+
+
+17. How did you ensure data integrity?
+Answer:
+Data integrity is maintained using constraints, relationships, and validation.
+
+Real-Time Example from ECommerceAPI:
+- Foreign key relationships between Orders and Users
+- Validation in AuthService: Password hashing using PasswordHelper
+- Parameterized queries prevent SQL injection
+- Email OTP verification ensures valid email addresses
+- Transaction handling in MongoOrderService
+
+
+18. How did you optimize database queries?
+Answer:
+Query optimization uses indexing, proper query structure, and pagination.
+
+Real-Time Example from ECommerceAPI:
+- Implemented pagination in MongoProductsController for product listing (reduce data transfer)
+- Created indexes on frequently queried fields (email, userID, productID)
+- Used aggregation pipelines in MongoDB for complex queries
+- Implemented caching for product catalog using Redis
+
+
+19. How did you handle OTP and Email verification?
+Answer:
+OTP verification adds security layer for user authentication and email confirmation.
+
+Real-Time Example from ECommerceAPI:
+- MongoEmailOtpController generates and sends OTP to user email
+- IMongoEmailOtpService manages OTP generation and validation
+- Tokens expire after set duration
+- Email verification required before order processing
+
+
+20. How did you implement QR Code payment system?
+Answer:
+QR code payments provide alternative payment gateway integration for transactions.
+
+Real-Time Example from ECommerceAPI:
+- QRPaymentController handles QR payment requests
+- IQRPaymentService generates dynamic QR codes for orders
+- QR code links to payment gateway
+- Payment confirmation triggers order status update
+- Implemented in CheckoutPage with Qrpaymentmodal component
+
+
+AI INTEGRATION INTERVIEW QUESTIONS
+==================================
+
+21. How did you integrate AI Chat functionality?
+Answer:
+AI chat provides real-time customer support and product recommendations.
+
+Real-Time Example from ECommerceAPI:
+- AIChatController manages chat requests
+- Frontend ChatWidget component handles UI
+- FloatingChatButton provides persistent access
+- AI agent processes customer queries using LLM
+- Responses integrated into chat interface
+
+
+22. How did you implement semantic search?
+Answer:
+Semantic search understands context and meaning beyond keyword matching.
+
+Real-Time Example from ECommerceAPI:
+- ISemanticSearchService implements semantic search logic
+- Generates embeddings for products using AI
+- generate_embeddings.py creates vector representations
+- SearchController uses semantic_search.py for intelligent product discovery
+- Users find products by meaning instead of exact keywords
+
+
+DEPLOYMENT & DEVOPS QUESTIONS
+=============================
+
+23. How did you containerize your application?
+Answer:
+Containerization packages application with dependencies for consistent deployment.
+
+Real-Time Example from ECommerceAPI:
+- Created Dockerfile for .NET Core backend with:
+    - Base image: mcr.microsoft.com/dotnet/aspnet
+    - Build stage: dotnet publish
+    - Runtime stage: EXPOSE ports, configured startup
+- Created Dockerfile for Python AI agent
+- Used .dockerignore to exclude unnecessary files
+- Enables deployment on Docker, Kubernetes, or cloud platforms
+
+
+24. How did you configure environment settings?
+Answer:
+Environment configuration manages different settings for development, testing, and production.
+
+Real-Time Example from ECommerceAPI:
+- appsettings.json: Default settings
+- appsettings.Development.json: Development config (debug logging, test DB)
+- appsettings.Production.json: Production config (security, performance settings)
+- Frontend .env file: API endpoints for different environments
+- Sensitive data stored securely (not hardcoded)
+
+
+PROJECT ARCHITECTURE OVERVIEW
+=============================
+
+25. Explain your overall project architecture.
+Answer:
+Multi-tier architecture separating concerns into presentation, application, domain, and infrastructure layers.
+
+Real-Time Example from ECommerceAPI:
+- Frontend Layer (React): User interface for customers and admins
+- API Layer (.NET Core): RESTful APIs in ECommerceAPI.API project
+- Application Layer: Business logic in ECommerceAPI.Application (Services, DTOs)
+- Domain Layer: Entities and business rules in ECommerceAPI.Domain
+- Infrastructure Layer: Data access and external integrations
+- AI Layer (Python): Semantic search and chat functionality
+
+This ensures scalability, maintainability, and separation of concerns.
+
+
+26. How would you scale this application for 1 million users?
+Answer:
+Scaling involves database optimization, caching, load balancing, and microservices.
+
+Real-Time Example Scaling Strategy for ECommerceAPI:
+- Database: Implement MongoDB sharding for horizontal scaling
+- Cache: Use Redis caching for products and frequently accessed data
+- Load Balancing: Deploy API on multiple servers behind load balancer
+- Microservices: Separate Order Service, Payment Service, Product Service
+- CDN: Store static images on CDN
+- Async Processing: Use message queues for email/OTP processing
+- Monitoring: Implement logging and monitoring for production issues
+
+
+27. Describe your Security Implementation.
+Answer:
+Security involves authentication, authorization, encryption, and validation.
+
+Real-Time Example from ECommerceAPI:
+- JWT Authentication: Secure token-based access
+- HTTPS: Encrypted communication between frontend and backend
+- Password Hashing: PasswordHelper encrypts passwords using PBKDF2
+- Input Validation: Sanitize user inputs in controllers
+- CORS Configuration: Only allowed origins can access API
+- Parameterized Queries: Prevent SQL injection attacks
+- OTP Verification: Additional security for sensitive operations
+- Role-Based Authorization: Admins have different permissions than customers

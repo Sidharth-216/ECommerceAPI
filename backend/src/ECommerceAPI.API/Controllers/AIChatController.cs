@@ -446,16 +446,27 @@ namespace ECommerceAPI.API.Controllers
             {
                 var userId = GetUserId();
 
-                // If agent didn't supply an address, auto-resolve the default
+                // If agent didn't supply an address, auto-resolve:
+                // 1. Try the address marked as default
+                // 2. Fall back to the first saved address (handles case where no default is set)
                 var addressId = request?.ShippingAddressId;
                 if (string.IsNullOrWhiteSpace(addressId))
                 {
                     var defaultAddr = await _addressService.GetDefaultAddressAsync(userId);
-                    if (defaultAddr == null)
-                        return BadRequest(AiApiResponse<AiOrderDto>.Fail(
-                            "No shipping address found. Please add an address first."));
+                    if (defaultAddr != null)
+                    {
+                        addressId = defaultAddr.Id;
+                    }
+                    else
+                    {
+                        // No default — pick the first available address
+                        var allAddresses = (await _addressService.GetByUserIdAsync(userId))?.ToList();
+                        if (allAddresses == null || !allAddresses.Any())
+                            return BadRequest(AiApiResponse<AiOrderDto>.Fail(
+                                "No shipping address found. Please add an address from your Profile first."));
 
-                    addressId = defaultAddr.Id;
+                        addressId = allAddresses.First().Id;
+                    }
                 }
 
                 var order = await _orderService.CreateOrderAsync(userId, new CreateOrderDto

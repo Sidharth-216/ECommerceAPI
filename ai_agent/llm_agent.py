@@ -36,15 +36,16 @@ INTENT_SCHEMA = {
               "update_cart | remove_from_cart | place_order | order_history | "
               "cancel_order | get_context | greeting | other",
     "parameters": {
-        "query":              "string — product search phrase",
-        "category":           "string — product category",
-        "budget_max":         "number — maximum price in INR",
-        "features":           "string — desired feature keywords",
-        "product_id":         "string — MongoDB ObjectId of a specific product",
-        "product_ids":        "array of strings — for compare_products (2-4 ids)",
-        "quantity":           "number — default 1",
-        "order_id":           "string — MongoDB ObjectId of an order",
-        "shipping_address_id":"string — MongoDB ObjectId of an address (optional for place_order)"
+        "query":               "string — product search phrase or product name",
+        "product_name":        "string — exact product name the user mentioned (for add/remove cart)",
+        "category":            "string — product category",
+        "budget_max":          "number — maximum price in INR",
+        "features":            "string — desired feature keywords",
+        "product_id":          "string — MongoDB ObjectId only (24 hex chars)",
+        "product_ids":         "array of strings — for compare_products (2-4 ids)",
+        "quantity":            "number — default 1",
+        "order_id":            "string — MongoDB ObjectId of an order",
+        "shipping_address_id": "string — MongoDB ObjectId of an address (optional for place_order)"
     }
 }
 
@@ -52,18 +53,35 @@ INTENT_SCHEMA = {
 # System prompt for LLM intent extraction (MODE B)
 # ─────────────────────────────────────────────────────────────────
 INTENT_SYSTEM_PROMPT = f"""You are an intent extractor for a shopping assistant.
-Your job is to analyse the user's latest message and output ONLY a JSON object
-matching this schema — no prose, no markdown, no backticks:
+Output ONLY a valid JSON object — no prose, no markdown, no backticks.
+Schema:
 {json.dumps(INTENT_SCHEMA, indent=2)}
-Rules:
-- Always output valid JSON.
-- If the user asks to search or find products, use search_product.
-- If the user asks to compare two or more products, use compare_products.
-- product_ids must be real MongoDB ObjectIds from the conversation history.
-  If none are visible, return an empty list [].
-- budget_max must be an integer (strip commas, currency symbols).
-- For greetings or unclear input, use greeting or other.
-- Do NOT invent product_ids. Only use ids explicitly mentioned in history.
+STRICT RULES — follow exactly:
+1. REMOVE/DELETE from cart → intent: "remove_from_cart"
+   Triggers: "remove", "delete", "take out", "don't want", "cancel item"
+   Put the product name in BOTH "product_name" AND "query" parameters.
+   Example: "remove Samsung TV" → {{"intent":"remove_from_cart","parameters":{{"product_name":"Samsung TV","query":"Samsung TV"}}}}
+2. ADD to cart → intent: "add_to_cart"
+   Triggers: "add", "buy", "put in cart", "i want", "i'll take"
+   Put the product name in "query" parameter.
+3. VIEW cart → intent: "view_cart"
+   Triggers: "my cart", "show cart", "what's in my cart", "cart"
+4. SEARCH products → intent: "search_product"
+   Triggers: "find", "search", "show me", "recommend", "best", "looking for"
+5. CHECKOUT/place order → intent: "place_order"
+   Triggers: "checkout", "place order", "proceed to pay", "buy now", "confirm order"
+6. ORDER HISTORY → intent: "order_history"
+   Triggers: "my orders", "past orders", "order history"
+7. CANCEL ORDER → intent: "cancel_order"
+   Triggers: "cancel order", with order number in "order_id" parameter.
+8. COMPARE → intent: "compare_products"
+   Triggers: "compare", "vs", "difference between", "which is better"
+9. GREETING → intent: "greeting"
+   Triggers: "hi", "hello", "hey", "namaste"
+10. Other → intent: "other"
+- budget_max must be an integer (strip ₹, commas).
+- product_ids must be real 24-char MongoDB ObjectIds from history only. Never invent them.
+- Always output valid JSON. Nothing else.
 """
 
 # ─────────────────────────────────────────────────────────────────
@@ -258,6 +276,7 @@ class LLMAgent:
             items = data.get("items", [])
             slim_items = [
                 {
+                    "productId":   i.get("productId"),   # needed for remove_from_cart
                     "productName": i.get("productName"),
                     "quantity":    i.get("quantity"),
                     "price":       i.get("price"),
@@ -419,11 +438,23 @@ class LLMAgent:
             return {'intent': 'search_product', 'parameters': params}
 
         # ── Cart operations ───────────────────────────────────────
+        # ── REMOVE from cart (checked FIRST before search triggers)
+        # Handles: 'remove X from cart', 'delete X from cart'
+        remove_triggers = ['remove', 'delete', 'take out', 'dont want', "don't want"]
+        has_remove  = any(w in msg for w in remove_triggers)
+        has_cart    = any(w in msg for w in ['cart', 'from cart'])
+        if has_remove and has_cart:
+            import re as _re
+            m = _re.search(r'(?:remove|delete|take\s+out)\s+(.+?)\s+from\s+(?:my\s+)?cart', msg, _re.IGNORECASE)
+            pname = m.group(1).strip() if m else ''
+            return {'intent': 'remove_from_cart', 'parameters': {
+                'product_name': pname,
+                'query':        pname,
+            }}
+
         if any(w in msg for w in ['add to cart', 'add this', 'add it', 'put in cart', 'i\'ll take it']):
             return {'intent': 'add_to_cart', 'parameters': {'quantity': 1}}
 
-        if any(w in msg for w in ['remove from cart', 'delete from cart', 'take out']):
-            return {'intent': 'remove_from_cart', 'parameters': {}}
 
         if any(w in msg for w in ['my cart', 'show cart', 'view cart', 'what\'s in my cart', 'cart']):
             if any(w in msg for w in ['checkout', 'buy', 'order', 'place']):
@@ -560,16 +591,30 @@ class LLMAgent:
         if not result.get('success'):
             msg = result.get('message', '')
             if 'address' in msg.lower():
-                return "You don't have a shipping address set. Please add one from your profile and try again."
+                return "No shipping address found. Please go to Profile -> Addresses and add one, then try again."
             if 'empty' in msg.lower():
-                return "Your cart is empty — add some items before placing an order."
-            return f"Couldn't place your order: {msg}"
-        order = result.get('data') or {}
+                return "Your cart is empty -- add some items before placing an order."
+            return f"Could not place your order: {msg}. Please try again."
+
+        order     = result.get('data') or {}
+        order_num = order.get('orderNumber', '')
+        total     = order.get('totalAmount', 0)
+
+        # Timeout-success: order placed but Render did not respond in time
+        if 'check orders' in str(order_num).lower() or 'processing' in str(order.get('status','')).lower():
+            return (
+                "Your order is being processed! "
+                "Our server took a moment to respond but your order should be confirmed. "
+                "Please go to My Orders page to check status and complete payment."
+            )
+
+        total_str = f"Rs.{total:,}" if total else ""
         return (
-            f"🎉 Order **{order.get('orderNumber', '')}** placed!\n"
-            f"Total: ₹{order.get('totalAmount', 0):,}\n\n"
-            "Taking you to the payment screen now. Please complete your UPI payment."
+            f"Order {order_num} placed successfully! "
+            + (f"Total: {total_str}. " if total_str else "")
+            + "Please go to Orders -> Pay Now to complete your UPI payment."
         )
+
 
     def _tpl_cancel_order(self, result: Dict) -> str:
         if not result.get('success'):
