@@ -1,825 +1,630 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  ShoppingBag, Search, ShoppingCart, MessageCircle,
-  UserCircle, LogOut, Package, X, Send,
-  ChevronLeft, ChevronRight, Sparkles, Bot, Loader2,
-  TrendingUp, Star, Zap
+  ShoppingBag, ShoppingCart, LogOut, User, MapPin, Package,
+  Clock, Plus, Trash2, ChevronRight, X, Home, Briefcase, Star
 } from 'lucide-react';
-import { productsAPI } from '../api.js';
+import { authAPI, addressAPI } from '../api';
 
-// ─────────────────────────────────────────────────────────────────
-// CONSTANTS
-// ─────────────────────────────────────────────────────────────────
-const AI_AGENT_URL = process.env.REACT_APP_AI_AGENT_URL || 'http://localhost:7860';
-
-// ─────────────────────────────────────────────────────────────────
-// HELPERS
-// ─────────────────────────────────────────────────────────────────
-const getCategoryName = (product) => {
-  if (!product) return 'Uncategorized';
-  const cat = product.categoryName || product.category;
-  if (!cat) return 'Uncategorized';
-  if (typeof cat === 'string') return cat;
-  if (typeof cat === 'object' && cat.name) return cat.name;
-  return String(cat);
-};
-
-const getPrice = (product) => {
-  if (!product?.price) return 0;
-  if (typeof product.price === 'number') return product.price;
-  if (typeof product.price === 'object' && product.price.$numberDecimal)
-    return parseFloat(product.price.$numberDecimal);
-  return parseFloat(product.price) || 0;
-};
-
-const getRating = (product) => {
-  if (!product?.rating) return null;
-  if (typeof product.rating === 'number') return product.rating;
-  if (typeof product.rating === 'object' && product.rating.$numberDecimal)
-    return parseFloat(product.rating.$numberDecimal);
-  return parseFloat(product.rating) || null;
-};
-
-const getProductId = (product) => {
-  return product?.id || product?._id?.$oid || product?._id || product?.Id || null;
-};
-
-// ─────────────────────────────────────────────────────────────────
-// AI CHAT API CALL  →  POST /chat on the FastAPI agent
-// The agent reads the JWT from the request body and calls /api/ai/*
-// ─────────────────────────────────────────────────────────────────
-const callAIAgent = async (message, history, userId) => {
-  const token =
-    sessionStorage.getItem('token') || localStorage.getItem('token') || '';
-
-  const response = await fetch(`${AI_AGENT_URL}/chat`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      message,
-      userId,
-      history: history.map(m => ({ role: m.role, content: m.content })),
-      jwt_token: token,   // the Python agent forwards this to .NET
-    }),
+/* ─────────────────────────────────────────────
+   Address Modal Component
+───────────────────────────────────────────── */
+const AddressModal = ({ onClose, onSave }) => {
+  const [form, setForm] = useState({
+    addressLine1: '', addressLine2: '', city: '',
+    state: '', postalCode: '', country: 'India',
+    label: 'Home', isDefault: false
   });
+  const [saving, setSaving] = useState(false);
+  const [step, setStep] = useState(0);
 
-  if (!response.ok) throw new Error(`Agent error: ${response.status}`);
-  return response.json();  // { response, action, data, products }
-};
+  const labels = [
+    { value: 'Home', icon: <Home className="w-4 h-4" />, color: 'from-teal-500 to-cyan-500' },
+    { value: 'Work', icon: <Briefcase className="w-4 h-4" />, color: 'from-violet-500 to-purple-500' },
+    { value: 'Other', icon: <MapPin className="w-4 h-4" />, color: 'from-orange-400 to-amber-500' },
+  ];
 
-// ─────────────────────────────────────────────────────────────────
-// QUICK SUGGESTION CHIPS shown at chat start
-// ─────────────────────────────────────────────────────────────────
-const QUICK_CHIPS = [
-  { label: '📱 Best smartphones', msg: 'Show me the best smartphones' },
-  { label: '🎧 Headphones under ₹5000', msg: 'Find headphones under ₹5000' },
-  { label: '🛒 My cart', msg: 'Show my cart' },
-  { label: '📦 My orders', msg: 'Show my order history' },
-  { label: '🔥 Trending now', msg: 'What are trending products?' },
-  { label: '💻 Gaming laptops', msg: 'Recommend gaming laptops' },
-];
+  const fields = [
+    [
+      { key: 'addressLine1', label: 'Street Address', placeholder: '123 MG Road', type: 'text', required: true },
+      { key: 'addressLine2', label: 'Apartment / Suite (optional)', placeholder: 'Flat 4B, Tower 2', type: 'text' },
+    ],
+    [
+      { key: 'city', label: 'City', placeholder: 'Mumbai', type: 'text', required: true },
+      { key: 'state', label: 'State', placeholder: 'Maharashtra', type: 'text' },
+      { key: 'postalCode', label: 'Postal Code', placeholder: '400001', type: 'text' },
+      { key: 'country', label: 'Country', placeholder: 'India', type: 'text' },
+    ],
+  ];
 
-// ─────────────────────────────────────────────────────────────────
-// PRODUCT MINI-CARD  (shown inside chat when agent returns products)
-// ─────────────────────────────────────────────────────────────────
-const ChatProductCard = ({ product, onAddToCart }) => {
-  const price = typeof product.price === 'number'
-    ? product.price
-    : parseFloat(product.price || 0);
-  const rating = product.rating || 0;
+  const canNext = step === 0
+    ? form.addressLine1.trim() !== ''
+    : form.city.trim() !== '';
+
+  const handleSubmit = async () => {
+    if (!canNext) return;
+    setSaving(true);
+    try {
+      const raw = sessionStorage.getItem('user') || localStorage.getItem('user');
+      const userData = JSON.parse(raw || '{}');
+      const userId = userData.id || userData.userId || userData.Id;
+      if (!userId) { alert('❌ User ID not found. Please re-login.'); return; }
+
+      const payload = {
+        userId,
+        addressLine1: form.addressLine1,
+        addressLine2: form.addressLine2,
+        city: form.city,
+        state: form.state,
+        postalCode: form.postalCode,
+        country: form.country || 'India',
+        label: form.label,
+        isDefault: form.isDefault,
+      };
+
+      await addressAPI.add(payload);
+      if (typeof addressAPI.syncLocalAddresses === 'function') await addressAPI.syncLocalAddresses();
+      onSave();
+    } catch (err) {
+      alert(err?.response?.data?.message || err.message || 'Failed to add address');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-3 flex gap-3 shadow-sm hover:shadow-md transition-all min-w-[240px] max-w-[260px]">
-      <img
-        src={product.imageUrl || 'https://via.placeholder.com/60x60/f1f5f9/94a3b8?text=P'}
-        alt={product.name}
-        className="w-14 h-14 object-contain rounded-lg bg-slate-50 shrink-0"
-        onError={e => { e.currentTarget.src = 'https://via.placeholder.com/60x60/f1f5f9/94a3b8?text=P'; }}
-      />
-      <div className="flex-1 min-w-0">
-        <p className="text-xs font-semibold text-slate-900 line-clamp-2 leading-tight">{product.name}</p>
-        {rating > 0 && (
-          <div className="flex items-center gap-0.5 mt-0.5">
-            <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
-            <span className="text-xs text-slate-500">{rating.toFixed(1)}</span>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backdropFilter: 'blur(8px)', background: 'rgba(15,23,42,0.55)' }}>
+      <div
+        className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden"
+        style={{ animation: 'modalIn 0.35s cubic-bezier(.22,1,.36,1)' }}
+      >
+        {/* Modal header */}
+        <div className="relative bg-gradient-to-br from-teal-500 via-cyan-500 to-teal-400 px-8 py-7 text-white overflow-hidden">
+          <div className="absolute -top-8 -right-8 w-32 h-32 bg-white/10 rounded-full" />
+          <div className="absolute top-4 -right-4 w-20 h-20 bg-white/10 rounded-full" />
+          <button onClick={onClose} className="absolute top-5 right-5 w-9 h-9 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center transition-all">
+            <X className="w-5 h-5" />
+          </button>
+          <div className="flex items-center gap-3 mb-1 relative">
+            <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+              <MapPin className="w-6 h-6" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold">Add New Address</h2>
+              <p className="text-teal-100 text-xs">Step {step + 1} of 2 — {step === 0 ? 'Street details' : 'City & region'}</p>
+            </div>
+          </div>
+          {/* step bar */}
+          <div className="flex gap-1 mt-4 relative">
+            {[0, 1].map(i => (
+              <div key={i} className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${i <= step ? 'bg-white' : 'bg-white/30'}`} />
+            ))}
+          </div>
+        </div>
+
+        {/* Label selector */}
+        {step === 0 && (
+          <div className="px-8 pt-6">
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Address Type</p>
+            <div className="flex gap-3">
+              {labels.map(l => (
+                <button
+                  key={l.value}
+                  onClick={() => setForm(f => ({ ...f, label: l.value }))}
+                  className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-2xl border-2 transition-all font-semibold text-sm ${
+                    form.label === l.value
+                      ? `bg-gradient-to-br ${l.color} text-white border-transparent shadow-lg scale-105`
+                      : 'border-slate-200 text-slate-600 hover:border-teal-300'
+                  }`}
+                >
+                  {l.icon}
+                  {l.value}
+                </button>
+              ))}
+            </div>
           </div>
         )}
-        <p className="text-sm font-bold text-teal-700 mt-1">₹{price.toLocaleString()}</p>
-        <button
-          onClick={() => onAddToCart(product)}
-          disabled={product.stockQuantity === 0 || product.isAvailable === false}
-          className="mt-1.5 w-full text-xs bg-teal-600 hover:bg-teal-700 text-white py-1 rounded-lg disabled:opacity-40 transition-colors font-medium"
-        >
-          {product.stockQuantity === 0 || product.isAvailable === false ? 'Out of stock' : '+ Add to cart'}
-        </button>
+
+        {/* Fields */}
+        <div className="px-8 py-6 space-y-4">
+          {fields[step].map(f => (
+            <div key={f.key}>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">{f.label}</label>
+              <input
+                type={f.type}
+                placeholder={f.placeholder}
+                value={form[f.key]}
+                onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:border-teal-400 focus:bg-white transition-all text-sm"
+              />
+            </div>
+          ))}
+
+          {step === 1 && (
+            <label className="flex items-center gap-3 cursor-pointer group mt-1">
+              <div
+                onClick={() => setForm(f => ({ ...f, isDefault: !f.isDefault }))}
+                className={`w-12 h-6 rounded-full relative transition-all duration-300 ${form.isDefault ? 'bg-gradient-to-r from-teal-500 to-cyan-500' : 'bg-slate-200'}`}
+              >
+                <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all duration-300 ${form.isDefault ? 'left-6' : 'left-0.5'}`} />
+              </div>
+              <span className="text-sm font-semibold text-slate-700">Set as default address</span>
+            </label>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-8 pb-7 flex gap-3">
+          {step > 0 && (
+            <button onClick={() => setStep(0)} className="flex-1 py-3.5 border-2 border-slate-200 text-slate-600 rounded-2xl font-bold hover:border-teal-300 transition-all">
+              ← Back
+            </button>
+          )}
+          {step === 0 ? (
+            <button
+              onClick={() => canNext && setStep(1)}
+              disabled={!canNext}
+              className="flex-1 py-3.5 bg-gradient-to-r from-teal-500 to-cyan-500 text-white rounded-2xl font-bold shadow-lg hover:shadow-teal-200 hover:shadow-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Next →
+            </button>
+          ) : (
+            <button
+              onClick={handleSubmit}
+              disabled={saving || !canNext}
+              className="flex-1 py-3.5 bg-gradient-to-r from-teal-500 to-cyan-500 text-white rounded-2xl font-bold shadow-lg hover:shadow-teal-200 hover:shadow-xl transition-all disabled:opacity-40 flex items-center justify-center gap-2"
+            >
+              {saving ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Saving…</> : '✓ Save Address'}
+            </button>
+          )}
+        </div>
       </div>
+
+      <style>{`
+        @keyframes modalIn {
+          from { opacity:0; transform:translateY(24px) scale(.97); }
+          to   { opacity:1; transform:translateY(0)    scale(1);   }
+        }
+      `}</style>
     </div>
   );
 };
 
-// ─────────────────────────────────────────────────────────────────
-// MAIN COMPONENT
-// ─────────────────────────────────────────────────────────────────
-const ProductsPage = ({
-  user,
-  products,
-  cart,
-  searchQuery,
-  setSearchQuery,
-  setCurrentPage,
-  handleLogout,
-  addToCart,
-  error,
-  setError,
+/* ─────────────────────────────────────────────
+   Main ProfilePage Component
+───────────────────────────────────────────── */
+const ProfilePage = ({
+  user, cart, orders, profileData, setProfileData,
+  setCurrentPage, handleLogout, setError, loadOrders, loading, setLoading
 }) => {
-  // Chat state
-  const [chatOpen, setChatOpen]           = useState(false);
-  const [chatMessages, setChatMessages]   = useState([]);
-  const [currentMessage, setCurrentMessage] = useState('');
-  const [isTyping, setIsTyping]           = useState(false);
-  const chatEndRef                        = useRef(null);
+  const [editMode, setEditMode] = useState(false);
+  const [loadingProfile, setLoadingProfile] = useState(false);
+  const [showAddressModal, setShowAddressModal] = useState(false);
+  const [activeTab, setActiveTab] = useState('profile');
 
-  // Search state
-  const [semanticSuggestions, setSemanticSuggestions] = useState([]);
-  const [semanticResults, setSemanticResults]         = useState([]);
-  const [searchLoading, setSearchLoading]             = useState(false);
-  const [showSuggestions, setShowSuggestions]         = useState(false);
-  const [isSemanticMode, setIsSemanticMode]           = useState(false);
-  const debounceTimer  = useRef(null);
+  useEffect(() => { if (!user) return; fetchAddresses(); fetchProfile(); }, [user]);
+  useEffect(() => { if (!user) return; fetchOrders(); }, [user]);
 
-  // Banner
-  const [currentBanner, setCurrentBanner] = useState(0);
-
-  // ── Auto-scroll chat ──
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chatMessages, isTyping]);
-
-  // ── Banner auto-rotate ──
-  useEffect(() => {
-    const t = setInterval(() => setCurrentBanner(p => (p + 1) % 3), 5000);
-    return () => clearInterval(t);
-  }, []);
-
-  // ── Semantic suggestions (debounced) ──
-  useEffect(() => {
-    const query = searchQuery.trim();
-    if (!query || query.length < 2) {
-      setSemanticSuggestions([]);
-      setShowSuggestions(false);
-      if (!query) { setIsSemanticMode(false); setSemanticResults([]); }
-      return;
-    }
-    clearTimeout(debounceTimer.current);
-    debounceTimer.current = setTimeout(async () => {
-      setSearchLoading(true);
-      try {
-        const res  = await productsAPI.search(query, 6);
-        const list = res?.data?.results || [];
-        setSemanticSuggestions(list);
-        setShowSuggestions(list.length > 0);
-      } catch {
-        setSemanticSuggestions([]);
-      } finally {
-        setSearchLoading(false);
-      }
-    }, 300);
-    return () => clearTimeout(debounceTimer.current);
-  }, [searchQuery]);
-
-  // ── Full search ──
-  const handleFullSearch = useCallback(async (override) => {
-    const q = (override || searchQuery).trim();
-    if (!q) return;
-    setShowSuggestions(false);
-    setSearchLoading(true);
-    setIsSemanticMode(true);
+  const fetchProfile = async () => {
     try {
-      const res = await productsAPI.search(q, 20);
-      setSemanticResults(res?.data?.results || []);
-    } catch {
-      setSemanticResults([]);
-      setError('Search failed. Showing all products.');
-      setIsSemanticMode(false);
-    } finally {
-      setSearchLoading(false);
-    }
-  }, [searchQuery]);
-
-  const applyCategory = async (cat) => {
-    if (!cat) { setSearchQuery(''); setIsSemanticMode(false); setSemanticResults([]); return; }
-    setSearchQuery(cat);
-    await handleFullSearch(cat);
-  };
-
-  const displayedProducts = isSemanticMode ? semanticResults : (products || []);
-
-  const uniqueCategories = Array.from(
-    new Set((products || []).map(p => getCategoryName(p)).filter(Boolean))
-  ).slice(0, 20);
-
-  // ── AI Chat send ──
-  const sendMessage = async (msg) => {
-    const text = (msg || currentMessage).trim();
-    if (!text || isTyping) return;
-
-    const userMsg = { role: 'user', content: text };
-    setChatMessages(prev => [...prev, userMsg]);
-    setCurrentMessage('');
-    setIsTyping(true);
-
-    try {
-      const userId = user?.id || user?.mongoUserId || user?.Id || '';
-      const result = await callAIAgent(text, chatMessages, userId);
-
-      const assistantMsg = {
-        role: 'assistant',
-        content: result.response || 'I had trouble understanding that. Please try again.',
-        products: result.products || null,
-        action: result.action || null,
-      };
-      setChatMessages(prev => [...prev, assistantMsg]);
+      setLoadingProfile(true);
+      const res = await authAPI.getProfile();
+      const data = res.data;
+      setProfileData({
+        fullName: data.fullName || user?.name || '',
+        email: data.email || user?.email || '',
+        mobile: data.mobile || user?.mobile || '+91 00000 00000',
+        gender: data.gender || user?.gender || '',
+        addresses: data.addresses || []
+      });
     } catch (err) {
-      console.error('AI agent error:', err);
-      setChatMessages(prev => [...prev, {
-        role: 'assistant',
-        content: "Sorry, I'm having trouble connecting to the AI service right now. Please try again in a moment.",
-      }]);
-    } finally {
-      setIsTyping(false);
-    }
+      if (user) setProfileData({ fullName: user.name||'', email: user.email||'', mobile: user.mobile||'+91 00000 00000', gender: user.gender||'', addresses: [] });
+    } finally { setLoadingProfile(false); }
   };
 
-  // ── Add to cart from chat product card ──
-  const handleChatAddToCart = (product) => {
-    addToCart(product, setError);
-    setChatMessages(prev => [...prev, {
-      role: 'assistant',
-      content: `✅ **${product.name}** added to your cart!`,
-    }]);
+  const fetchAddresses = async () => {
+    try {
+      let res;
+      let currentUserId = null;
+      try {
+        const profileRes = await authAPI.getProfile();
+        currentUserId = profileRes.data?.id || profileRes.data?.userId || profileRes.data?.Id;
+      } catch { currentUserId = user?.id || user?.userId; }
+
+      if (typeof addressAPI?.getAll === 'function') res = await addressAPI.getAll();
+      else {
+        const profileRes = await authAPI.getProfile();
+        res = { data: profileRes.data?.addresses || profileRes.data?.addressList || [] };
+      }
+
+      const rawAddresses = Array.isArray(res.data) ? res.data : (res.data?.addresses || res.data?.addressList || []);
+      const userAddresses = currentUserId
+        ? rawAddresses.filter(a => { const uid = a.userId||a.UserId||a.user_id||a.UserID; return uid===currentUserId||uid===String(currentUserId); })
+        : rawAddresses;
+
+      const normalized = userAddresses.map((a, index) => {
+        const addrLine1=a.AddressLine1||a.addressLine1||a.line1||'';
+        const addrLine2=a.AddressLine2||a.addressLine2||a.line2||'';
+        const city=a.City||a.city||''; const state=a.State||a.state||'';
+        const postal=a.PostalCode||a.postalCode||a.pincode||'';
+        const country=a.Country||a.country||'';
+        return {
+          id: a.Id||a.id||`addr_${Date.now()}_${index}`,
+          label: a.Label||a.label||(a.IsDefault?'Home':'Address'),
+          AddressLine1:addrLine1, AddressLine2:addrLine2,
+          City:city, State:state, PostalCode:postal, Country:country,
+          IsDefault:!!(a.IsDefault||a.isDefault),
+          address:[addrLine1,addrLine2,city,state,postal,country].filter(Boolean).join(', ').trim(),
+          userId: a.userId||a.UserId||a.user_id||currentUserId
+        };
+      });
+      setProfileData(prev => ({ ...prev, addresses: normalized }));
+    } catch { setProfileData(prev => ({ ...prev, addresses: [] })); }
   };
 
-  // ─────────────────────────────────────────────────────────────────
-  // BANNERS
-  // ─────────────────────────────────────────────────────────────────
-  const banners = [
-    { title: 'Summer Sale 2026', subtitle: 'Up to 50% OFF on Electronics', desc: 'Free shipping on orders above ₹999', bg: 'from-teal-500 via-cyan-500 to-blue-500' },
-    { title: 'New Arrivals', subtitle: 'Latest Smartphones & Gadgets', desc: 'Shop the newest tech at best prices', bg: 'from-purple-600 via-pink-500 to-rose-500' },
-    { title: 'Special Offer', subtitle: 'Buy 2 Get 1 Free', desc: 'On selected audio & wearables', bg: 'from-orange-500 via-amber-500 to-yellow-500' },
+  const handleSaveProfile = async () => {
+    try {
+      setLoading(true); setError('');
+      const payload = { fullName: profileData.fullName, mobile: profileData.mobile, gender: profileData.gender };
+      if (typeof authAPI.updateProfile === 'function') await authAPI.updateProfile(payload);
+      const raw = sessionStorage.getItem('user') || localStorage.getItem('user');
+      const userData = JSON.parse(raw || '{}');
+      const updatedUser = { ...userData, ...payload };
+      if (sessionStorage.getItem('user')) sessionStorage.setItem('user', JSON.stringify(updatedUser));
+      if (localStorage.getItem('user')) localStorage.setItem('user', JSON.stringify(updatedUser));
+      setEditMode(false);
+      alert('✅ Profile updated successfully!');
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Failed to update profile.');
+    } finally { setLoading(false); }
+  };
+
+  const fetchOrders = async () => { try { await loadOrders(); } catch {} };
+
+  const initials = (profileData.fullName||user?.name||'U').split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2);
+
+  const tabs = [
+    { id: 'profile', label: 'Profile', icon: User },
+    { id: 'addresses', label: 'Addresses', icon: MapPin },
+    { id: 'orders', label: 'Orders', icon: Package },
   ];
 
-  // ─────────────────────────────────────────────────────────────────
-  // RENDER
-  // ─────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-slate-50">
-
-      {/* ══════════════ HEADER ══════════════ */}
-      <header className="sticky top-0 z-40 shadow-lg">
-
-        {/* Top bar */}
-        <div className="bg-slate-900">
-          <div className="max-w-[1500px] mx-auto px-4 py-2 flex items-center justify-between gap-4">
-
-            {/* Logo */}
-            <div className="flex items-center gap-2 shrink-0 cursor-pointer">
-              <div className="w-9 h-9 bg-gradient-to-br from-teal-500 to-cyan-600 rounded-lg flex items-center justify-center">
-                <ShoppingBag className="w-4 h-4 text-white" />
-              </div>
-              <div>
-                <h1 className="text-lg font-bold text-white leading-none">ShopAI</h1>
-                <p className="text-[9px] text-teal-400 leading-none">.marketplace</p>
-              </div>
+    <div className="min-h-screen" style={{ background: 'linear-gradient(135deg,#f0fdfa 0%,#ecfeff 40%,#f0fdf4 100%)' }}>
+      {/* HEADER */}
+      <header className="sticky top-0 z-40 bg-white/80 border-b border-teal-100" style={{ backdropFilter: 'blur(16px)' }}>
+        <div className="max-w-6xl mx-auto px-6 py-3.5 flex justify-between items-center">
+          {/* Logo */}
+          <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => setCurrentPage('products')}>
+            <div className="w-9 h-9 bg-gradient-to-br from-teal-500 to-cyan-500 rounded-xl flex items-center justify-center shadow-md shadow-teal-200">
+              <ShoppingBag className="w-5 h-5 text-white" />
             </div>
-
-            {/* Search */}
-            <div className="hidden md:flex flex-1 max-w-3xl relative">
-              <select
-                className="bg-white text-slate-800 px-3 py-2.5 rounded-l-lg border-r border-slate-200 text-sm focus:outline-none font-medium shrink-0"
-                onChange={e => applyCategory(e.target.value)}
-              >
-                <option value="">All</option>
-                {uniqueCategories.map((cat, i) => <option key={i} value={cat}>{cat}</option>)}
-              </select>
-
-              <div className="relative flex-1">
-                <input
-                  aria-label="Search products"
-                  value={searchQuery}
-                  onChange={e => {
-                    setSearchQuery(e.target.value);
-                    if (!e.target.value.trim()) { setIsSemanticMode(false); setSemanticResults([]); }
-                  }}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') handleFullSearch();
-                    if (e.key === 'Escape') setShowSuggestions(false);
-                  }}
-                  onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                  onFocus={() => semanticSuggestions.length > 0 && setShowSuggestions(true)}
-                  placeholder="Search products... (AI-powered)"
-                  className="w-full px-4 py-2.5 text-slate-900 focus:outline-none bg-white"
-                />
-                {searchLoading && (
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                    <Loader2 className="w-4 h-4 text-teal-500 animate-spin" />
-                  </div>
-                )}
-
-                {/* Suggestions dropdown */}
-                {showSuggestions && semanticSuggestions.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 bg-white border border-slate-200 shadow-xl z-50 max-h-96 overflow-y-auto mt-1 rounded-lg">
-                    <div className="px-4 py-2 bg-teal-50 border-b border-slate-100 flex items-center gap-2">
-                      <Sparkles className="w-3.5 h-3.5 text-teal-600" />
-                      <span className="text-xs font-semibold text-teal-700">AI Suggestions</span>
-                    </div>
-                    {semanticSuggestions.map((item, idx) => {
-                      const price = getPrice(item);
-                      const score = item.score ? `${Math.round(item.score * 100)}% match` : '';
-                      return (
-                        <div
-                          key={item.id || idx}
-                          onMouseDown={() => { setSearchQuery(item.name); setShowSuggestions(false); handleFullSearch(item.name); }}
-                          className="px-4 py-3 cursor-pointer hover:bg-teal-50 flex justify-between items-center border-b border-slate-100 last:border-0"
-                        >
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-slate-900 truncate">{item.name}</p>
-                            <p className="text-xs text-slate-500">{item.brand || getCategoryName(item)}</p>
-                          </div>
-                          <div className="flex flex-col items-end ml-3 shrink-0">
-                            <span className="text-sm font-bold text-teal-600">₹{price.toLocaleString()}</span>
-                            {score && <span className="text-xs text-slate-400">{score}</span>}
-                          </div>
-                        </div>
-                      );
-                    })}
-                    <div
-                      onMouseDown={() => { setShowSuggestions(false); handleFullSearch(); }}
-                      className="px-4 py-2.5 text-center text-sm text-teal-600 font-semibold hover:bg-teal-50 cursor-pointer border-t border-slate-100"
-                    >
-                      See all results for "{searchQuery}" →
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <button
-                onClick={() => handleFullSearch()}
-                className="bg-gradient-to-r from-cyan-400 to-cyan-500 hover:from-cyan-500 hover:to-cyan-600 px-5 py-2.5 rounded-r-lg transition-all"
-              >
-                <Search className="w-5 h-5 text-white" />
-              </button>
-            </div>
-
-            {/* Right icons */}
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => setCurrentPage('profile')}
-                className="hover:bg-white/10 px-3 py-2 rounded-lg transition-all group hidden sm:block"
-              >
-                <div className="text-xs text-slate-400 group-hover:text-white">Hello,</div>
-                <div className="font-bold text-sm text-white flex items-center gap-1.5">
-                  <UserCircle className="w-4 h-4" />
-                  {user?.name || user?.fullName || 'User'}
-                </div>
-              </button>
-
-              <button
-                onClick={() => setCurrentPage('cart')}
-                className="flex items-center gap-2 hover:bg-white/10 px-3 py-2 rounded-lg transition-all group relative"
-              >
-                <div className="relative">
-                  <ShoppingCart className="w-6 h-6 text-white group-hover:scale-110 transition-transform" />
-                  {cart.length > 0 && (
-                    <span className="absolute -top-2 -right-2 bg-orange-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                      {cart.length}
-                    </span>
-                  )}
-                </div>
-                <div className="hidden lg:flex flex-col items-start">
-                  <span className="text-xs text-slate-400">My Cart</span>
-                  <span className="font-bold text-sm text-white">{cart.length} items</span>
-                </div>
-              </button>
+            <div>
+              <span className="font-black text-xl text-slate-900 tracking-tight">Shop</span>
+              <span className="font-black text-xl bg-gradient-to-r from-teal-500 to-cyan-500 bg-clip-text text-transparent">AI</span>
             </div>
           </div>
-        </div>
 
-        {/* Nav bar */}
-        <div className="bg-gradient-to-r from-teal-700 to-cyan-700">
-          <div className="max-w-[1500px] mx-auto px-4 py-2 flex items-center gap-4 text-sm overflow-x-auto">
-            <button
-              onClick={() => applyCategory('')}
-              className="flex items-center gap-1.5 hover:bg-white/10 px-3 py-1.5 rounded-lg whitespace-nowrap transition-all text-white"
-            >
-              <Package className="w-3.5 h-3.5" /> All
-            </button>
-            {uniqueCategories.slice(0, 8).map((cat, i) => (
-              <button
-                key={i}
-                onClick={() => applyCategory(cat)}
-                className={`text-white hover:bg-white/10 px-3 py-1.5 rounded-lg whitespace-nowrap transition-all ${searchQuery === cat ? 'bg-white/20' : ''}`}
-              >
-                {cat}
+          {/* Nav */}
+          <nav className="hidden md:flex items-center gap-1">
+            {[['products','🛍️ Shop'],['orders','📦 Orders']].map(([page, label]) => (
+              <button key={page} onClick={() => setCurrentPage(page)}
+                className="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-teal-600 hover:bg-teal-50 rounded-xl transition-all">
+                {label}
               </button>
             ))}
-            <button
-              onClick={() => setChatOpen(true)}
-              className="flex items-center gap-1.5 text-white hover:bg-white/10 px-3 py-1.5 rounded-lg ml-auto whitespace-nowrap transition-all"
-            >
-              <Bot className="w-3.5 h-3.5" /> AI Help
+          </nav>
+
+          {/* Actions */}
+          <div className="flex items-center gap-2">
+            <button onClick={() => setCurrentPage('cart')} className="relative p-2.5 hover:bg-teal-50 rounded-xl transition-all">
+              <ShoppingCart className="w-5 h-5 text-slate-600" />
+              {cart.length > 0 && (
+                <span className="absolute -top-1 -right-1 bg-gradient-to-br from-teal-500 to-cyan-500 text-white text-[10px] font-black rounded-full w-4.5 h-4.5 flex items-center justify-center min-w-[18px] min-h-[18px]">
+                  {cart.length}
+                </span>
+              )}
             </button>
-            <button
-              onClick={handleLogout}
-              className="text-white hover:bg-white/10 px-3 py-1.5 rounded-lg whitespace-nowrap transition-all"
-            >
-              <LogOut className="w-3.5 h-3.5 inline mr-1" />Logout
+            <button onClick={handleLogout}
+              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white rounded-xl font-bold text-sm shadow-md shadow-teal-200 transition-all">
+              <LogOut className="w-4 h-4" />
+              <span className="hidden sm:inline">Logout</span>
             </button>
           </div>
         </div>
       </header>
 
-      {/* Mobile search */}
-      <div className="md:hidden bg-white p-3 border-b shadow-sm">
-        <div className="flex items-center gap-2 bg-slate-100 rounded-lg px-3 py-2.5">
-          <Search className="w-4 h-4 text-slate-500 shrink-0" />
-          <input
-            aria-label="Search products"
-            value={searchQuery}
-            onChange={e => {
-              setSearchQuery(e.target.value);
-              if (!e.target.value.trim()) { setIsSemanticMode(false); setSemanticResults([]); }
-            }}
-            onKeyDown={e => { if (e.key === 'Enter') handleFullSearch(); }}
-            placeholder="Search products (AI-powered)..."
-            className="flex-1 bg-transparent text-sm focus:outline-none"
-          />
-          {searchLoading && <Loader2 className="w-4 h-4 text-teal-500 animate-spin shrink-0" />}
-        </div>
-      </div>
+      <div className="max-w-6xl mx-auto px-6 py-10">
+        {/* ── HERO ROW ── */}
+        <div className="relative bg-gradient-to-br from-teal-500 via-cyan-500 to-teal-400 rounded-3xl p-8 mb-8 overflow-hidden text-white shadow-2xl shadow-teal-200">
+          {/* Decorative blobs */}
+          <div className="absolute -top-12 -right-12 w-56 h-56 bg-white/10 rounded-full" />
+          <div className="absolute top-8 -right-4 w-32 h-32 bg-white/10 rounded-full" />
+          <div className="absolute -bottom-8 right-32 w-40 h-40 bg-white/10 rounded-full" />
 
-      {/* ══════════════ MAIN CONTENT ══════════════ */}
-      <div className="max-w-[1500px] mx-auto px-3">
-
-        {error && (
-          <div className="mt-4 bg-red-50 border-l-4 border-red-500 text-red-800 px-4 py-3 mb-4 rounded-r-lg">
-            <p className="text-sm font-medium">{error}</p>
-          </div>
-        )}
-
-        {/* Banner */}
-        <div className="relative h-[300px] overflow-hidden mt-4 mb-6 bg-white rounded-xl shadow-lg">
-          <div
-            className="absolute inset-0 flex transition-transform duration-500"
-            style={{ transform: `translateX(-${currentBanner * 100}%)` }}
-          >
-            {banners.map((b, idx) => (
-              <div key={idx} className="min-w-full h-full relative">
-                <div className={`absolute inset-0 bg-gradient-to-r ${b.bg}`}>
-                  <div className="max-w-2xl h-full flex flex-col justify-center px-10 text-white">
-                    <h2 className="text-4xl font-extrabold mb-3">{b.title}</h2>
-                    <p className="text-xl font-semibold mb-1">{b.subtitle}</p>
-                    <p className="text-base mb-5 text-white/90">{b.desc}</p>
-                    <button
-                      onClick={() => { setSearchQuery(''); setIsSemanticMode(false); setSemanticResults([]); }}
-                      className="w-fit px-7 py-2.5 bg-white text-slate-900 font-bold rounded-lg hover:shadow-xl transition-all hover:scale-105 text-sm"
-                    >
-                      Shop Now →
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-          <button
-            onClick={() => setCurrentBanner(p => (p - 1 + banners.length) % banners.length)}
-            className="absolute left-3 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white p-2 rounded-full shadow-lg"
-          >
-            <ChevronLeft className="w-4 h-4 text-slate-900" />
-          </button>
-          <button
-            onClick={() => setCurrentBanner(p => (p + 1) % banners.length)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white p-2 rounded-full shadow-lg"
-          >
-            <ChevronRight className="w-4 h-4 text-slate-900" />
-          </button>
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
-            {banners.map((_, idx) => (
-              <button
-                key={idx}
-                onClick={() => setCurrentBanner(idx)}
-                className={`h-1.5 rounded-full transition-all ${currentBanner === idx ? 'bg-white w-6' : 'bg-white/50 w-1.5'}`}
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* Category cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          {[
-            { title: 'Trending Electronics', subs: ['Smartphones', 'Laptops', 'Tablets', 'Accessories'], cat: 'Electronics', icon: <Zap className="w-4 h-4" /> },
-            { title: 'Audio & Wearables', subs: ['Headphones', 'Smart Watches', 'Earbuds', 'Speakers'], cat: 'Audio', icon: <Star className="w-4 h-4" /> },
-            { title: 'Home Appliances', subs: ['Air Purifiers', 'Vacuums', 'Microwaves', 'Washers'], cat: 'Appliances', icon: <Package className="w-4 h-4" /> },
-            { title: 'Deals Under ₹999', subs: ['Cables', 'Cases', 'Chargers', 'More'], cat: '', icon: <TrendingUp className="w-4 h-4" /> },
-          ].map((c, i) => (
-            <div key={i} className="bg-white p-4 rounded-lg shadow-sm hover:shadow-md transition-all">
-              <h3 className="text-sm font-bold mb-2 text-slate-900 flex items-center gap-1.5">
-                <span className="text-teal-600">{c.icon}</span>{c.title}
-              </h3>
-              <div className="grid grid-cols-2 gap-1.5 mb-3">
-                {c.subs.map(sub => (
-                  <div key={sub}>
-                    <div className="aspect-square bg-gradient-to-br from-slate-100 to-slate-200 rounded-md mb-1" />
-                    <p className="text-xs text-slate-600">{sub}</p>
-                  </div>
-                ))}
-              </div>
-              <button onClick={() => applyCategory(c.cat)} className="text-xs text-teal-600 hover:text-teal-700 font-semibold">
-                Explore all →
-              </button>
+          <div className="relative flex flex-col sm:flex-row items-start sm:items-center gap-6">
+            {/* Avatar */}
+            <div className="w-20 h-20 bg-white/25 rounded-2xl flex items-center justify-center text-3xl font-black shadow-inner border-2 border-white/40 flex-shrink-0">
+              {initials}
             </div>
-          ))}
-        </div>
 
-        {/* Filter bar */}
-        <div className="bg-white p-3 mb-4 rounded-lg shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-slate-600">Sort:</span>
-            <select className="text-xs border border-slate-200 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500">
-              <option>Featured</option>
-              <option>Price: Low to High</option>
-              <option>Price: High to Low</option>
-              <option>Top Rated</option>
-            </select>
-          </div>
-          <div className="flex items-center gap-2">
-            {isSemanticMode && (
-              <>
-                <span className="text-xs bg-teal-100 text-teal-700 px-2.5 py-1 rounded-full font-semibold flex items-center gap-1">
-                  <Sparkles className="w-3 h-3" /> AI results for "{searchQuery}"
-                </span>
-                <button
-                  onClick={() => { setSearchQuery(''); setIsSemanticMode(false); setSemanticResults([]); }}
-                  className="text-xs text-slate-500 hover:text-slate-700 underline"
-                >
-                  Clear
-                </button>
-              </>
-            )}
-            <span className="text-xs text-slate-500">
-              <strong className="text-slate-900">{displayedProducts.length}</strong> products
-            </span>
-          </div>
-        </div>
+            {/* Info */}
+            <div className="flex-1">
+              <p className="text-teal-100 text-sm font-semibold mb-1">Welcome back 👋</p>
+              <h1 className="text-3xl font-black tracking-tight mb-1">{profileData.fullName || user?.name || 'User'}</h1>
+              <p className="text-teal-100 text-sm">{profileData.email || user?.email}</p>
+            </div>
 
-        {/* Products grid */}
-        <div className="pb-8">
-          {searchLoading && isSemanticMode ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-              {[...Array(10)].map((_, i) => (
-                <div key={i} className="bg-white p-4 rounded-lg border border-slate-200 animate-pulse">
-                  <div className="aspect-square bg-slate-200 rounded-lg mb-3" />
-                  <div className="h-3.5 bg-slate-200 rounded mb-2" />
-                  <div className="h-3 bg-slate-200 rounded w-2/3 mb-3" />
-                  <div className="h-8 bg-slate-200 rounded" />
+            {/* Stats chips */}
+            <div className="flex flex-wrap gap-3 sm:flex-col sm:items-end">
+              {[
+                { label: 'Orders', value: orders.length, icon: Package },
+                { label: 'Addresses', value: profileData.addresses?.length || 0, icon: MapPin },
+                { label: 'Cart', value: cart.length, icon: ShoppingCart },
+              ].map(({ label, value, icon: Icon }) => (
+                <div key={label} className="flex items-center gap-2 bg-white/20 rounded-2xl px-4 py-2 backdrop-blur-sm border border-white/30">
+                  <Icon className="w-4 h-4" />
+                  <span className="font-black text-lg leading-none">{value}</span>
+                  <span className="text-teal-100 text-xs font-medium">{label}</span>
                 </div>
               ))}
             </div>
-          ) : displayedProducts.length === 0 ? (
-            <div className="bg-white p-12 text-center rounded-xl shadow-sm">
-              <Search className="w-12 h-12 mx-auto text-slate-300 mb-3" />
-              <h3 className="text-lg font-bold text-slate-900 mb-1">No products found</h3>
-              <p className="text-slate-500 text-sm mb-5">
-                {isSemanticMode ? `No matches for "${searchQuery}". Try different keywords.` : 'Try different keywords.'}
-              </p>
+          </div>
+        </div>
+
+        {/* ── TABS ── */}
+        <div className="flex gap-1 bg-white rounded-2xl p-1.5 shadow-sm border border-slate-100 mb-8 w-fit">
+          {tabs.map(({ id, label, icon: Icon }) => (
+            <button key={id} onClick={() => setActiveTab(id)}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 ${
+                activeTab === id
+                  ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-md shadow-teal-200'
+                  : 'text-slate-500 hover:text-teal-600 hover:bg-teal-50'
+              }`}>
+              <Icon className="w-4 h-4" />
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* ── PROFILE TAB ── */}
+        {activeTab === 'profile' && (
+          <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+            <div className="flex items-center justify-between px-8 py-6 border-b border-slate-100">
+              <div>
+                <h2 className="text-xl font-black text-slate-900">Personal Information</h2>
+                <p className="text-slate-500 text-sm mt-0.5">Manage your personal details</p>
+              </div>
               <button
-                onClick={() => { setSearchQuery(''); setIsSemanticMode(false); setSemanticResults([]); }}
-                className="px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-semibold rounded-lg transition-all text-sm"
-              >
-                View All Products
+                onClick={editMode ? handleSaveProfile : () => setEditMode(true)}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all shadow-md ${
+                  editMode
+                    ? 'bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-green-200 hover:shadow-lg'
+                    : 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-teal-200 hover:shadow-lg'
+                }`}>
+                {editMode ? '✓ Save Changes' : '✏️ Edit Profile'}
               </button>
             </div>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-              {displayedProducts.map((product, index) => {
-                const price    = getPrice(product);
-                const rating   = getRating(product);
-                const category = getCategoryName(product);
-                const pid      = getProductId(product) || index;
 
-                return (
-                  <div
-                    key={pid}
-                    className="bg-white p-3 hover:shadow-lg transition-all rounded-lg border border-slate-200 flex flex-col group"
-                  >
-                    <div className="relative mb-3 bg-slate-50 rounded-lg overflow-hidden aspect-square">
-                      <img
-                        src={product.imageUrl || 'https://via.placeholder.com/300x300/f1f5f9/94a3b8?text=Product'}
-                        alt={product.name}
-                        className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
-                        onError={e => { e.currentTarget.src = 'https://via.placeholder.com/300x300/f1f5f9/94a3b8?text=Product'; }}
-                      />
-                      {isSemanticMode && product.score && (
-                        <div className="absolute top-2 right-2 bg-teal-600 text-white text-xs font-bold px-1.5 py-0.5 rounded">
-                          {Math.round(product.score * 100)}%
-                        </div>
-                      )}
-                      {product.stockQuantity !== undefined && product.stockQuantity > 0 && product.stockQuantity <= 5 && (
-                        <div className="absolute top-2 left-2 bg-orange-500 text-white text-xs font-bold px-1.5 py-0.5 rounded">
-                          Only {product.stockQuantity} left
-                        </div>
-                      )}
-                    </div>
+            <div className="p-8">
+              <div className="grid md:grid-cols-2 gap-6">
+                {[
+                  { key: 'fullName', label: 'Full Name', type: 'text', editable: true },
+                  { key: 'email', label: 'Email Address', type: 'email', editable: false, note: '✓ Cannot be changed' },
+                  { key: 'mobile', label: 'Mobile Number', type: 'tel', editable: true },
+                ].map(({ key, label, type, editable, note }) => (
+                  <div key={key}>
+                    <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">{label}</label>
+                    <input
+                      type={type}
+                      value={(profileData[key]||'').toString()}
+                      onChange={e => setProfileData({...profileData,[key]:e.target.value})}
+                      disabled={!editMode || !editable}
+                      className={`w-full px-4 py-3.5 rounded-xl text-sm font-medium transition-all focus:outline-none ${
+                        editMode && editable
+                          ? 'bg-white border-2 border-teal-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-50 text-slate-800'
+                          : 'bg-slate-50 border-2 border-slate-100 text-slate-500 cursor-not-allowed'
+                      }`}
+                    />
+                    {note && <p className="text-[11px] text-slate-400 mt-1 font-medium">{note}</p>}
+                  </div>
+                ))}
 
-                    <div className="flex-1 flex flex-col">
-                      <h3 className="text-xs font-medium text-slate-900 mb-1 line-clamp-2 group-hover:text-teal-600 transition-colors">
-                        {product.name}
-                      </h3>
+                {/* Gender */}
+                <div>
+                  <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Gender</label>
+                  <select
+                    value={profileData.gender || ''}
+                    onChange={e => setProfileData({...profileData, gender: e.target.value})}
+                    disabled={!editMode}
+                    className={`w-full px-4 py-3.5 rounded-xl text-sm font-medium transition-all focus:outline-none ${
+                      editMode
+                        ? 'bg-white border-2 border-teal-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-50 text-slate-800'
+                        : 'bg-slate-50 border-2 border-slate-100 text-slate-500 cursor-not-allowed'
+                    }`}>
+                    <option value="">Select Gender (Optional)</option>
+                    <option value="Male">👨 Male</option>
+                    <option value="Female">👩 Female</option>
+                    <option value="Other">🧑 Other</option>
+                    <option value="PreferNotToSay">🤐 Prefer Not to Say</option>
+                  </select>
+                </div>
+              </div>
 
-                      {rating && (
-                        <div className="flex items-center gap-0.5 mb-1.5">
-                          {[...Array(5)].map((_, i) => (
-                            <Star
-                              key={i}
-                              className={`w-3 h-3 ${i < Math.floor(rating) ? 'text-amber-400 fill-amber-400' : 'text-slate-200 fill-slate-200'}`}
-                            />
-                          ))}
-                          <span className="text-xs text-slate-500 ml-0.5">({product.reviewCount || 0})</span>
-                        </div>
-                      )}
+              {editMode && (
+                <div className="flex gap-4 mt-8 pt-6 border-t border-slate-100">
+                  <button onClick={handleSaveProfile} disabled={loading}
+                    className="flex-1 py-3.5 bg-gradient-to-r from-emerald-500 to-green-500 text-white rounded-2xl font-black text-sm shadow-lg shadow-green-200 hover:shadow-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+                    {loading ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Saving…</> : '✓ Save Changes'}
+                  </button>
+                  <button onClick={() => { setEditMode(false); fetchProfile(); }}
+                    className="flex-1 py-3.5 border-2 border-slate-200 text-slate-600 rounded-2xl font-black text-sm hover:border-slate-300 hover:bg-slate-50 transition-all">
+                    ✕ Discard
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
-                      <div className="mb-2">
-                        <div className="flex items-baseline gap-1.5">
-                          <span className="text-xs font-semibold text-orange-500 bg-orange-50 px-1.5 py-0.5 rounded">-20%</span>
-                          <span className="text-base font-bold text-slate-900">₹{price.toLocaleString()}</span>
+        {/* ── ADDRESSES TAB ── */}
+        {activeTab === 'addresses' && (
+          <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+            <div className="flex items-center justify-between px-8 py-6 border-b border-slate-100">
+              <div>
+                <h2 className="text-xl font-black text-slate-900">Saved Addresses</h2>
+                <p className="text-slate-500 text-sm mt-0.5">{profileData.addresses?.length || 0} address{profileData.addresses?.length !== 1 ? 'es' : ''} saved</p>
+              </div>
+              <div className="flex gap-2">
+                {profileData.addresses?.length > 0 && (
+                  <button
+                    onClick={async () => {
+                      if (!window.confirm('🗑️ Delete all addresses?')) return;
+                      try { for (const a of profileData.addresses) await addressAPI.remove(a.id); await fetchAddresses(); alert('✅ All deleted'); }
+                      catch { alert('❌ Failed to delete some addresses'); }
+                    }}
+                    className="flex items-center gap-2 px-4 py-2.5 border-2 border-red-200 text-red-500 rounded-xl font-bold text-sm hover:bg-red-50 transition-all">
+                    <Trash2 className="w-4 h-4" /> Delete All
+                  </button>
+                )}
+                <button onClick={() => setShowAddressModal(true)}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-teal-500 to-cyan-500 text-white rounded-xl font-bold text-sm shadow-md shadow-teal-200 hover:shadow-lg transition-all">
+                  <Plus className="w-4 h-4" /> Add Address
+                </button>
+              </div>
+            </div>
+
+            <div className="p-8">
+              {!profileData.addresses || profileData.addresses.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <div className="w-20 h-20 bg-gradient-to-br from-teal-50 to-cyan-100 rounded-3xl flex items-center justify-center mb-5 border-2 border-dashed border-teal-200">
+                    <MapPin className="w-9 h-9 text-teal-400" />
+                  </div>
+                  <p className="font-black text-slate-700 text-lg mb-1">No addresses yet</p>
+                  <p className="text-slate-400 text-sm mb-6">Add your first delivery address</p>
+                  <button onClick={() => setShowAddressModal(true)}
+                    className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-teal-500 to-cyan-500 text-white rounded-2xl font-bold shadow-lg shadow-teal-200 hover:shadow-xl transition-all">
+                    <Plus className="w-5 h-5" /> Add Address
+                  </button>
+                </div>
+              ) : (
+                <div className="grid md:grid-cols-2 gap-4">
+                  {profileData.addresses.map((addr, idx) => {
+                    const labelIcon = addr.label === 'Work' ? <Briefcase className="w-4 h-4" /> : addr.label === 'Other' ? <MapPin className="w-4 h-4" /> : <Home className="w-4 h-4" />;
+                    const labelColor = addr.label === 'Work' ? 'from-violet-500 to-purple-500' : addr.label === 'Other' ? 'from-orange-400 to-amber-500' : 'from-teal-500 to-cyan-500';
+                    return (
+                      <div key={addr.id} className="group relative border-2 border-slate-100 hover:border-teal-200 rounded-2xl p-5 transition-all hover:shadow-md bg-white">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex items-center gap-2.5">
+                            <div className={`w-8 h-8 bg-gradient-to-br ${labelColor} rounded-xl flex items-center justify-center text-white`}>{labelIcon}</div>
+                            <div>
+                              <p className="font-black text-slate-800 text-sm">{addr.label || `Address ${idx+1}`}</p>
+                              {addr.IsDefault && (
+                                <span className="text-[10px] font-bold bg-teal-50 text-teal-600 px-2 py-0.5 rounded-full border border-teal-200 flex items-center gap-1 w-fit mt-0.5">
+                                  <Star className="w-2.5 h-2.5 fill-teal-500" /> Default
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <button onClick={async () => {
+                            if (!window.confirm('Delete this address?')) return;
+                            try { await addressAPI.remove(addr.id); await fetchAddresses(); }
+                            catch { alert('❌ Failed to delete'); }
+                          }} className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-300 hover:text-red-400 hover:bg-red-50 rounded-lg transition-all">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
-                        <div className="text-xs text-slate-400">
-                          M.R.P: <span className="line-through">₹{(price * 1.2).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                        <p className="text-sm text-slate-600 leading-relaxed">
+                          {[addr.AddressLine1,addr.AddressLine2,addr.City,addr.State,addr.PostalCode,addr.Country].filter(Boolean).join(', ')}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── ORDERS TAB ── */}
+        {activeTab === 'orders' && (
+          <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+            <div className="flex items-center justify-between px-8 py-6 border-b border-slate-100">
+              <div>
+                <h2 className="text-xl font-black text-slate-900">Order History</h2>
+                <p className="text-slate-500 text-sm mt-0.5">{orders.length} order{orders.length !== 1 ? 's' : ''} placed</p>
+              </div>
+              <button onClick={() => setCurrentPage('orders')}
+                className="flex items-center gap-2 px-4 py-2.5 border-2 border-teal-200 text-teal-600 rounded-xl font-bold text-sm hover:bg-teal-50 transition-all">
+                View All <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="divide-y divide-slate-50">
+              {orders.length === 0 ? (
+                <div className="flex flex-col items-center py-16">
+                  <div className="w-20 h-20 bg-gradient-to-br from-orange-50 to-amber-100 rounded-3xl flex items-center justify-center mb-5 border-2 border-dashed border-orange-200">
+                    <Package className="w-9 h-9 text-orange-400" />
+                  </div>
+                  <p className="font-black text-slate-700 text-lg mb-1">No orders yet</p>
+                  <p className="text-slate-400 text-sm mb-6">Start shopping to see your orders here</p>
+                  <button onClick={() => setCurrentPage('products')}
+                    className="px-6 py-3 bg-gradient-to-r from-teal-500 to-cyan-500 text-white rounded-2xl font-bold shadow-lg shadow-teal-200">
+                    🛍️ Start Shopping
+                  </button>
+                </div>
+              ) : (
+                orders.slice(0,5).map(order => {
+                  const statusStyles = {
+                    Pending:    'bg-amber-50 text-amber-700 border-amber-200',
+                    Processing: 'bg-blue-50 text-blue-700 border-blue-200',
+                    Shipped:    'bg-violet-50 text-violet-700 border-violet-200',
+                    Delivered:  'bg-emerald-50 text-emerald-700 border-emerald-200',
+                  };
+                  const st = statusStyles[order.status] || 'bg-slate-50 text-slate-600 border-slate-200';
+                  return (
+                    <div key={order.id} className="flex items-center justify-between px-8 py-5 hover:bg-slate-50 transition-all group">
+                      <div className="flex items-center gap-4">
+                        <div className="w-11 h-11 bg-gradient-to-br from-teal-50 to-cyan-100 rounded-2xl flex items-center justify-center text-sm font-black text-teal-700 border border-teal-100">
+                          #{order.id % 100}
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-800 text-sm">Order #{order.id}</p>
+                          <p className="text-slate-400 text-xs mt-0.5">
+                            {order.orderDate ? new Date(order.orderDate).toLocaleDateString('en-IN',{year:'numeric',month:'short',day:'numeric'}) : 'N/A'}
+                          </p>
                         </div>
                       </div>
 
-                      <p className="text-xs text-slate-500 mb-3">{product.brand || category}</p>
-
-                      <div className="mt-auto space-y-1.5">
-                        <button
-                          onClick={() => addToCart(product, setError)}
-                          disabled={product.stockQuantity === 0}
-                          className="w-full px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                        >
-                          {product.stockQuantity === 0 ? 'Out of Stock' : 'Add to Cart'}
+                      <div className="flex items-center gap-4">
+                        <p className="font-black text-teal-600">₹{(order.totalAmount||0).toLocaleString()}</p>
+                        <span className={`text-[11px] font-bold px-3 py-1 rounded-full border ${st}`}>{order.status||'Processing'}</span>
+                        <button onClick={() => setCurrentPage('orders')}
+                          className="opacity-0 group-hover:opacity-100 p-2 hover:bg-teal-50 rounded-xl transition-all">
+                          <ChevronRight className="w-4 h-4 text-teal-500" />
                         </button>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
-      {/* ══════════════ AI CHAT WIDGET ══════════════ */}
-      {chatOpen && (
-        <div className="fixed bottom-6 right-6 w-[400px] bg-white rounded-2xl shadow-2xl flex flex-col border border-slate-200 z-50 max-h-[650px]">
-
-          {/* Header */}
-          <div className="bg-gradient-to-r from-teal-600 to-cyan-600 text-white p-4 flex justify-between items-center rounded-t-2xl shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center">
-                <Bot className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="font-bold text-sm">ShopAI Assistant</h3>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                  <p className="text-xs text-teal-100">Online · AI-powered</p>
-                </div>
-              </div>
-            </div>
-            <button
-              aria-label="Close chat"
-              onClick={() => setChatOpen(false)}
-              className="hover:bg-white/20 p-1.5 rounded-lg transition-all"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50 min-h-[320px] max-h-[430px]">
-
-            {/* Empty state */}
-            {chatMessages.length === 0 && (
-              <div className="text-center pt-4">
-                <div className="w-14 h-14 bg-teal-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                  <Bot className="w-7 h-7 text-teal-600" />
-                </div>
-                <p className="font-semibold text-slate-800 text-sm mb-1">Hi {user?.fullName?.split(' ')[0] || 'there'}! 👋</p>
-                <p className="text-xs text-slate-500 mb-4">I can search products, manage your cart,<br />compare items, and place orders.</p>
-                <div className="flex flex-wrap gap-1.5 justify-center">
-                  {QUICK_CHIPS.map((chip, i) => (
-                    <button
-                      key={i}
-                      onClick={() => sendMessage(chip.msg)}
-                      className="text-xs bg-white border border-slate-200 hover:border-teal-400 hover:bg-teal-50 text-slate-700 px-2.5 py-1.5 rounded-full transition-all"
-                    >
-                      {chip.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Message list */}
-            {chatMessages.map((msg, idx) => (
-              <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} gap-2`}>
-                {msg.role === 'assistant' && (
-                  <div className="w-7 h-7 bg-teal-100 rounded-full flex items-center justify-center shrink-0 mt-0.5">
-                    <Bot className="w-3.5 h-3.5 text-teal-600" />
-                  </div>
-                )}
-                <div className="max-w-[80%] space-y-2">
-                  <div className={`px-3 py-2 rounded-2xl text-xs leading-relaxed whitespace-pre-wrap
-                    ${msg.role === 'user'
-                      ? 'bg-teal-600 text-white rounded-tr-sm'
-                      : 'bg-white text-slate-900 border border-slate-200 rounded-tl-sm shadow-sm'
-                    }`}
-                  >
-                    {msg.content}
-                  </div>
-
-                  {/* Product cards from agent */}
-                  {msg.role === 'assistant' && msg.products && msg.products.length > 0 && (
-                    <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-                      {msg.products.slice(0, 3).map((p, pi) => (
-                        <ChatProductCard
-                          key={pi}
-                          product={p}
-                          onAddToCart={handleChatAddToCart}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-
-            {/* Typing indicator */}
-            {isTyping && (
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 bg-teal-100 rounded-full flex items-center justify-center shrink-0">
-                  <Bot className="w-3.5 h-3.5 text-teal-600" />
-                </div>
-                <div className="bg-white border border-slate-200 rounded-2xl rounded-tl-sm px-3 py-2 shadow-sm">
-                  <div className="flex gap-1 items-center">
-                    <div className="w-1.5 h-1.5 bg-teal-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <div className="w-1.5 h-1.5 bg-teal-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <div className="w-1.5 h-1.5 bg-teal-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div ref={chatEndRef} />
-          </div>
-
-          {/* Input */}
-          <div className="border-t border-slate-200 p-3 bg-white rounded-b-2xl flex gap-2 shrink-0">
-            <input
-              type="text"
-              value={currentMessage}
-              onChange={e => setCurrentMessage(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-              placeholder="Ask me anything..."
-              disabled={isTyping}
-              className="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:opacity-50 bg-slate-50"
-            />
-            <button
-              onClick={() => sendMessage()}
-              disabled={!currentMessage.trim() || isTyping}
-              className="bg-teal-600 hover:bg-teal-700 disabled:opacity-40 disabled:cursor-not-allowed text-white p-2.5 rounded-xl transition-all"
-            >
-              {isTyping ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Floating chat button */}
-      {!chatOpen && (
-        <button
-          onClick={() => setChatOpen(true)}
-          className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-br from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 text-white rounded-2xl shadow-xl flex items-center justify-center z-40 transition-all hover:scale-110"
-        >
-          <Bot className="w-6 h-6" />
-          {chatMessages.length > 0 && (
-            <span className="absolute -top-1 -right-1 w-5 h-5 bg-orange-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
-              {Math.min(chatMessages.filter(m => m.role === 'user').length, 9)}
-            </span>
-          )}
-        </button>
+      {/* ADDRESS MODAL */}
+      {showAddressModal && (
+        <AddressModal
+          onClose={() => setShowAddressModal(false)}
+          onSave={async () => {
+            await fetchAddresses();
+            setShowAddressModal(false);
+            alert('✅ Address added successfully');
+          }}
+        />
       )}
     </div>
   );
 };
 
-export default ProductsPage;
+export default ProfilePage;

@@ -4,6 +4,7 @@ api_client.py  (v2 — AI Controller Edition)
 HTTP client that talks exclusively to /api/ai/* on your .NET backend.
 All cart, order, address, and product calls go through the new AIChatController,
 which returns a consistent { success, message, data } wrapper.
+
 To plug in a real base URL, set API_BASE_URL in your .env file.
 """
 
@@ -18,6 +19,7 @@ class APIClient:
     """
     Communicates with the .NET AIChatController on behalf of the agent.
     Instantiated per-request with the user's JWT token.
+
     All methods return:
         { 'success': bool, 'message': str, 'data': <payload> }
     """
@@ -28,7 +30,7 @@ class APIClient:
             'Authorization': f'Bearer {jwt_token}',
             'Content-Type': 'application/json'
         }
-        self.timeout = 20   # seconds — generous for Render.com cold-start
+        self.timeout = 60   # seconds — Render.com free tier cold-start can take 40-60s
 
     # ── Internal HTTP Helpers ─────────────────────────────────────────────────
 
@@ -115,11 +117,30 @@ class APIClient:
 
     # ── Context (session bootstrap) ───────────────────────────────────────────
 
+    def warmup(self) -> bool:
+        """
+        GET /ai/cart — lightweight ping to wake up Render.com free tier.
+        Called once at agent startup so the first real user request is fast.
+        Returns True if the server responded.
+        """
+        try:
+            resp = requests.get(
+                f"{self.base_url}/ai/cart",
+                headers=self.headers,
+                timeout=90   # allow full cold-start time
+            )
+            logger.info(f"🔥 Warmup ping → {resp.status_code}")
+            return resp.ok
+        except Exception as e:
+            logger.warning(f"🔥 Warmup ping failed (server may be starting): {e}")
+            return False
+
     def get_context(self) -> Dict[str, Any]:
         """
         GET /ai/context
         Returns cart + addresses + recent orders + user info in one call.
         Call once at the start of each chat session.
+
         data: {
           userId, userName, userEmail,
           cart: { items, total, isEmpty },
@@ -140,6 +161,7 @@ class APIClient:
         """
         GET /ai/products/search?q=...&topK=...
         Semantic vector search via MongoDB Atlas.
+
         data: list of products with { id, name, brand, price, category,
                                       description, imageUrl, stockQuantity,
                                       isAvailable, rating, reviewCount }
@@ -157,6 +179,7 @@ class APIClient:
         """
         POST /ai/products/compare
         Body: { productIds: ['id1', 'id2', ...] }
+
         data: {
           products: [...],
           highlights: ['💰 Product A is cheapest...', '⭐ Product B rated highest...']

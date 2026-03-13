@@ -2,6 +2,7 @@
 orchestrator.py  (v3)
 =====================
 Coordinates LLMAgent ↔ APIClient ↔ AIChatController (/api/ai/*).
+
 Key change from v2: jwt_token comes from ChatRequest and is forwarded
 to APIClient so every .NET call is authenticated as the correct user.
 No userId plumbing needed — the .NET controller reads the user from the JWT.
@@ -23,6 +24,7 @@ API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:5033/api")
 class ShoppingAgentOrchestrator:
     """
     Entry point for every chat message.
+
     Flow:
       1. Build APIClient with the user's JWT (from request.jwt_token)
       2. Extract intent via LLMAgent
@@ -107,11 +109,21 @@ class ShoppingAgentOrchestrator:
 
         # ── Compare ───────────────────────────────────────────────
         elif intent == 'compare_products':
-            ids = params.get('product_ids', [])
+            ids   = params.get('product_ids', [])
+            query = params.get('query') or params.get('category') or ''
+
+            # If no IDs from history, search for products and compare top results
+            if len(ids) < 2 and query:
+                logger.info(f"🔍 compare: no IDs in history, searching for '{query}'")
+                search = api_client.search_products(query=query, top_k=4)
+                results = search.get('data') or []
+                ids = [r.get('id') for r in results if r.get('id')][:4]
+                logger.info(f"🔍 compare: resolved IDs from search: {ids}")
+
             if len(ids) < 2:
                 return {
                     'success': False,
-                    'message': 'I need at least 2 product IDs to compare. Please share which products you want to compare.',
+                    'message': 'Please search for some products first, then ask me to compare them.',
                     'data': None
                 }
             return api_client.compare_products(ids)

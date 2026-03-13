@@ -541,7 +541,7 @@ const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCu
   const uniqueCategories = Array.from(new Set((products || []).map(p => getCategoryName(p)).filter(Boolean))).slice(0, 20);
 
   const banners = [
-    { title: 'Summer Sale 2026', subtitle: 'Up to 50% OFF on Electronics', desc: 'Free shipping on orders above ₹999', bg: 'linear-gradient(135deg,#99f6e4 0%,#5eead4 50%,#2dd4bf 100%)', tc: '#064e3b', bb: '#0d9488', bc: 'white' },
+    { title: 'Summer Sale 2026', subtitle: 'Up to 50% OFF on Electronics', desc: 'Free shipping on orders above ₹999', bg: 'linear-gradient(135deg,#fca5a5 0%,#f87171 50%,#ef4444 100%)', tc: '#a0328e', bb: '#d61e64', bc: 'white' },
     { title: 'New Arrivals', subtitle: 'Latest Smartphones & Gadgets', desc: 'Shop the newest tech at best prices', bg: 'linear-gradient(135deg,#ccfbf1 0%,#99f6e4 50%,#5eead4 100%)', tc: '#064e3b', bb: '#0f766e', bc: 'white' },
     { title: 'Special Offer', subtitle: 'Buy 2 Get 1 Free', desc: 'On selected audio & wearables', bg: 'linear-gradient(135deg,#fef9c3 0%,#fde68a 50%,#fcd34d 100%)', tc: '#713f12', bb: '#f59e0b', bc: 'white' },
   ];

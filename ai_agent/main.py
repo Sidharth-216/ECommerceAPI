@@ -2,8 +2,10 @@
 main.py  (v2)
 FastAPI entry point for the ShopAI agent.
 Thin by design — only wires up services and routes.
+
 Run locally:
     uvicorn main:app --reload --port 7860
+
 On HF Spaces: started automatically via Dockerfile CMD.
 """
 
@@ -67,6 +69,21 @@ async def startup():
         logger.error(f"❌ Orchestrator failed: {e}")
 
     logger.info(f"✅ Service ready on port {os.getenv('PORT', '7860')}")
+
+    # Warm up Render.com free tier in the background so the first user request is fast.
+    # We use a dummy JWT — the warmup just needs Render to boot, not authenticate.
+    import asyncio
+    async def _warmup():
+        import time
+        await asyncio.sleep(3)   # let HF Spaces finish startup first
+        try:
+            from api_client import APIClient
+            dummy = APIClient(os.getenv("API_BASE_URL", ""), "warmup")
+            logger.info("🔥 Sending warmup ping to Render.com...")
+            dummy.warmup()
+        except Exception as e:
+            logger.warning(f"🔥 Warmup error: {e}")
+    asyncio.create_task(_warmup())
 
 
 # ─────────────────────────────────────────────────────────────────────────────

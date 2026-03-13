@@ -1,659 +1,645 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingBag, ShoppingCart, LogOut, User, MapPin, Package, Clock, Plus, Trash2 } from 'lucide-react';
+import {
+  ShoppingBag, ShoppingCart, LogOut, User, MapPin, Package,
+  Clock, Plus, Trash2, ChevronRight, X, Home, Briefcase, Star
+} from 'lucide-react';
 import { authAPI, addressAPI } from '../api';
 
+/* ─────────────────────────────────────────────
+   Address Modal Component
+───────────────────────────────────────────── */
+const AddressModal = ({ onClose, onSave }) => {
+  const [form, setForm] = useState({
+    addressLine1: '', addressLine2: '', city: '',
+    state: '', postalCode: '', country: 'India',
+    label: 'Home', isDefault: false
+  });
+  const [saving, setSaving] = useState(false);
+  const [step, setStep] = useState(0);
+
+  const labels = [
+    { value: 'Home', icon: <Home className="w-4 h-4" />, color: 'from-teal-500 to-cyan-500' },
+    { value: 'Work', icon: <Briefcase className="w-4 h-4" />, color: 'from-violet-500 to-purple-500' },
+    { value: 'Other', icon: <MapPin className="w-4 h-4" />, color: 'from-orange-400 to-amber-500' },
+  ];
+
+  const fields = [
+    [
+      { key: 'addressLine1', label: 'Street Address', placeholder: '123 MG Road', type: 'text', required: true },
+      { key: 'addressLine2', label: 'Apartment / Suite (optional)', placeholder: 'Flat 4B, Tower 2', type: 'text' },
+    ],
+    [
+      { key: 'city', label: 'City', placeholder: 'Mumbai', type: 'text', required: true },
+      { key: 'state', label: 'State', placeholder: 'Maharashtra', type: 'text' },
+      { key: 'postalCode', label: 'Postal Code', placeholder: '400001', type: 'text' },
+      { key: 'country', label: 'Country', placeholder: 'India', type: 'text' },
+    ],
+  ];
+
+  const canNext = step === 0
+    ? form.addressLine1.trim() !== ''
+    : form.city.trim() !== '';
+
+  const handleSubmit = async () => {
+    if (!canNext) return;
+    setSaving(true);
+    try {
+      const raw = sessionStorage.getItem('user') || localStorage.getItem('user');
+      const userData = JSON.parse(raw || '{}');
+      const userId = userData.id || userData.userId || userData.Id;
+      if (!userId) { alert('❌ User ID not found. Please re-login.'); return; }
+
+      const payload = {
+        userId,
+        addressLine1: form.addressLine1,
+        addressLine2: form.addressLine2,
+        city: form.city,
+        state: form.state,
+        postalCode: form.postalCode,
+        country: form.country || 'India',
+        label: form.label,
+        isDefault: form.isDefault,
+      };
+
+      await addressAPI.add(payload);
+      if (typeof addressAPI.syncLocalAddresses === 'function') await addressAPI.syncLocalAddresses();
+      onSave();
+    } catch (err) {
+      alert(err?.response?.data?.message || err.message || 'Failed to add address');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backdropFilter: 'blur(8px)', background: 'rgba(15,23,42,0.55)' }}>
+      <div
+        className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden"
+        style={{ animation: 'modalIn 0.35s cubic-bezier(.22,1,.36,1)' }}
+      >
+        {/* Modal header */}
+        <div className="relative bg-gradient-to-br from-teal-500 via-cyan-500 to-teal-400 px-8 py-7 text-white overflow-hidden">
+          <div className="absolute -top-8 -right-8 w-32 h-32 bg-white/10 rounded-full" />
+          <div className="absolute top-4 -right-4 w-20 h-20 bg-white/10 rounded-full" />
+          <button onClick={onClose} className="absolute top-5 right-5 w-9 h-9 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center transition-all">
+            <X className="w-5 h-5" />
+          </button>
+          <div className="flex items-center gap-3 mb-1 relative">
+            <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+              <MapPin className="w-6 h-6" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold">Add New Address</h2>
+              <p className="text-teal-100 text-xs">Step {step + 1} of 2 — {step === 0 ? 'Street details' : 'City & region'}</p>
+            </div>
+          </div>
+          {/* step bar */}
+          <div className="flex gap-1 mt-4 relative">
+            {[0, 1].map(i => (
+              <div key={i} className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${i <= step ? 'bg-white' : 'bg-white/30'}`} />
+            ))}
+          </div>
+        </div>
+
+        {/* Label selector */}
+        {step === 0 && (
+          <div className="px-8 pt-6">
+            <p className="text-xs font-bold text-slate-900 uppercase tracking-widest mb-3">Address Type</p>
+            <div className="flex gap-3">
+              {labels.map(l => (
+                <button
+                  key={l.value}
+                  onClick={() => setForm(f => ({ ...f, label: l.value }))}
+                  className={`flex-1 flex flex-col items-center gap-1.5 py-3 rounded-2xl border-2 transition-all font-semibold text-sm ${
+                    form.label === l.value
+                      ? `bg-gradient-to-br ${l.color} text-white border-transparent shadow-lg scale-105`
+                      : 'border-slate-200 text-slate-900 hover:border-teal-300'
+                  }`}
+                >
+                  {l.icon}
+                  {l.value}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Fields */}
+        <div className="px-8 py-6 space-y-4">
+          {fields[step].map(f => (
+            <div key={f.key}>
+              <label className="block text-xs font-bold text-slate-900 uppercase tracking-widest mb-1.5">{f.label}</label>
+              <input
+                type={f.type}
+                placeholder={f.placeholder}
+                value={form[f.key]}
+                onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-teal-400 focus:bg-white transition-all text-sm"
+              />
+            </div>
+          ))}
+
+          {step === 1 && (
+            <label className="flex items-center gap-3 cursor-pointer group mt-1">
+              <div
+                onClick={() => setForm(f => ({ ...f, isDefault: !f.isDefault }))}
+                className={`w-12 h-6 rounded-full relative transition-all duration-300 ${form.isDefault ? 'bg-gradient-to-r from-teal-500 to-cyan-500' : 'bg-slate-200'}`}
+              >
+                <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all duration-300 ${form.isDefault ? 'left-6' : 'left-0.5'}`} />
+              </div>
+              <span className="text-sm font-semibold text-slate-900">Set as default address</span>
+            </label>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-8 pb-7 flex gap-3">
+          {step > 0 && (
+            <button onClick={() => setStep(0)} className="flex-1 py-3.5 border-2 border-slate-200 text-slate-900 rounded-2xl font-bold hover:border-teal-300 transition-all">
+              ← Back
+            </button>
+          )}
+          {step === 0 ? (
+            <button
+              onClick={() => canNext && setStep(1)}
+              disabled={!canNext}
+              className="flex-1 py-3.5 bg-gradient-to-r from-teal-500 to-cyan-500 text-white rounded-2xl font-bold shadow-lg hover:shadow-teal-200 hover:shadow-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Next →
+            </button>
+          ) : (
+            <button
+              onClick={handleSubmit}
+              disabled={saving || !canNext}
+              className="flex-1 py-3.5 bg-gradient-to-r from-teal-500 to-cyan-500 text-white rounded-2xl font-bold shadow-lg hover:shadow-teal-200 hover:shadow-xl transition-all disabled:opacity-40 flex items-center justify-center gap-2"
+            >
+              {saving ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Saving…</> : '✓ Save Address'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes modalIn {
+          from { opacity:0; transform:translateY(24px) scale(.97); }
+          to   { opacity:1; transform:translateY(0)    scale(1);   }
+        }
+      `}</style>
+    </div>
+  );
+};
+
+/* ─────────────────────────────────────────────
+   Main ProfilePage Component
+───────────────────────────────────────────── */
 const ProfilePage = ({
-  user,
-  cart,
-  orders,
-  profileData,
-  setProfileData,
-  setCurrentPage,
-  handleLogout,
-  setError,
-  loadOrders,
-  loading,
-  setLoading
+  user, cart, orders, profileData, setProfileData,
+  setCurrentPage, handleLogout, setError, loadOrders, loading, setLoading
 }) => {
   const [editMode, setEditMode] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(false);
+  const [showAddressModal, setShowAddressModal] = useState(false);
+  const [activeTab, setActiveTab] = useState('profile');
 
-  // FIX #2: Gate both fetches on `user` being available.
-  // Add `user` as a dependency so this re-runs once the user is rehydrated from
-  // localStorage (the race condition where fetchAddresses fired before user was set).
-  useEffect(() => {
-    if (!user) return;
-    fetchAddresses();
-    fetchProfile();
-  }, [user]);
-
-  // FIX #2: Same guard for orders — no fetch until user is confirmed.
-  useEffect(() => {
-    if (!user) return;
-    fetchOrders();
-  }, [user]);
+  useEffect(() => { if (!user) return; fetchAddresses(); fetchProfile(); }, [user]);
+  useEffect(() => { if (!user) return; fetchOrders(); }, [user]);
 
   const fetchProfile = async () => {
     try {
       setLoadingProfile(true);
       const res = await authAPI.getProfile();
       const data = res.data;
-
+      // Backend UserProfileDto uses PascalCase (FullName) — handle both casings
+      const resolvedName =
+        data.FullName || data.fullName ||
+        user?.FullName || user?.fullName || user?.name || '';
+      const resolvedEmail  = data.Email  || data.email  || user?.Email  || user?.email  || '';
+      const resolvedMobile = data.Mobile || data.mobile || user?.Mobile || user?.mobile || '+91 00000 00000';
+      const resolvedGender = data.Gender || data.gender || user?.Gender || user?.gender || '';
       setProfileData({
-        fullName: data.fullName || user?.name || '',
-        email: data.email || user?.email || '',
-        mobile: data.mobile || user?.mobile || '+91 00000 00000',
-        gender: data.gender || user?.gender || '',
+        fullName: resolvedName,
+        email:    resolvedEmail,
+        mobile:   resolvedMobile,
+        gender:   resolvedGender,
         addresses: data.addresses || []
       });
     } catch (err) {
-      console.error('Profile fetch error:', err);
-      if (user) {
-        setProfileData({
-          fullName: user.name || '',
-          email: user.email || '',
-          mobile: user.mobile || '+91 00000 00000',
-          gender: user.gender || '',
-          addresses: []
-        });
-      }
-    } finally {
-      setLoadingProfile(false);
-    }
+      if (user) setProfileData({
+        fullName: user.FullName || user.fullName || user.name || '',
+        email:    user.Email    || user.email    || '',
+        mobile:   user.Mobile   || user.mobile   || '+91 00000 00000',
+        gender:   user.Gender   || user.gender   || '',
+        addresses: []
+      });
+    } finally { setLoadingProfile(false); }
   };
 
   const fetchAddresses = async () => {
     try {
       let res;
       let currentUserId = null;
-
       try {
         const profileRes = await authAPI.getProfile();
         currentUserId = profileRes.data?.id || profileRes.data?.userId || profileRes.data?.Id;
-      } catch (err) {
-        console.error('Failed to get user profile for ID extraction:', err);
-        // Fall back to the user object already in state
-        currentUserId = user?.id || user?.userId;
-      }
+      } catch { currentUserId = user?.id || user?.userId; }
 
-      if (typeof addressAPI?.getAll === 'function') {
-        res = await addressAPI.getAll();
-      } else if (typeof authAPI?.getProfile === 'function') {
+      if (typeof addressAPI?.getAll === 'function') res = await addressAPI.getAll();
+      else {
         const profileRes = await authAPI.getProfile();
         res = { data: profileRes.data?.addresses || profileRes.data?.addressList || [] };
-      } else {
-        setProfileData(prev => ({ ...prev, addresses: [] }));
-        return;
       }
 
-      const rawAddresses = Array.isArray(res.data)
-        ? res.data
-        : (res.data?.addresses || res.data?.addressList || []);
-
-      // Filter to current user's addresses only (cross-user contamination guard)
+      const rawAddresses = Array.isArray(res.data) ? res.data : (res.data?.addresses || res.data?.addressList || []);
       const userAddresses = currentUserId
-        ? rawAddresses.filter(a => {
-            const addrUserId = a.userId || a.UserId || a.user_id || a.UserID;
-            return addrUserId === currentUserId || addrUserId === String(currentUserId);
-          })
+        ? rawAddresses.filter(a => { const uid = a.userId||a.UserId||a.user_id||a.UserID; return uid===currentUserId||uid===String(currentUserId); })
         : rawAddresses;
 
       const normalized = userAddresses.map((a, index) => {
-        const addrLine1 = a.AddressLine1 || a.addressLine1 || a.line1 || '';
-        const addrLine2 = a.AddressLine2 || a.addressLine2 || a.line2 || '';
-        const city = a.City || a.city || '';
-        const state = a.State || a.state || '';
-        const postal = a.PostalCode || a.postalCode || a.pincode || '';
-        const country = a.Country || a.country || '';
-        const addressString = [addrLine1, addrLine2, city, state, postal, country]
-          .filter(Boolean)
-          .join(', ')
-          .trim();
-
+        const addrLine1=a.AddressLine1||a.addressLine1||a.line1||'';
+        const addrLine2=a.AddressLine2||a.addressLine2||a.line2||'';
+        const city=a.City||a.city||''; const state=a.State||a.state||'';
+        const postal=a.PostalCode||a.postalCode||a.pincode||'';
+        const country=a.Country||a.country||'';
         return {
-          id: a.Id || a.id || `addr_${Date.now()}_${index}`,
-          label: a.Label || a.label || (a.IsDefault ? 'Home' : 'Address'),
-          AddressLine1: addrLine1,
-          AddressLine2: addrLine2,
-          City: city,
-          State: state,
-          PostalCode: postal,
-          Country: country,
-          IsDefault: !!(a.IsDefault || a.isDefault),
-          address: addressString,
-          userId: a.userId || a.UserId || a.user_id || currentUserId
+          id: a.Id||a.id||`addr_${Date.now()}_${index}`,
+          label: a.Label||a.label||(a.IsDefault?'Home':'Address'),
+          AddressLine1:addrLine1, AddressLine2:addrLine2,
+          City:city, State:state, PostalCode:postal, Country:country,
+          IsDefault:!!(a.IsDefault||a.isDefault),
+          address:[addrLine1,addrLine2,city,state,postal,country].filter(Boolean).join(', ').trim(),
+          userId: a.userId||a.UserId||a.user_id||currentUserId
         };
       });
-
       setProfileData(prev => ({ ...prev, addresses: normalized }));
-    } catch (err) {
-      console.error('Failed to fetch addresses for profile page', err);
-      setProfileData(prev => ({ ...prev, addresses: [] }));
-    }
+    } catch { setProfileData(prev => ({ ...prev, addresses: [] })); }
   };
 
   const handleSaveProfile = async () => {
     try {
-      setLoading(true);
-      setError('');
-
-      const payload = {
-        fullName: profileData.fullName,
-        mobile: profileData.mobile,
-        gender: profileData.gender
-      };
-
-      if (typeof authAPI.updateProfile === 'function') {
-        await authAPI.updateProfile(payload);
-      }
-
-      // Read from sessionStorage first (tab-scoped), fall back to localStorage
+      setLoading(true); setError('');
+      const payload = { fullName: profileData.fullName, mobile: profileData.mobile, gender: profileData.gender };
+      if (typeof authAPI.updateProfile === 'function') await authAPI.updateProfile(payload);
       const raw = sessionStorage.getItem('user') || localStorage.getItem('user');
       const userData = JSON.parse(raw || '{}');
-      const updatedUser = {
-        ...userData,
-        fullName: profileData.fullName,
-        mobile: profileData.mobile,
-        gender: profileData.gender
-      };
-      // Write back to whichever storages hold this tab's session
+      const updatedUser = { ...userData, ...payload };
       if (sessionStorage.getItem('user')) sessionStorage.setItem('user', JSON.stringify(updatedUser));
-      if (localStorage.getItem('user'))   localStorage.setItem('user', JSON.stringify(updatedUser));
-
+      if (localStorage.getItem('user')) localStorage.setItem('user', JSON.stringify(updatedUser));
       setEditMode(false);
       alert('✅ Profile updated successfully!');
     } catch (err) {
-      console.error('Profile update error:', err);
-      setError(
-        err.response?.data?.message ||
-        err.message ||
-        'Failed to update profile. Please try again.'
-      );
-    } finally {
-      setLoading(false);
-    }
+      setError(err.response?.data?.message || err.message || 'Failed to update profile.');
+    } finally { setLoading(false); }
   };
 
-  const fetchOrders = async () => {
-    try {
-      await loadOrders();
-    } catch (err) {
-      console.error('Orders fetch failed', err);
-    }
-  };
+  const fetchOrders = async () => { try { await loadOrders(); } catch {} };
+
+  const displayName = profileData.fullName || user?.FullName || user?.fullName || user?.name || 'User';
+  const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+
+  const tabs = [
+    { id: 'profile', label: 'Profile', icon: User },
+    { id: 'addresses', label: 'Addresses', icon: MapPin },
+    { id: 'orders', label: 'Orders', icon: Package },
+  ];
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen" style={{ background: 'linear-gradient(135deg,#f0fdfa 0%,#ecfeff 40%,#f0fdf4 100%)' }}>
       {/* HEADER */}
-      <header className="bg-gradient-to-r from-teal-600 to-cyan-600 text-white sticky top-0 z-40 shadow-lg">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-              <ShoppingBag className="w-6 h-6 text-white" />
+      <header className="sticky top-0 z-40 bg-white/80 border-b border-teal-100" style={{ backdropFilter: 'blur(16px)' }}>
+        <div className="max-w-6xl mx-auto px-6 py-3.5 flex justify-between items-center">
+          {/* Logo */}
+          <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => setCurrentPage('products')}>
+            <div className="w-9 h-9 bg-gradient-to-br from-teal-500 to-cyan-500 rounded-xl flex items-center justify-center shadow-md shadow-teal-200">
+              <ShoppingBag className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold">ShopAI</h1>
-              <p className="text-xs text-teal-100">.marketplace</p>
+              <span className="font-black text-xl text-slate-900 tracking-tight">Shop</span>
+              <span className="font-black text-xl bg-gradient-to-r from-teal-500 to-cyan-500 bg-clip-text text-transparent">AI</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3">
-            <button
-              onClick={() => setCurrentPage('products')}
-              className="hidden sm:flex items-center gap-2 px-4 py-2 text-white hover:bg-white/20 rounded-lg transition-all font-medium"
-            >
-              🛍️ Shop
-            </button>
+          {/* Nav */}
+          <nav className="hidden md:flex items-center gap-1">
+            {[['products','🛍️ Shop'],['orders','📦 Orders']].map(([page, label]) => (
+              <button key={page} onClick={() => setCurrentPage(page)}
+                className="px-4 py-2 text-sm font-semibold text-slate-900 hover:text-teal-600 hover:bg-teal-50 rounded-xl transition-all">
+                {label}
+              </button>
+            ))}
+          </nav>
 
-            <button
-              onClick={() => setCurrentPage('orders')}
-              className="hidden sm:flex items-center gap-2 px-4 py-2 text-white hover:bg-white/20 rounded-lg transition-all font-medium"
-            >
-              📦 Orders
-            </button>
-
-            <button
-              onClick={() => setCurrentPage('cart')}
-              className="relative p-3 hover:bg-white/20 rounded-lg transition-all"
-            >
-              <ShoppingCart className="w-6 h-6 text-white" />
+          {/* Actions */}
+          <div className="flex items-center gap-2">
+            <button onClick={() => setCurrentPage('cart')} className="relative p-2.5 hover:bg-teal-50 rounded-xl transition-all">
+              <ShoppingCart className="w-5 h-5 text-slate-900" />
               {cart.length > 0 && (
-                <span className="absolute -top-1 -right-1 bg-coral-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 bg-gradient-to-br from-teal-500 to-cyan-500 text-white text-[10px] font-black rounded-full w-4.5 h-4.5 flex items-center justify-center min-w-[18px] min-h-[18px]">
                   {cart.length}
                 </span>
               )}
             </button>
-
-            <button className="p-3 bg-white/20 rounded-lg">
-              <User className="w-6 h-6 text-white" />
-            </button>
-
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-2 px-4 py-2.5 bg-coral-500 hover:bg-coral-600 rounded-lg transition-all font-semibold"
-            >
-              <LogOut className="w-5 h-5" />
+            <button onClick={handleLogout}
+              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white rounded-xl font-bold text-sm shadow-md shadow-teal-200 transition-all">
+              <LogOut className="w-4 h-4" />
               <span className="hidden sm:inline">Logout</span>
             </button>
           </div>
         </div>
       </header>
 
-      {/* CONTENT */}
-      <div className="max-w-6xl mx-auto px-6 py-8">
-        {/* PAGE HEADER */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-2">
-            <div>
-              <h2 className="text-4xl font-bold text-slate-900 mb-2">Welcome, {profileData.fullName || user?.fullName || user?.name || 'User'}! 👋</h2>
-              <p className="text-slate-600">Manage your profile, addresses, and orders</p>
+      <div className="max-w-6xl mx-auto px-6 py-10">
+        {/* ── HERO ROW ── */}
+        <div className="relative bg-gradient-to-br from-teal-500 via-cyan-500 to-teal-400 rounded-3xl p-8 mb-8 overflow-hidden text-white shadow-2xl shadow-teal-200">
+          {/* Decorative blobs */}
+          <div className="absolute -top-12 -right-12 w-56 h-56 bg-white/10 rounded-full" />
+          <div className="absolute top-8 -right-4 w-32 h-32 bg-white/10 rounded-full" />
+          <div className="absolute -bottom-8 right-32 w-40 h-40 bg-white/10 rounded-full" />
+
+          <div className="relative flex flex-col sm:flex-row items-start sm:items-center gap-6">
+            {/* Avatar */}
+            <div className="w-20 h-20 bg-gradient-to-br from-teal-600 via-cyan-700 to-teal-800 rounded-2xl flex items-center justify-center text-3xl font-black shadow-inner border-4 border-teal-700/90 ring-4 ring-white/70 flex-shrink-0 text-white">
+              {initials}
             </div>
-            <button
-              onClick={editMode ? handleSaveProfile : () => setEditMode(true)}
-              className={`px-6 py-3 rounded-xl font-bold transition-all duration-300 shadow-md hover:shadow-lg transform hover:scale-105 flex items-center gap-2 ${
-                editMode
-                  ? 'bg-gradient-to-r from-emerald-500 to-green-600 text-white'
-                  : 'bg-gradient-to-r from-teal-500 to-cyan-600 text-white'
-              }`}
-            >
-              {editMode ? '✓ Save Changes' : '✏️ Edit Profile'}
+
+            {/* Info */}
+            <div className="flex-1">
+              <p className="text-slate-900 text-sm font-semibold mb-1">Welcome back 👋</p>
+              <h1 className="text-3xl font-black tracking-tight mb-1 text-slate-900">{displayName}</h1>
+              <p className="text-slate-900 text-sm">{profileData.email || user?.email}</p>
+            </div>
+
+                {/* Stats chips */}
+                <div className="flex flex-wrap gap-3 sm:flex-col sm:items-end">
+                  {[
+                    { label: 'Orders', value: orders.length, icon: Package, color: 'bg-blue-100 border-blue-300 text-blue-700' },
+                    { label: 'Addresses', value: profileData.addresses?.length || 0, icon: MapPin, color: 'bg-green-100 border-green-300 text-green-700' },
+                    { label: 'Cart', value: cart.length, icon: ShoppingCart, color: 'bg-purple-100 border-purple-300 text-purple-700' },
+                  ].map(({ label, value, icon: Icon, color }) => (
+                    <div
+                      key={label}
+                      className={`flex items-center gap-2 rounded-2xl px-4 py-2 backdrop-blur-sm border ${color}`}
+                    >
+                      <Icon className="w-4 h-4" />
+                      <span className="font-black text-lg leading-none">{value}</span>
+                      <span className="text-xs font-medium">{label}</span>
+                    </div>
+                  ))}
+                </div>
+                  </div>
+              </div>
+
+            {/* ── TABS ── */}
+        <div className="flex gap-1 bg-white rounded-2xl p-1.5 shadow-sm border border-slate-100 mb-8 w-fit">
+          {tabs.map(({ id, label, icon: Icon }) => (
+            <button key={id} onClick={() => setActiveTab(id)}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 ${
+                activeTab === id
+                  ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-md shadow-teal-200'
+                  : 'text-slate-900 hover:text-teal-600 hover:bg-teal-50'
+              }`}>
+              <Icon className="w-4 h-4" />
+              {label}
             </button>
-          </div>
+          ))}
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-8">
-          {/* MAIN CONTENT */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* PERSONAL INFO CARD */}
-            <div className="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden">
-              <div className="bg-gradient-to-r from-teal-50 to-cyan-50 px-8 py-5 border-b border-slate-200">
-                <h3 className="text-xl font-bold text-slate-900 flex items-center gap-3">
-                  <div className="w-10 h-10 bg-teal-500 rounded-lg flex items-center justify-center">
-                    <User className="w-6 h-6 text-white" />
-                  </div>
-                  Personal Information
-                </h3>
+        {/* ── PROFILE TAB ── */}
+        {activeTab === 'profile' && (
+          <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+            <div className="flex items-center justify-between px-8 py-6 border-b border-slate-100">
+              <div>
+                <h2 className="text-xl font-black text-slate-900">Personal Information</h2>
+                <p className="text-slate-900 text-sm mt-0.5">Manage your personal details</p>
               </div>
-              <div className="p-8">
-                <div className="grid md:grid-cols-2 gap-6">
-                  {/* Full Name */}
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">FULL NAME</label>
+              <button
+                onClick={editMode ? handleSaveProfile : () => setEditMode(true)}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all shadow-md ${
+                  editMode
+                    ? 'bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-green-200 hover:shadow-lg'
+                    : 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-teal-200 hover:shadow-lg'
+                }`}>
+                {editMode ? '✓ Save Changes' : '✏️ Edit Profile'}
+              </button>
+            </div>
+
+            <div className="p-8">
+              <div className="grid md:grid-cols-2 gap-6">
+                {[
+                  { key: 'fullName', label: 'Full Name', type: 'text', editable: true },
+                  { key: 'email', label: 'Email Address', type: 'email', editable: false, note: '✓ Cannot be changed' },
+                  { key: 'mobile', label: 'Mobile Number', type: 'tel', editable: true },
+                ].map(({ key, label, type, editable, note }) => (
+                  <div key={key}>
+                    <label className="block text-[11px] font-black text-slate-900 uppercase tracking-widest mb-2">{label}</label>
                     <input
-                      value={profileData.fullName || ''}
-                      onChange={e =>
-                        setProfileData({ ...profileData, fullName: e.target.value })
-                      }
-                      disabled={!editMode}
-                      className={`w-full px-4 py-3 border-2 rounded-lg transition-all focus:outline-none ${
-                        editMode
-                          ? 'border-teal-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 bg-white'
-                          : 'border-slate-200 bg-slate-50 cursor-not-allowed'
+                      type={type}
+                      value={(profileData[key]||'').toString()}
+                      onChange={e => setProfileData({...profileData,[key]:e.target.value})}
+                      disabled={!editMode || !editable}
+                      className={`w-full px-4 py-3.5 rounded-xl text-sm font-medium transition-all focus:outline-none ${
+                        editMode && editable
+                          ? 'bg-white border-2 border-teal-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-50 text-slate-900'
+                          : 'bg-slate-50 border-2 border-slate-100 text-slate-900 cursor-not-allowed'
                       }`}
                     />
+                    {note && <p className="text-[11px] text-slate-900 mt-1 font-medium">{note}</p>}
                   </div>
+                ))}
 
-                  {/* Email */}
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">EMAIL ADDRESS</label>
-                    <input
-                      value={profileData.email || ''}
-                      disabled
-                      className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg bg-slate-50 cursor-not-allowed text-slate-600"
-                    />
-                    <p className="text-xs text-slate-500 mt-1">✓ Email cannot be changed</p>
-                  </div>
-
-                  {/* Mobile */}
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">MOBILE NUMBER</label>
-                    <input
-                      type="tel"
-                      value={(profileData.mobile || '').toString()}
-                      onChange={e =>
-                        setProfileData({ ...profileData, mobile: e.target.value })
-                      }
-                      disabled={!editMode}
-                      className={`w-full px-4 py-3 border-2 rounded-lg transition-all focus:outline-none ${
-                        editMode
-                          ? 'border-teal-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 bg-white'
-                          : 'border-slate-200 bg-slate-50 cursor-not-allowed'
-                      }`}
-                    />
-                  </div>
-
-                  {/* Gender */}
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">GENDER</label>
-                    <select
-                      value={profileData.gender || ''}
-                      onChange={e =>
-                        setProfileData({ ...profileData, gender: e.target.value })
-                      }
-                      disabled={!editMode}
-                      className={`w-full px-4 py-3 border-2 rounded-lg transition-all focus:outline-none ${
-                        editMode
-                          ? 'border-teal-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-200 bg-white'
-                          : 'border-slate-200 bg-slate-50 cursor-not-allowed'
-                      }`}
-                    >
-                      <option value="">Select Gender (Optional)</option>
-                      <option value="Male">👨 Male</option>
-                      <option value="Female">👩 Female</option>
-                      <option value="Other">🧑 Other</option>
-                      <option value="PreferNotToSay">🤐 Prefer Not to Say</option>
-                    </select>
-                  </div>
+                {/* Gender */}
+                <div>
+                  <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Gender</label>
+                  <select
+                    value={profileData.gender || ''}
+                    onChange={e => setProfileData({...profileData, gender: e.target.value})}
+                    disabled={!editMode}
+                    className={`w-full px-4 py-3.5 rounded-xl text-sm font-medium transition-all focus:outline-none ${
+                      editMode
+                        ? 'bg-white border-2 border-teal-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-50 text-slate-900'
+                        : 'bg-slate-50 border-2 border-slate-100 text-slate-900 cursor-not-allowed'
+                    }`}>
+                    <option value="">Select Gender (Optional)</option>
+                    <option value="Male">👨 Male</option>
+                    <option value="Female">👩 Female</option>
+                    <option value="Other">🧑 Other</option>
+                    <option value="PreferNotToSay">🤐 Prefer Not to Say</option>
+                  </select>
                 </div>
+              </div>
 
-                {/* Save Changes Button */}
-                {editMode && (
-                  <div className="mt-8 flex gap-4 pt-6 border-t border-slate-200">
-                    <button
-                      onClick={handleSaveProfile}
-                      disabled={loading}
-                      className="flex-1 px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white rounded-lg font-bold transition-all transform hover:scale-105 disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg"
-                    >
-                      {loading ? (
-                        <>
-                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                          Saving...
-                        </>
-                      ) : (
-                        <>✓ Save Changes</>
-                      )}
-                    </button>
+              {editMode && (
+                <div className="flex gap-4 mt-8 pt-6 border-t border-slate-100">
+                  <button onClick={handleSaveProfile} disabled={loading}
+                    className="flex-1 py-3.5 bg-gradient-to-r from-emerald-500 to-green-500 text-white rounded-2xl font-black text-sm shadow-lg shadow-green-200 hover:shadow-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+                    {loading ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Saving…</> : '✓ Save Changes'}
+                  </button>
+                  <button onClick={() => { setEditMode(false); fetchProfile(); }}
+                    className="flex-1 py-3.5 border-2 border-slate-200 text-slate-900 rounded-2xl font-black text-sm hover:border-slate-300 hover:bg-slate-50 transition-all">
+                    ✕ Discard
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
-                    <button
-                      onClick={() => {
-                        setEditMode(false);
-                        fetchProfile();
-                      }}
-                      className="flex-1 px-6 py-3 border-2 border-slate-300 text-slate-700 hover:border-coral-300 hover:bg-coral-50 rounded-lg font-bold transition-all"
-                    >
-                      ✕ Cancel
-                    </button>
-                  </div>
+        {/* ── ADDRESSES TAB ── */}
+        {activeTab === 'addresses' && (
+          <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+            <div className="flex items-center justify-between px-8 py-6 border-b border-slate-100">
+              <div>
+                <h2 className="text-xl font-black text-slate-900">Saved Addresses</h2>
+                <p className="text-slate-900 text-sm mt-0.5">{profileData.addresses?.length || 0} address{profileData.addresses?.length !== 1 ? 'es' : ''} saved</p>
+              </div>
+              <div className="flex gap-2">
+                {profileData.addresses?.length > 0 && (
+                  <button
+                    onClick={async () => {
+                      if (!window.confirm('🗑️ Delete all addresses?')) return;
+                      try { for (const a of profileData.addresses) await addressAPI.remove(a.id); await fetchAddresses(); alert('✅ All deleted'); }
+                      catch { alert('❌ Failed to delete some addresses'); }
+                    }}
+                    className="flex items-center gap-2 px-4 py-2.5 border-2 border-red-200 text-red-500 rounded-xl font-bold text-sm hover:bg-red-50 transition-all">
+                    <Trash2 className="w-4 h-4" /> Delete All
+                  </button>
                 )}
+                <button onClick={() => setShowAddressModal(true)}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-teal-500 to-cyan-500 text-white rounded-xl font-bold text-sm shadow-md shadow-teal-200 hover:shadow-lg transition-all">
+                  <Plus className="w-4 h-4" /> Add Address
+                </button>
               </div>
             </div>
 
-            {/* ADDRESSES CARD */}
-            <div className="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden">
-              <div className="bg-gradient-to-r from-purple-50 to-pink-50 px-8 py-5 border-b border-slate-200">
-                <h3 className="text-xl font-bold text-slate-900 flex items-center gap-3">
-                  <div className="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
-                    <MapPin className="w-6 h-6 text-white" />
+            <div className="p-8">
+              {!profileData.addresses || profileData.addresses.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <div className="w-20 h-20 bg-gradient-to-br from-teal-50 to-cyan-100 rounded-3xl flex items-center justify-center mb-5 border-2 border-dashed border-teal-200">
+                    <MapPin className="w-9 h-9 text-teal-400" />
                   </div>
-                  Saved Addresses
-                </h3>
-              </div>
-
-              <div className="p-8">
-                <div className="flex gap-3 mb-6">
-                  {/* Add Address Button */}
-                  <button
-                    onClick={async () => {
-                      try {
-                        const line1 = window.prompt('📍 Address Line 1');
-                        if (!line1) return;
-
-                        // Read from sessionStorage first (tab-scoped), fall back to localStorage
-                        const raw = sessionStorage.getItem('user') || localStorage.getItem('user');
-                        const userData = JSON.parse(raw || '{}');
-                        const userId = userData.id || userData.userId || userData.Id;
-
-                        if (!userId) {
-                          alert('❌ User ID not found. Please re-login.');
-                          return;
-                        }
-
-                        const payload = {
-                          userId: userId,
-                          addressLine1: line1,
-                          addressLine2: window.prompt('📍 Address Line 2 (optional)') || '',
-                          city: window.prompt('🏙️ City') || '',
-                          state: window.prompt('📌 State (optional)') || '',
-                          postalCode: window.prompt('📮 Postal Code (optional)') || '',
-                          country: window.prompt('🌍 Country', 'India') || 'India',
-                          isDefault: window.confirm('⭐ Set as default address?')
-                        };
-
-                        await addressAPI.add(payload);
-
-                        if (typeof addressAPI.syncLocalAddresses === 'function') {
-                          await addressAPI.syncLocalAddresses();
-                        }
-
-                        await fetchAddresses();
-                        alert('✅ Address added successfully');
-                      } catch (err) {
-                        console.error('Add address error:', err);
-                        alert(err?.response?.data?.message || err.message || 'Failed to add address');
-                      }
-                    }}
-                    className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-lg hover:shadow-lg transition-all font-bold flex items-center gap-2"
-                  >
-                    <Plus className="w-5 h-5" />
-                    Add Address
+                  <p className="font-black text-slate-900 text-lg mb-1">No addresses yet</p>
+                  <p className="text-slate-900 text-sm mb-6">Add your first delivery address</p>
+                  <button onClick={() => setShowAddressModal(true)}
+                    className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-teal-500 to-cyan-500 text-white rounded-2xl font-bold shadow-lg shadow-teal-200 hover:shadow-xl transition-all">
+                    <Plus className="w-5 h-5" /> Add Address
                   </button>
-
-                  {/* Delete All Button */}
-                  {profileData.addresses && profileData.addresses.length > 0 && (
-                    <button
-                      onClick={async () => {
-                        if (!window.confirm('🗑️ Delete all addresses? Cannot be undone!')) return;
-
-                        try {
-                          for (const addr of profileData.addresses) {
-                            await addressAPI.remove(addr.id);
-                          }
-                          await fetchAddresses();
-                          alert('✅ All addresses deleted');
-                        } catch (err) {
-                          console.error('Delete error:', err);
-                          alert('❌ Failed to delete some addresses');
-                        }
-                      }}
-                      className="px-6 py-3 bg-gradient-to-r from-coral-500 to-orange-600 text-white rounded-lg hover:shadow-lg transition-all font-bold flex items-center gap-2"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                      Delete All
-                    </button>
-                  )}
                 </div>
-
-                {/* Address List */}
-                {!profileData.addresses || profileData.addresses.length === 0 ? (
-                  <div className="bg-slate-50 rounded-lg p-8 text-center border-2 border-dashed border-slate-300">
-                    <MapPin className="w-12 h-12 mx-auto text-slate-300 mb-3" />
-                    <p className="text-slate-600 font-medium">No addresses saved</p>
-                    <p className="text-sm text-slate-500 mt-1">Add your first address</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {profileData.addresses.map((addr, idx) => (
-                      <div
-                        key={addr.id}
-                        className="border-2 border-slate-200 rounded-lg p-5 bg-white hover:border-teal-300 hover:shadow-md transition-all"
-                      >
-                        <div className="flex justify-between items-start mb-3">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <p className="font-bold text-lg text-slate-900">
-                                {addr.label || (addr.IsDefault ? 'Home' : `Address ${idx + 1}`)}
-                              </p>
+              ) : (
+                <div className="grid md:grid-cols-2 gap-4">
+                  {profileData.addresses.map((addr, idx) => {
+                    const labelIcon = addr.label === 'Work' ? <Briefcase className="w-4 h-4" /> : addr.label === 'Other' ? <MapPin className="w-4 h-4" /> : <Home className="w-4 h-4" />;
+                    const labelColor = addr.label === 'Work' ? 'from-violet-500 to-purple-500' : addr.label === 'Other' ? 'from-orange-400 to-amber-500' : 'from-teal-500 to-cyan-500';
+                    return (
+                      <div key={addr.id} className="group relative border-2 border-slate-100 hover:border-teal-200 rounded-2xl p-5 transition-all hover:shadow-md bg-white">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex items-center gap-2.5">
+                            <div className={`w-8 h-8 bg-gradient-to-br ${labelColor} rounded-xl flex items-center justify-center text-white`}>{labelIcon}</div>
+                            <div>
+                              <p className="font-black text-slate-800 text-sm">{addr.label || `Address ${idx+1}`}</p>
                               {addr.IsDefault && (
-                                <span className="text-xs font-bold bg-teal-100 text-teal-700 px-3 py-1 rounded-full">
-                                  ⭐ Default
+                                <span className="text-[10px] font-bold bg-teal-50 text-teal-600 px-2 py-0.5 rounded-full border border-teal-200 flex items-center gap-1 w-fit mt-0.5">
+                                  <Star className="w-2.5 h-2.5 fill-teal-500" /> Default
                                 </span>
                               )}
                             </div>
                           </div>
-                          <button
-                            onClick={async () => {
-                              if (!window.confirm('❌ Delete this address?')) return;
-                              try {
-                                await addressAPI.remove(addr.id);
-                                await fetchAddresses();
-                                alert('✅ Address deleted');
-                              } catch (err) {
-                                console.error('Delete error:', err);
-                                alert('❌ Failed to delete address');
-                              }
-                            }}
-                            className="text-coral-500 hover:text-coral-700 hover:bg-coral-50 p-2 rounded-lg transition-all"
-                          >
-                            <Trash2 className="w-5 h-5" />
+                          <button onClick={async () => {
+                            if (!window.confirm('Delete this address?')) return;
+                            try { await addressAPI.remove(addr.id); await fetchAddresses(); }
+                            catch { alert('❌ Failed to delete'); }
+                          }} className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-300 hover:text-red-400 hover:bg-red-50 rounded-lg transition-all">
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
-                        <p className="text-sm text-slate-700 leading-relaxed">
-                          {[
-                            addr.AddressLine1,
-                            addr.AddressLine2,
-                            addr.City,
-                            addr.State,
-                            addr.PostalCode,
-                            addr.Country
-                          ]
-                            .filter(Boolean)
-                            .join(', ')}
+                        <p className="text-sm text-slate-900 leading-relaxed">
+                          {[addr.AddressLine1,addr.AddressLine2,addr.City,addr.State,addr.PostalCode,addr.Country].filter(Boolean).join(', ')}
                         </p>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
+        )}
 
-          {/* SIDEBAR */}
-          <div className="lg:col-span-1">
-            {/* ACCOUNT STATS */}
-            <div className="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden mb-6">
-              <div className="bg-gradient-to-r from-orange-50 to-amber-50 px-6 py-5 border-b border-slate-200">
-                <h3 className="text-lg font-bold text-slate-900">Account Stats</h3>
+        {/* ── ORDERS TAB ── */}
+        {activeTab === 'orders' && (
+          <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+            <div className="flex items-center justify-between px-8 py-6 border-b border-slate-100">
+              <div>
+                <h2 className="text-xl font-black text-slate-900">Order History</h2>
+                <p className="text-slate-900 text-sm mt-0.5">{orders.length} order{orders.length !== 1 ? 's' : ''} placed</p>
               </div>
-              <div className="p-6 space-y-4">
-                <div className="flex items-center justify-between p-4 bg-gradient-to-br from-teal-50 to-cyan-50 rounded-lg border border-teal-200">
-                  <div>
-                    <p className="text-sm text-slate-600">Total Orders</p>
-                    <p className="text-2xl font-bold text-teal-600">{orders.length}</p>
-                  </div>
-                  <Package className="w-8 h-8 text-teal-400 opacity-30" />
-                </div>
-
-                <div className="flex items-center justify-between p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg border border-purple-200">
-                  <div>
-                    <p className="text-sm text-slate-600">Addresses</p>
-                    <p className="text-2xl font-bold text-purple-600">{profileData.addresses?.length || 0}</p>
-                  </div>
-                  <MapPin className="w-8 h-8 text-purple-400 opacity-30" />
-                </div>
-
-                <div className="flex items-center justify-between p-4 bg-gradient-to-br from-coral-50 to-orange-50 rounded-lg border border-coral-200">
-                  <div>
-                    <p className="text-sm text-slate-600">Cart Items</p>
-                    <p className="text-2xl font-bold text-coral-600">{cart.length}</p>
-                  </div>
-                  <ShoppingCart className="w-8 h-8 text-coral-400 opacity-30" />
-                </div>
-              </div>
+              <button onClick={() => setCurrentPage('orders')}
+                className="flex items-center gap-2 px-4 py-2.5 border-2 border-teal-200 text-teal-600 rounded-xl font-bold text-sm hover:bg-teal-50 transition-all">
+                View All <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
 
-            {/* QUICK ACTIONS */}
-            <div className="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden">
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-5 border-b border-slate-200">
-                <h3 className="text-lg font-bold text-slate-900">Quick Actions</h3>
-              </div>
-              <div className="p-6 space-y-3">
-                <button
-                  onClick={() => setCurrentPage('products')}
-                  className="w-full px-4 py-3 bg-gradient-to-r from-teal-500 to-cyan-600 text-white rounded-lg hover:shadow-lg transition-all font-bold flex items-center justify-center gap-2"
-                >
-                  <ShoppingBag className="w-5 h-5" />
-                  Continue Shopping
-                </button>
-
-                <button
-                  onClick={() => setCurrentPage('orders')}
-                  className="w-full px-4 py-3 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-lg hover:shadow-lg transition-all font-bold flex items-center justify-center gap-2"
-                >
-                  <Package className="w-5 h-5" />
-                  View Orders
-                </button>
-
-                <button
-                  onClick={() => setCurrentPage('cart')}
-                  className="w-full px-4 py-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-lg hover:shadow-lg transition-all font-bold flex items-center justify-center gap-2"
-                >
-                  <ShoppingCart className="w-5 h-5" />
-                  View Cart
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* RECENT ORDERS SECTION */}
-        {orders.length > 0 && (
-          <div className="mt-8 bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden">
-            <div className="bg-gradient-to-r from-amber-50 to-orange-50 px-8 py-5 border-b border-slate-200">
-              <h3 className="text-xl font-bold text-slate-900 flex items-center gap-3">
-                <div className="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center">
-                  <Clock className="w-6 h-6 text-white" />
-                </div>
-                Recent Orders
-              </h3>
-            </div>
-
-            <div className="p-8 space-y-3">
-              {orders.slice(0, 5).map((order) => (
-                <div
-                  key={order.id}
-                  className="border-2 border-slate-200 rounded-lg p-5 flex justify-between items-center hover:border-teal-300 hover:shadow-md transition-all"
-                >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="w-10 h-10 bg-gradient-to-br from-teal-100 to-cyan-100 rounded-lg flex items-center justify-center text-sm font-bold text-teal-700">
-                        #{order.id % 100}
-                      </div>
-                      <div>
-                        <p className="font-bold text-slate-900">Order #{order.id}</p>
-                        <p className="text-sm text-slate-500">
-                          {order.orderDate ? new Date(order.orderDate).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A'}
-                        </p>
-                      </div>
-                    </div>
+            <div className="divide-y divide-slate-50">
+              {orders.length === 0 ? (
+                <div className="flex flex-col items-center py-16">
+                  <div className="w-20 h-20 bg-gradient-to-br from-orange-50 to-amber-100 rounded-3xl flex items-center justify-center mb-5 border-2 border-dashed border-orange-200">
+                    <Package className="w-9 h-9 text-orange-400" />
                   </div>
-
-                  <div className="text-right mr-4">
-                    <p className="font-bold text-lg text-teal-600">
-                      ₹{(order.totalAmount || 0).toLocaleString()}
-                    </p>
-                    <span className={`inline-block text-xs font-bold px-3 py-1 rounded-full mt-1 ${
-                      order.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' :
-                      order.status === 'Processing' ? 'bg-blue-100 text-blue-800' :
-                      order.status === 'Shipped' ? 'bg-purple-100 text-purple-800' :
-                      order.status === 'Delivered' ? 'bg-green-100 text-green-800' :
-                      'bg-red-100 text-red-800'
-                    }`}>
-                      {order.status || 'Processing'}
-                    </span>
-                  </div>
-
-                  <button
-                    onClick={() => setCurrentPage('orders')}
-                    className="px-4 py-2 bg-white border-2 border-slate-200 text-slate-700 rounded-lg hover:border-teal-400 hover:bg-teal-50 transition-all font-semibold"
-                  >
-                    View →
+                  <p className="font-black text-slate-900 text-lg mb-1">No orders yet</p>
+                  <p className="text-slate-900 text-sm mb-6">Start shopping to see your orders here</p>
+                  <button onClick={() => setCurrentPage('products')}
+                    className="px-6 py-3 bg-gradient-to-r from-teal-500 to-cyan-500 text-white rounded-2xl font-bold shadow-lg shadow-teal-200">
+                    🛍️ Start Shopping
                   </button>
                 </div>
-              ))}
+              ) : (
+                orders.slice(0,5).map(order => {
+                  const statusStyles = {
+                    Pending:    'bg-amber-50 text-amber-700 border-amber-200',
+                    Processing: 'bg-blue-50 text-blue-700 border-blue-200',
+                    Shipped:    'bg-violet-50 text-violet-700 border-violet-200',
+                    Delivered:  'bg-emerald-50 text-emerald-700 border-emerald-200',
+                  };
+                  const st = statusStyles[order.status] || 'bg-slate-50 text-slate-600 border-slate-200';
+                  return (
+                    <div key={order.id} className="flex items-center justify-between px-8 py-5 hover:bg-slate-50 transition-all group">
+                      <div className="flex items-center gap-4">
+                        <div className="w-11 h-11 bg-gradient-to-br from-teal-50 to-cyan-100 rounded-2xl flex items-center justify-center text-sm font-black text-teal-700 border border-teal-100">
+                          #{order.id % 100}
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-900 text-sm">Order #{order.id}</p>
+                          <p className="text-slate-900 text-xs mt-0.5">
+                            {order.orderDate ? new Date(order.orderDate).toLocaleDateString('en-IN',{year:'numeric',month:'short',day:'numeric'}) : 'N/A'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-4">
+                        <p className="font-black text-teal-600">₹{(order.totalAmount||0).toLocaleString()}</p>
+                        <span className={`text-[11px] font-bold px-3 py-1 rounded-full border ${st}`}>{order.status||'Processing'}</span>
+                        <button onClick={() => setCurrentPage('orders')}
+                          className="opacity-0 group-hover:opacity-100 p-2 hover:bg-teal-50 rounded-xl transition-all">
+                          <ChevronRight className="w-4 h-4 text-teal-500" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
         )}
       </div>
+
+      {/* ADDRESS MODAL */}
+      {showAddressModal && (
+        <AddressModal
+          onClose={() => setShowAddressModal(false)}
+          onSave={async () => {
+            await fetchAddresses();
+            setShowAddressModal(false);
+            alert('✅ Address added successfully');
+          }}
+        />
+      )}
     </div>
   );
 };
