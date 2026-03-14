@@ -4,7 +4,6 @@ api_client.py  (v2 — AI Controller Edition)
 HTTP client that talks exclusively to /api/ai/* on your .NET backend.
 All cart, order, address, and product calls go through the new AIChatController,
 which returns a consistent { success, message, data } wrapper.
-
 To plug in a real base URL, set API_BASE_URL in your .env file.
 """
 
@@ -19,7 +18,6 @@ class APIClient:
     """
     Communicates with the .NET AIChatController on behalf of the agent.
     Instantiated per-request with the user's JWT token.
-
     All methods return:
         { 'success': bool, 'message': str, 'data': <payload> }
     """
@@ -140,7 +138,6 @@ class APIClient:
         GET /ai/context
         Returns cart + addresses + recent orders + user info in one call.
         Call once at the start of each chat session.
-
         data: {
           userId, userName, userEmail,
           cart: { items, total, isEmpty },
@@ -161,7 +158,6 @@ class APIClient:
         """
         GET /ai/products/search?q=...&topK=...
         Semantic vector search via MongoDB Atlas.
-
         data: list of products with { id, name, brand, price, category,
                                       description, imageUrl, stockQuantity,
                                       isAvailable, rating, reviewCount }
@@ -179,7 +175,6 @@ class APIClient:
         """
         POST /ai/products/compare
         Body: { productIds: ['id1', 'id2', ...] }
-
         data: {
           products: [...],
           highlights: ['💰 Product A is cheapest...', '⭐ Product B rated highest...']

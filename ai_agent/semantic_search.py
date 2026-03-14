@@ -1,10 +1,13 @@
 """
 semantic_search.py
 Semantic vector search powered by MongoDB Atlas $vectorSearch.
-
-Key fix: use $toDouble in the $project stage to convert Decimal128
-fields (price, rating) to plain doubles INSIDE MongoDB before
-they ever reach Python. This bypasses all Decimal128 handling issues.
+Key features:
+  - $toDouble in $project converts Decimal128 price/rating to plain doubles
+    inside MongoDB so Python always receives plain floats.
+  - Optional min_price / max_price filters applied as a $match stage INSIDE
+    the pipeline — MongoDB does the filtering, not Python.
+  - Fetches (top_k * NUM_CANDIDATES_MULTIPLIER) candidates from the vector
+    index then filters + limits, so price-filtered results still fill top_k.
 """
 
 import os
@@ -40,34 +43,43 @@ class SemanticSearchService:
         logger.info("Connecting to MongoDB Atlas...")
         client = MongoClient(MONGO_URI)
         self.collection = client[DB_NAME][COLLECTION_NAME]
-        logger.info(f"Connected → {DB_NAME}.{COLLECTION_NAME}")
+        logger.info(f"Connected -> {DB_NAME}.{COLLECTION_NAME}")
 
+    # ─────────────────────────────────────────────────────────
+    # Main Search Method
+    # ─────────────────────────────────────────────────────────
     def search(self, request: SearchRequest) -> SearchResponse:
-        query = request.query.strip()
-        top_k = request.top_k
+        query     = request.query.strip()
+        top_k     = request.top_k
+        min_price = request.min_price
+        max_price = request.max_price
 
-        logger.info(f"Searching: '{query}' top_k={top_k}")
+        logger.info(
+            f"Searching: '{query}' top_k={top_k} "
+            f"min_price={min_price} max_price={max_price}"
+        )
 
         # Step 1: Embed user query
         query_vector = self.model.encode(query).tolist()
 
-        # Step 2: Vector search pipeline
-        # ── KEY FIX ──────────────────────────────────────────────────────────
-        # Use $toDouble on price and rating directly inside the $project stage.
-        # MongoDB converts Decimal128 → double BEFORE Python ever sees the value.
-        # This means Python always receives a plain float — no Decimal128 objects.
-        # ─────────────────────────────────────────────────────────────────────
+        # Step 2: Build pipeline
+        # When a price filter is active we fetch more candidates first
+        # (numCandidates stays generous) then $match filters them down
+        # so we still return up to top_k results after filtering.
+        num_candidates = top_k * NUM_CANDIDATES_MULTIPLIER
+
         pipeline = [
             {
                 "$vectorSearch": {
                     "index":         VECTOR_INDEX_NAME,
                     "path":          "embedding",
                     "queryVector":   query_vector,
-                    "numCandidates": top_k * NUM_CANDIDATES_MULTIPLIER,
-                    "limit":         top_k
+                    "numCandidates": num_candidates,
+                    "limit":         num_candidates   # pull all candidates; $match + $limit below
                 }
             },
             {
+                # Convert Decimal128 -> double INSIDE MongoDB so Python gets plain floats
                 "$project": {
                     "_id":           1,
                     "name":          1,
@@ -77,18 +89,31 @@ class SemanticSearchService:
                     "reviewCount":   1,
                     "imageUrl":      1,
                     "stockQuantity": 1,
-                    # Convert Decimal128 → double inside MongoDB
                     "price":  {"$toDouble": "$price"},
                     "rating": {"$toDouble": "$rating"},
                     "score":  {"$meta": "vectorSearchScore"}
                 }
-            }
+            },
         ]
 
-        raw_docs = list(self.collection.aggregate(pipeline))
-        logger.info(f"Atlas returned {len(raw_docs)} documents")
+        # Step 3: Price filter stage (only added when needed)
+        price_filter = {}
+        if min_price is not None:
+            price_filter["$gte"] = float(min_price)
+        if max_price is not None:
+            price_filter["$lte"] = float(max_price)
 
-        # Debug — confirm price/rating are now plain floats
+        if price_filter:
+            pipeline.append({"$match": {"price": price_filter}})
+            logger.info(f"Price filter applied: {price_filter}")
+
+        # Step 4: Limit to requested top_k after filtering
+        pipeline.append({"$limit": top_k})
+
+        raw_docs = list(self.collection.aggregate(pipeline))
+        logger.info(f"Atlas returned {len(raw_docs)} documents after filter")
+
+        # Debug — confirm price/rating are plain floats
         if raw_docs:
             first = raw_docs[0]
             logger.info(
@@ -97,7 +122,7 @@ class SemanticSearchService:
                 f"rating={first.get('rating')} (type={type(first.get('rating')).__name__})"
             )
 
-        # Step 3: Map to ProductResult
+        # Step 5: Map to ProductResult
         results: List[ProductResult] = []
         for doc in raw_docs:
             results.append(ProductResult(
@@ -114,9 +139,12 @@ class SemanticSearchService:
                 score         = round(float(doc.get("score", 0.0)), 4)
             ))
 
-        logger.info(f"Query: '{query}' → {len(results)} results")
+        logger.info(f"Query: '{query}' -> {len(results)} results")
         return SearchResponse(results=results, query=query, total=len(results))
 
+    # ─────────────────────────────────────────────────────────
+    # Helpers
+    # ─────────────────────────────────────────────────────────
     def _extract_category(self, category) -> str:
         if not category:
             return "Uncategorized"
@@ -125,7 +153,6 @@ class SemanticSearchService:
         if isinstance(category, dict):
             return category.get("name", "Uncategorized")
         return str(category)
-    
 
 '''
 """

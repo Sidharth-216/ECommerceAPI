@@ -2,10 +2,8 @@
 main.py  (v2)
 FastAPI entry point for the ShopAI agent.
 Thin by design — only wires up services and routes.
-
 Run locally:
     uvicorn main:app --reload --port 7860
-
 On HF Spaces: started automatically via Dockerfile CMD.
 """
 
@@ -64,6 +62,10 @@ async def startup():
     logger.info("Initialising orchestrator...")
     try:
         orchestrator = ShoppingAgentOrchestrator()
+        # Wire in the already-loaded search service so the orchestrator
+        # can do instant local semantic search (no Render round-trip needed)
+        if search_service:
+            orchestrator.set_search_service(search_service)
         logger.info("✅ Orchestrator ready")
     except Exception as e:
         logger.error(f"❌ Orchestrator failed: {e}")

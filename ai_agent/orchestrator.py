@@ -2,7 +2,6 @@
 orchestrator.py  (v3)
 =====================
 Coordinates LLMAgent ↔ APIClient ↔ AIChatController (/api/ai/*).
-
 Key change from v2: jwt_token comes from ChatRequest and is forwarded
 to APIClient so every .NET call is authenticated as the correct user.
 No userId plumbing needed — the .NET controller reads the user from the JWT.
@@ -24,7 +23,6 @@ API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:5033/api")
 class ShoppingAgentOrchestrator:
     """
     Entry point for every chat message.
-
     Flow:
       1. Build APIClient with the user's JWT (from request.jwt_token)
       2. Extract intent via LLMAgent
@@ -33,9 +31,15 @@ class ShoppingAgentOrchestrator:
       5. Return ChatResponse (response text + optional product list)
     """
 
-    def __init__(self):
-        self.llm_agent = LLMAgent()
+    def __init__(self, search_service=None):
+        self.llm_agent      = LLMAgent()
+        self.search_service = search_service   # SemanticSearchService injected from main.py
         logger.info("✅ ShoppingAgentOrchestrator ready")
+
+    def set_search_service(self, svc):
+        """Called by main.py after SemanticSearchService is initialised."""
+        self.search_service = svc
+        logger.info("✅ SemanticSearchService wired into orchestrator")
 
     async def process_message(self, request: ChatRequest) -> ChatResponse:
         # Build per-request API client with the user's token
@@ -99,12 +103,33 @@ class ShoppingAgentOrchestrator:
 
         # ── Search ────────────────────────────────────────────────
         if intent == 'search_product':
-            query = (
+            query     = (
                 params.get('query') or
                 params.get('category') or
                 params.get('features') or
                 ''
             )
+            max_price = params.get('budget_max')
+            if max_price:
+                try:
+                    max_price = float(max_price)
+                except (TypeError, ValueError):
+                    max_price = None
+
+            logger.info(f"search_product: query='{query}' max_price={max_price}")
+            results = self._local_search(query, top_k=5, max_price=max_price)
+
+            if not results and max_price:
+                # Nothing in budget — tell user instead of showing over-budget results
+                return {
+                    'success': True,
+                    'message': f'No products found under Rs.{int(max_price):,}',
+                    'data':    []
+                }
+            if results:
+                return {'success': True, 'message': f'{len(results)} results', 'data': results}
+            # Fallback to .NET search if local search service unavailable
+            logger.warning("Local search unavailable, falling back to API")
             return api_client.search_products(query=query, top_k=5)
 
         # ── Compare ───────────────────────────────────────────────
@@ -114,11 +139,10 @@ class ShoppingAgentOrchestrator:
 
             # If no IDs from history, search for products and compare top results
             if len(ids) < 2 and query:
-                logger.info(f"🔍 compare: no IDs in history, searching for '{query}'")
-                search = api_client.search_products(query=query, top_k=4)
-                results = search.get('data') or []
+                logger.info(f"🔍 compare: using local search for '{query}'")
+                results = self._local_search(query, top_k=4)
                 ids = [r.get('id') for r in results if r.get('id')][:4]
-                logger.info(f"🔍 compare: resolved IDs from search: {ids}")
+                logger.info(f"🔍 compare: resolved IDs: {ids}")
 
             if len(ids) < 2:
                 return {
@@ -133,18 +157,22 @@ class ShoppingAgentOrchestrator:
             product_id = params.get('product_id')
             query      = params.get('query') or params.get('product_name') or ''
 
-            # If LLM gave a name instead of a MongoDB ID, search for the product
+            # Use in-process sentence-transformer — instant, no network call
             if not self._is_mongo_id(product_id) and query:
-                search  = api_client.search_products(query=query, top_k=1)
-                results = (search.get('data') or [])
+                results = self._local_search(query, top_k=3)
                 if results:
-                    product_id = results[0].get('id')
-                    logger.info(f"🔍 Resolved '{query}' → ID: {product_id}")
+                    best       = results[0]
+                    product_id = best.get('id')
+                    logger.info(f"add_to_cart: '{query}' resolved to '{best.get('name')}' id={product_id}")
+                else:
+                    logger.warning(f"add_to_cart: local search returned 0 results for '{query}'")
 
             if not product_id or not self._is_mongo_id(product_id):
-                return {'success': False,
-                        'message': f"I couldn't find a product matching '{query}'. Try searching first.",
-                        'data': None}
+                return {
+                    'success': False,
+                    'message': f"I couldn't find '{query}' in our catalog. Try searching for it first.",
+                    'data': None
+                }
             return api_client.add_to_cart(product_id, quantity=params.get('quantity', 1))
 
         elif intent == 'remove_from_cart':
@@ -158,12 +186,20 @@ class ShoppingAgentOrchestrator:
                 matched     = self._find_cart_item_by_name(cart_items, product_name)
                 if matched:
                     product_id = self._get_product_id(matched)
-                    logger.info(f"🛒 Matched '{product_name}' → productId: {product_id} | item keys: {list(matched.keys())}")
+                    logger.info(f"🛒 Matched '{product_name}' → productId: {product_id}")
                 else:
-                    names = ', '.join(i.get('productName','?') for i in cart_items)
-                    return {'success': False,
-                            'message': f"Couldn't find '{product_name}' in cart. Cart has: {names}",
-                            'data': None}
+                    # Fallback: use local search to find the product ID, then match in cart
+                    search_results = self._local_search(product_name, top_k=3)
+                    search_ids = {r.get('id') for r in search_results if r.get('id')}
+                    matched = next((i for i in cart_items if self._get_product_id(i) in search_ids), None)
+                    if matched:
+                        product_id = self._get_product_id(matched)
+                        logger.info(f"🛒 Semantic fallback matched '{product_name}' → {product_id}")
+                    else:
+                        names = ', '.join(i.get('productName','?') for i in cart_items)
+                        return {'success': False,
+                                'message': f"Couldn't find '{product_name}' in cart. Cart has: {names}",
+                                'data': None}
 
             if not product_id:
                 return {'success': False,
@@ -236,6 +272,40 @@ class ShoppingAgentOrchestrator:
             return {'success': True, 'message': 'ok', 'data': None}
 
     # ── Helper utilities ──────────────────────────────────────────────────────
+
+    def _local_search(self, query: str, top_k: int = 5, max_price: float = None) -> list:
+        """
+        Search using in-process sentence-transformer. No network calls.
+        max_price: fetches extra candidates then filters by budget.
+        """
+        if not query or not self.search_service:
+            return []
+        try:
+            from models import SearchRequest
+            # Pass price filter directly to SearchRequest — MongoDB does the filtering
+            response = self.search_service.search(SearchRequest(
+                query     = query,
+                top_k     = top_k,
+                max_price = max_price,
+            ))
+            results  = []
+            for r in response.results:
+                results.append({
+                    'id':            r.id,
+                    'name':          r.name,
+                    'brand':         r.brand,
+                    'price':         r.price,
+                    'rating':        r.rating,
+                    'stockQuantity': r.stockQuantity,
+                    'isAvailable':   r.stockQuantity > 0,
+                    'category':      r.category,
+                    'imageUrl':      r.imageUrl,
+                })
+            logger.info(f"local_search '{query}' max_price={max_price} -> {len(results)} results")
+            return results
+        except Exception as e:
+            logger.error(f"local_search error: {e}")
+            return []
 
     @staticmethod
     def _is_mongo_id(value: str) -> bool:

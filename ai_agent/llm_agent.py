@@ -4,13 +4,11 @@ llm_agent.py  (v4 — Groq Edition)
 Two clear modes:
   MODE A (current)  — rule-based extraction + template responses. Works now.
   MODE B (active)   — real LLM calls via Groq (or openai / anthropic / ollama).
-
 To activate Groq (recommended):
   1. pip install groq
   2. Set LLM_PROVIDER=groq  in .env
   3. Set LLM_MODEL=llama-3.1-8b-instant  in .env
   4. Set GROQ_API_KEY=gsk_...  in .env  (free at console.groq.com)
-
 Other supported providers: ollama | openai | anthropic
 """
 
@@ -56,46 +54,36 @@ INTENT_SCHEMA = {
 # ─────────────────────────────────────────────────────────────────
 INTENT_SYSTEM_PROMPT = f"""You are an intent extractor for a shopping assistant.
 Output ONLY a valid JSON object — no prose, no markdown, no backticks.
-
 Schema:
 {json.dumps(INTENT_SCHEMA, indent=2)}
-
 STRICT RULES — follow exactly:
-
 1. REMOVE/DELETE from cart → intent: "remove_from_cart"
    Triggers: "remove", "delete", "take out", "don't want", "cancel item"
    Put the product name in BOTH "product_name" AND "query" parameters.
    Example: "remove Samsung TV" → {{"intent":"remove_from_cart","parameters":{{"product_name":"Samsung TV","query":"Samsung TV"}}}}
-
 2. ADD to cart → intent: "add_to_cart"
    Triggers: "add", "buy", "put in cart", "i want", "i'll take", "<product> add to cart"
    Put the product name in BOTH "product_name" AND "query" parameters.
    Example: "JBL Tune add to cart" → {{"intent":"add_to_cart","parameters":{{"product_name":"JBL Tune","query":"JBL Tune","quantity":1}}}}
    Example: "add Samsung TV to cart" → {{"intent":"add_to_cart","parameters":{{"product_name":"Samsung TV","query":"Samsung TV","quantity":1}}}}
-
 3. VIEW cart → intent: "view_cart"
    Triggers: "my cart", "show cart", "what's in my cart", "cart"
-
 4. SEARCH products → intent: "search_product"
-   Triggers: "find", "search", "show me", "recommend", "best", "looking for"
-
+   Triggers: "find", "search", "show me", "recommend", "best", "looking for", bare category words
+   If user mentions a budget, put the NUMBER ONLY in "budget_max" (e.g. "under 5000" → budget_max: 5000, "below 15k" → budget_max: 15000).
+   Always put the full search phrase in "query".
+   Example: "earphones under 5000" → {{"intent":"search_product","parameters":{{"query":"earphones under 5000","budget_max":5000}}}}
 5. CHECKOUT/place order → intent: "place_order"
    Triggers: "checkout", "place order", "proceed to pay", "buy now", "confirm order"
-
 6. ORDER HISTORY → intent: "order_history"
    Triggers: "my orders", "past orders", "order history"
-
 7. CANCEL ORDER → intent: "cancel_order"
    Triggers: "cancel order", with order number in "order_id" parameter.
-
 8. COMPARE → intent: "compare_products"
    Triggers: "compare", "vs", "difference between", "which is better"
-
 9. GREETING → intent: "greeting"
    Triggers: "hi", "hello", "hey", "namaste"
-
 10. Other → intent: "other"
-
 - budget_max must be an integer (strip ₹, commas).
 - product_ids must be real 24-char MongoDB ObjectIds from history only. Never invent them.
 - Always output valid JSON. Nothing else.
@@ -106,7 +94,6 @@ STRICT RULES — follow exactly:
 # ─────────────────────────────────────────────────────────────────
 RESPONSE_SYSTEM_PROMPT = """You are ShopAI, a friendly and knowledgeable Indian e-commerce assistant.
 You help users find products, manage their cart, and place orders.
-
 Tone guidelines:
 - Warm, concise, and confident. Never robotic.
 - Use ₹ for prices. Use emojis sparingly (max 2 per response).
@@ -114,7 +101,6 @@ Tone guidelines:
 - Always end with a clear next-step question or call-to-action.
 - If an API call failed, apologise briefly and suggest an alternative.
 - Keep responses under 150 words unless comparing products.
-
 Formatting:
 - Use **bold** for product names and prices.
 - Never fabricate product details — only use what is in the API result.
@@ -127,7 +113,6 @@ class LLMAgent:
     Two responsibilities:
       1. extract_intent(message, history) → { intent, parameters }
       2. generate_response(intent_data, api_result) → str
-
     MODE A: Both methods use rules/templates (works immediately, no GPU needed).
     MODE B: Both methods call a real LLM. Switch by changing LLM_PROVIDER in .env.
     """
@@ -448,14 +433,22 @@ class LLMAgent:
         if is_search or has_category:
             params: Dict[str, Any] = {}
 
-            # Budget — handle "under 20000", "below 15k", "20k budget"
-            budget_match = re.search(r'(?:under|below|within|budget|upto|up to|less than)?\s*[₹rs\.]*\s*(\d[\d,]*)\s*(?:k|thousand)?', msg)
-            if budget_match and any(t in msg for t in ['₹', 'rs', 'under', 'below', 'budget', 'cheap', 'affordable', 'upto', 'within', 'k']):
+            # Budget — handle "under 20000", "below 15k", "20k budget", "under ₹5000"
+            budget_match = re.search(
+                r'(?:under|below|within|upto|up\s+to|less\s+than|budget\s+of|max)\s*[₹rRsS\.]*\s*(\d[\d,]*)\s*(k|thousand)?',
+                msg, re.IGNORECASE
+            )
+            if not budget_match:
+                # also catch "₹5000" or "5000 budget"
+                budget_match = re.search(r'[₹]\s*(\d[\d,]*)\s*(k|thousand)?', msg)
+            if budget_match and any(t in msg for t in ['₹','rs','under','below','budget','affordable','upto','within','k','max']):
                 raw = budget_match.group(1).replace(',', '')
                 val = int(raw)
-                if 'k' in msg[budget_match.start():budget_match.end()+2]:
+                suffix = (budget_match.group(2) or '').lower()
+                if suffix in ('k', 'thousand'):
                     val *= 1000
                 params['budget_max'] = val
+                logger.debug(f"Budget extracted: {val}")
 
             # Use full message as query for semantic search (it's already good at this)
             params['query'] = message.strip()

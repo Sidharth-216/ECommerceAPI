@@ -13,8 +13,10 @@ from pydantic import BaseModel, field_validator
 # ─────────────────────────────────────────────────────────────────
 
 class SearchRequest(BaseModel):
-    query: str
-    top_k: int = 5
+    query:     str
+    top_k:     int             = 5
+    min_price: Optional[float] = None  # only show products >= this price
+    max_price: Optional[float] = None  # only show products <= this price
 
 
 class ProductResult(BaseModel):
