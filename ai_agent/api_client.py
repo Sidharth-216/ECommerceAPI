@@ -248,13 +248,25 @@ class APIClient:
             logger.info(f"POST /ai/orders/place → {resp.status_code}")
 
             if not resp.ok:
-                logger.error(f"POST /ai/orders/place FAILED {resp.status_code}: {resp.text[:500]}")
+                logger.error(f"POST /ai/orders/place FAILED {resp.status_code}: {resp.text[:300]}")
+
+                # 5xx / 520 — Render crashed or restarted.
+                # The order MAY have been created. Tell user to check Orders page.
+                if resp.status_code >= 500:
+                    logger.warning("5xx on place_order — treating as possible success, check Orders page")
+                    return {
+                        'success': True,
+                        'message': 'Order submitted but server response was unclear. Check Orders page.',
+                        'data': {'orderNumber': 'Check Orders page', 'status': 'Processing'}
+                    }
+
                 try:
                     err = resp.json()
                     msg = err.get('message') or err.get('title') or err.get('detail') or str(err)
                 except Exception:
-                    msg = resp.text[:300]
-                # Special case: cart empty after timeout means order was already placed
+                    msg = resp.text[:200] or f"HTTP {resp.status_code}"
+
+                # Cart empty after timeout = order already placed on prior attempt
                 if 'cart' in msg.lower() and 'empty' in msg.lower():
                     return {
                         'success': True,

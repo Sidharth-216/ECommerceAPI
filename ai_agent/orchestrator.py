@@ -1,350 +1,64 @@
 """
-orchestrator.py  (v3)
-=====================
-Coordinates LLMAgent ↔ APIClient ↔ AIChatController (/api/ai/*).
-Key change from v2: jwt_token comes from ChatRequest and is forwarded
-to APIClient so every .NET call is authenticated as the correct user.
-No userId plumbing needed — the .NET controller reads the user from the JWT.
+orchestrator.py  (v4 -- Agentic Edition)
+=========================================
+Thin coordinator. All reasoning now lives in ShoppingAgent (llm_agent.py).
+This file only:
+  1. Builds an authenticated APIClient from the JWT
+  2. Calls ShoppingAgent.process()
+  3. Wraps the result in ChatResponse
 """
 
 import os
 import logging
-from typing import Dict, Any, Optional
-
 from models import ChatRequest, ChatResponse
-from llm_agent import LLMAgent
+from llm_agent import ShoppingAgent
 from api_client import APIClient
 
-logger = logging.getLogger(__name__)
-
-API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:5033/api")
+logger     = logging.getLogger(__name__)
+API_BASE   = os.getenv("API_BASE_URL", "http://localhost:5033/api")
 
 
 class ShoppingAgentOrchestrator:
-    """
-    Entry point for every chat message.
-    Flow:
-      1. Build APIClient with the user's JWT (from request.jwt_token)
-      2. Extract intent via LLMAgent
-      3. Execute the intent against /api/ai/* endpoints
-      4. Generate a natural-language reply
-      5. Return ChatResponse (response text + optional product list)
-    """
 
     def __init__(self, search_service=None):
-        self.llm_agent      = LLMAgent()
-        self.search_service = search_service   # SemanticSearchService injected from main.py
-        logger.info("✅ ShoppingAgentOrchestrator ready")
+        self.agent          = ShoppingAgent()
+        self.search_service = search_service
+        if search_service:
+            self.agent.set_search_service(search_service)
+        logger.info("ShoppingAgentOrchestrator ready (agentic mode)")
 
     def set_search_service(self, svc):
-        """Called by main.py after SemanticSearchService is initialised."""
         self.search_service = svc
-        logger.info("✅ SemanticSearchService wired into orchestrator")
+        self.agent.set_search_service(svc)
+        logger.info("SemanticSearchService wired")
 
     async def process_message(self, request: ChatRequest) -> ChatResponse:
-        # Build per-request API client with the user's token
-        token      = request.jwt_token or ""
-
-        # JWT diagnostics
+        token = request.jwt_token or ""
         if not token:
-            logger.warning("⚠️  NO JWT TOKEN received — /api/ai/* calls will return 401")
+            logger.warning("No JWT token -- all /api/ai/* calls will return 401")
         else:
-            logger.info(f"🔑 JWT received: ...{token[-12:]} (last 12 chars)")
+            logger.info("JWT received: ...%s", token[-12:])
 
-        api_client = APIClient(API_BASE_URL, token)
+        api_client = APIClient(API_BASE, token)
+        user_id    = request.userId or "anon"
 
-        # Convert Message objects to plain dicts for the LLM agent
+        # Convert Message objects to plain dicts
         history = [{"role": m.role, "content": m.content} for m in request.history]
 
-        # 1. Intent extraction
-        intent_data = self.llm_agent.extract_intent(request.message, history)
-        logger.info(f"🎯 Intent: {intent_data['intent']} | params: {intent_data.get('parameters', {})}")
-
-        # 2. Execute intent
-        api_result = await self._execute_intent(intent_data, api_client)
-
-        # API result diagnostics
-        logger.info(
-            f"📦 API result: success={api_result.get('success')} | "
-            f"message={str(api_result.get('message', ''))[:80]} | "
-            f"data_preview={str(api_result.get('data'))[:150]}"
+        # The agent decides everything -- which tools, what order, final reply
+        result = self.agent.process(
+            user_message = request.message,
+            history      = history,
+            api_client   = api_client,
+            user_id      = user_id,
         )
 
-        # 3. Generate reply
-        response_text = self.llm_agent.generate_response(intent_data, api_result)
-
-        # 4. Extract product list for the frontend product cards (if any)
-        products = None
-        if intent_data['intent'] in ('search_product', 'compare_products'):
-            data = api_result.get('data')
-            if isinstance(data, list):
-                products = data
-            elif isinstance(data, dict):
-                products = data.get('products')
+        logger.info("Agent result: action=%s | response_len=%d",
+                    result.get("action"), len(result.get("response", "")))
 
         return ChatResponse(
-            response=response_text,
-            action=intent_data['intent'],
-            data=api_result.get('data'),
-            products=products,
+            response = result.get("response", ""),
+            action   = result.get("action"),
+            data     = None,
+            products = result.get("products"),
         )
-
-    async def _execute_intent(
-        self,
-        intent_data: Dict[str, Any],
-        api_client: APIClient,
-    ) -> Dict[str, Any]:
-        """
-        Routes intent to the correct /api/ai/* endpoint.
-        Always returns { success, message, data } from APIClient.
-        """
-        intent = intent_data['intent']
-        params = intent_data.get('parameters', {})
-
-        # ── Search ────────────────────────────────────────────────
-        if intent == 'search_product':
-            query     = (
-                params.get('query') or
-                params.get('category') or
-                params.get('features') or
-                ''
-            )
-            max_price = params.get('budget_max')
-            if max_price:
-                try:
-                    max_price = float(max_price)
-                except (TypeError, ValueError):
-                    max_price = None
-
-            logger.info(f"search_product: query='{query}' max_price={max_price}")
-            results = self._local_search(query, top_k=5, max_price=max_price)
-
-            if not results and max_price:
-                # Nothing in budget — tell user instead of showing over-budget results
-                return {
-                    'success': True,
-                    'message': f'No products found under Rs.{int(max_price):,}',
-                    'data':    []
-                }
-            if results:
-                return {'success': True, 'message': f'{len(results)} results', 'data': results}
-            # Fallback to .NET search if local search service unavailable
-            logger.warning("Local search unavailable, falling back to API")
-            return api_client.search_products(query=query, top_k=5)
-
-        # ── Compare ───────────────────────────────────────────────
-        elif intent == 'compare_products':
-            ids   = params.get('product_ids', [])
-            query = params.get('query') or params.get('category') or ''
-
-            # If no IDs from history, search for products and compare top results
-            if len(ids) < 2 and query:
-                logger.info(f"🔍 compare: using local search for '{query}'")
-                results = self._local_search(query, top_k=4)
-                ids = [r.get('id') for r in results if r.get('id')][:4]
-                logger.info(f"🔍 compare: resolved IDs: {ids}")
-
-            if len(ids) < 2:
-                return {
-                    'success': False,
-                    'message': 'Please search for some products first, then ask me to compare them.',
-                    'data': None
-                }
-            return api_client.compare_products(ids)
-
-        # ── Add to cart ───────────────────────────────────────────
-        elif intent == 'add_to_cart':
-            product_id = params.get('product_id')
-            query      = params.get('query') or params.get('product_name') or ''
-
-            # Use in-process sentence-transformer — instant, no network call
-            if not self._is_mongo_id(product_id) and query:
-                results = self._local_search(query, top_k=3)
-                if results:
-                    best       = results[0]
-                    product_id = best.get('id')
-                    logger.info(f"add_to_cart: '{query}' resolved to '{best.get('name')}' id={product_id}")
-                else:
-                    logger.warning(f"add_to_cart: local search returned 0 results for '{query}'")
-
-            if not product_id or not self._is_mongo_id(product_id):
-                return {
-                    'success': False,
-                    'message': f"I couldn't find '{query}' in our catalog. Try searching for it first.",
-                    'data': None
-                }
-            return api_client.add_to_cart(product_id, quantity=params.get('quantity', 1))
-
-        elif intent == 'remove_from_cart':
-            product_id   = params.get('product_id')
-            product_name = params.get('product_name') or params.get('query') or ''
-
-            # If no valid MongoDB ID, look up item in cart by name
-            if not self._is_mongo_id(product_id):
-                cart_result = api_client.get_cart()
-                cart_items  = (cart_result.get('data') or {}).get('items') or []
-                matched     = self._find_cart_item_by_name(cart_items, product_name)
-                if matched:
-                    product_id = self._get_product_id(matched)
-                    logger.info(f"🛒 Matched '{product_name}' → productId: {product_id}")
-                else:
-                    # Fallback: use local search to find the product ID, then match in cart
-                    search_results = self._local_search(product_name, top_k=3)
-                    search_ids = {r.get('id') for r in search_results if r.get('id')}
-                    matched = next((i for i in cart_items if self._get_product_id(i) in search_ids), None)
-                    if matched:
-                        product_id = self._get_product_id(matched)
-                        logger.info(f"🛒 Semantic fallback matched '{product_name}' → {product_id}")
-                    else:
-                        names = ', '.join(i.get('productName','?') for i in cart_items)
-                        return {'success': False,
-                                'message': f"Couldn't find '{product_name}' in cart. Cart has: {names}",
-                                'data': None}
-
-            if not product_id:
-                return {'success': False,
-                        'message': 'Which item would you like to remove?',
-                        'data': None}
-            return api_client.remove_from_cart(product_id)
-
-        elif intent == 'view_cart':
-            return api_client.get_cart()
-
-        # ── Place order ───────────────────────────────────────────
-        elif intent == 'place_order':
-            address_id = params.get('shipping_address_id')
-
-            if not address_id:
-                # Strategy 1: try dedicated default address endpoint
-                logger.info("🏠 Fetching default address...")
-                addr_result = api_client.get_default_address()
-                logger.info(f"🏠 get_default_address → success={addr_result.get('success')} data={str(addr_result.get('data'))[:200]}")
-
-                if addr_result.get('success') and addr_result.get('data'):
-                    addr_data  = addr_result['data']
-                    address_id = (addr_data.get('id') or addr_data.get('Id') or addr_data.get('_id') or '')
-                    logger.info(f"🏠 Default address resolved: {address_id}")
-
-            if not address_id:
-                # Strategy 2: get all addresses, pick the first one
-                logger.info("🏠 No default — fetching all addresses as fallback...")
-                all_addr = api_client.get_addresses()
-                logger.info(f"🏠 get_addresses → success={all_addr.get('success')} data={str(all_addr.get('data'))[:300]}")
-
-                addresses = all_addr.get('data') or []
-                if isinstance(addresses, list) and addresses:
-                    best = next((a for a in addresses if a.get('isDefault') or a.get('IsDefault')), addresses[0])
-                    address_id = (best.get('id') or best.get('Id') or best.get('_id') or '')
-                    logger.info(f"🏠 Fallback address resolved: {address_id} from {len(addresses)} addresses")
-
-            if not address_id:
-                logger.warning("🏠 No address found at all — user has no saved addresses")
-                return {
-                    'success': False,
-                    'message': 'No shipping address found. Please add one from Profile → Addresses, then try again.',
-                    'data': None
-                }
-
-            logger.info(f"🛒 Placing order with address_id={address_id}")
-            return api_client.place_order(address_id)
-
-        # ── Order history ─────────────────────────────────────────
-        elif intent == 'order_history':
-            return api_client.get_orders()
-
-        # ── Cancel order ──────────────────────────────────────────
-        elif intent == 'cancel_order':
-            order_id = params.get('order_id')
-            if not order_id:
-                return {
-                    'success': False,
-                    'message': 'Please share the order number you want to cancel (e.g. ORD-20260301-XXXX).',
-                    'data': None
-                }
-            return api_client.cancel_order(order_id)
-
-        # ── Context (session bootstrap) ───────────────────────────
-        elif intent == 'get_context':
-            return api_client.get_context()
-
-        # ── Greeting / other ──────────────────────────────────────
-        else:
-            return {'success': True, 'message': 'ok', 'data': None}
-
-    # ── Helper utilities ──────────────────────────────────────────────────────
-
-    def _local_search(self, query: str, top_k: int = 5, max_price: float = None) -> list:
-        """
-        Search using in-process sentence-transformer. No network calls.
-        max_price: fetches extra candidates then filters by budget.
-        """
-        if not query or not self.search_service:
-            return []
-        try:
-            from models import SearchRequest
-            # Pass price filter directly to SearchRequest — MongoDB does the filtering
-            response = self.search_service.search(SearchRequest(
-                query     = query,
-                top_k     = top_k,
-                max_price = max_price,
-            ))
-            results  = []
-            for r in response.results:
-                results.append({
-                    'id':            r.id,
-                    'name':          r.name,
-                    'brand':         r.brand,
-                    'price':         r.price,
-                    'rating':        r.rating,
-                    'stockQuantity': r.stockQuantity,
-                    'isAvailable':   r.stockQuantity > 0,
-                    'category':      r.category,
-                    'imageUrl':      r.imageUrl,
-                })
-            logger.info(f"local_search '{query}' max_price={max_price} -> {len(results)} results")
-            return results
-        except Exception as e:
-            logger.error(f"local_search error: {e}")
-            return []
-
-    @staticmethod
-    def _is_mongo_id(value: str) -> bool:
-        """Returns True if value looks like a 24-char MongoDB ObjectId."""
-        import re
-        return bool(value and re.match(r'^[0-9a-f]{24}$', str(value), re.IGNORECASE))
-
-    @staticmethod
-    def _get_product_id(item: dict) -> str:
-        """Extract product ID from a cart item — handles different field name casings."""
-        return (
-            item.get('productId') or
-            item.get('ProductId') or
-            item.get('product_id') or
-            item.get('id') or
-            item.get('Id') or
-            ''
-        )
-
-    @staticmethod
-    def _find_cart_item_by_name(cart_items: list, name: str) -> dict:
-        """
-        Fuzzy-match a cart item by product name.
-        Returns the first item whose productName contains all words from `name`.
-        """
-        if not name or not cart_items:
-            return None
-        name_lower = name.lower()
-        # Filter out short/common words
-        words = [w for w in name_lower.split() if len(w) > 2]
-        # Try matching all words
-        for item in cart_items:
-            item_name = (item.get('productName') or item.get('ProductName') or '').lower()
-            if all(w in item_name for w in words):
-                return item
-        # Fallback: match on first significant word
-        if words:
-            for item in cart_items:
-                item_name = (item.get('productName') or item.get('ProductName') or '').lower()
-                if words[0] in item_name:
-                    return item
-        return None
