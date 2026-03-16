@@ -1,0 +1,36 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# docker-compose.yml — Run ShopAI AI Agent locally with Docker
+#
+# Steps:
+#   1. cp .env.example .env     (fill in your secrets)
+#   2. docker compose up --build
+#   3. Open http://localhost:7860
+# ─────────────────────────────────────────────────────────────────────────────
+
+version: "3.9"
+
+services:
+  shopai-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: shopai-agent
+    ports:
+      - "7860:7860"        # Access at http://localhost:7860
+    env_file:
+      - .env               # Loads all variables from your .env file
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7860/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s    # Give 60s for model to load on first start
+
+
+# docker compose up --build      # build image and start (first time)
+# docker compose up              # start without rebuilding
+# docker compose up -d           # start in background (detached)
+# docker compose logs -f         # watch live logs
+# docker compose down            # stop and remove container
+# docker compose down --rmi all  # stop + delete image (full reset)
