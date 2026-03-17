@@ -1,0 +1,39 @@
+{
+  "Version": 1,
+  "Hash": "TC5xs0CVzjtCIkAE2jyHZM24LT0t1Jbrz0EupqEmEns=",
+  "Source": "ECommerceAPI.API",
+  "BasePath": "_content/ECommerceAPI.API",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [
+    {
+      "Name": "ECommerceAPI.API/wwwroot",
+      "Source": "ECommerceAPI.API",
+      "ContentRoot": "/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/wwwroot/",
+      "BasePath": "_content/ECommerceAPI.API",
+      "Pattern": "**"
+    }
+  ],
+  "Assets": [
+    {
+      "Identity": "/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/wwwroot/images/sidhu_qr.jpeg",
+      "SourceId": "ECommerceAPI.API",
+      "SourceType": "Discovered",
+      "ContentRoot": "/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/wwwroot/",
+      "BasePath": "_content/ECommerceAPI.API",
+      "RelativePath": "images/sidhu_qr.jpeg",
+      "AssetKind": "All",
+      "AssetMode": "All",
+      "AssetRole": "Primary",
+      "AssetMergeBehavior": "PreferTarget",
+      "AssetMergeSource": "",
+      "RelatedAsset": "",
+      "AssetTraitName": "",
+      "AssetTraitValue": "",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "wwwroot/images/sidhu_qr.jpeg"
+    }
+  ]
+}

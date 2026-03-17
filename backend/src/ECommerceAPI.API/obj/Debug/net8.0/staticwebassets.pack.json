@@ -1,0 +1,25 @@
+{
+  "Files": [
+    {
+      "Id": "/home/sidhu/Desktop/ECommerceAPI/backend/src/ECommerceAPI.API/wwwroot/images/sidhu_qr.jpeg",
+      "PackagePath": "staticwebassets/images/sidhu_qr.jpeg"
+    },
+    {
+      "Id": "obj/Debug/net8.0/staticwebassets/msbuild.ECommerceAPI.API.Microsoft.AspNetCore.StaticWebAssets.props",
+      "PackagePath": "build\\Microsoft.AspNetCore.StaticWebAssets.props"
+    },
+    {
+      "Id": "obj/Debug/net8.0/staticwebassets/msbuild.build.ECommerceAPI.API.props",
+      "PackagePath": "build\\ECommerceAPI.API.props"
+    },
+    {
+      "Id": "obj/Debug/net8.0/staticwebassets/msbuild.buildMultiTargeting.ECommerceAPI.API.props",
+      "PackagePath": "buildMultiTargeting\\ECommerceAPI.API.props"
+    },
+    {
+      "Id": "obj/Debug/net8.0/staticwebassets/msbuild.buildTransitive.ECommerceAPI.API.props",
+      "PackagePath": "buildTransitive\\ECommerceAPI.API.props"
+    }
+  ],
+  "ElementsToRemove": []
+}

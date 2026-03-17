@@ -1,4 +1,4 @@
-using System;
+/*using System;
 using System.Net;
 using System.Net.Mail;
 using System.Threading.Tasks;
@@ -238,6 +238,263 @@ namespace ECommerceAPI.Application.Services
                 _logger.LogError(ex, $"SMTP send failed for {email}");
                 return false;
             }
+        }
+    }
+}
+*/
+
+using System;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using ECommerceAPI.Application.Interfaces;
+using ECommerceAPI.Infrastructure.Repositories.Interfaces;
+
+namespace ECommerceAPI.Application.Services
+{
+    public class MongoEmailOtpService : IMongoEmailOtpService
+    {
+        private readonly IMongoEmailOtpRepository _emailOtpRepository;
+        private readonly IConfiguration _configuration;
+        private readonly ILogger<MongoEmailOtpService> _logger;
+        private readonly IHttpClientFactory _httpClientFactory;
+
+        private const int OTP_VALIDITY_MINUTES = 5;
+        private const int MAX_ATTEMPTS = 3;
+
+        // Brevo transactional email API endpoint
+        private const string BrevoApiUrl = "https://api.brevo.com/v3/smtp/email";
+
+        public MongoEmailOtpService(
+            IMongoEmailOtpRepository emailOtpRepository,
+            IConfiguration configuration,
+            ILogger<MongoEmailOtpService> logger,
+            IHttpClientFactory httpClientFactory)
+        {
+            _emailOtpRepository = emailOtpRepository;
+            _configuration      = configuration;
+            _logger             = logger;
+            _httpClientFactory  = httpClientFactory;
+        }
+
+        public async Task<bool> GenerateAndSendOtpAsync(string email)
+        {
+            try
+            {
+                // Invalidate old OTPs
+                await _emailOtpRepository.InvalidateAllForEmailAsync(email);
+
+                // Generate 6-digit OTP
+                var otpCode = new Random().Next(100000, 999999).ToString();
+
+                // Save to MongoDB
+                await _emailOtpRepository.AddAsync(new Domain.Entities.MongoDB.MongoEmailOtp
+                {
+                    Email        = email,
+                    OtpCode      = otpCode,
+                    CreatedAt    = DateTime.UtcNow,
+                    ExpiresAt    = DateTime.UtcNow.AddMinutes(OTP_VALIDITY_MINUTES),
+                    IsUsed       = false,
+                    AttemptCount = 0
+                });
+
+                // Send via Brevo HTTP API
+                var emailSent = await SendOtpEmailAsync(email, otpCode);
+
+                if (!emailSent)
+                    _logger.LogWarning("Failed to send OTP email to {Email}", email);
+                else
+                    _logger.LogInformation("OTP sent to {Email}", email);
+
+                return emailSent;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to generate/send OTP for {Email}", email);
+                return false;
+            }
+        }
+
+        public async Task<bool> VerifyOtpAsync(string email, string otp)
+        {
+            try
+            {
+                var otpRecord = await _emailOtpRepository.GetLatestValidOtpAsync(email);
+
+                if (otpRecord == null || otpRecord.IsUsed ||
+                    DateTime.UtcNow > otpRecord.ExpiresAt ||
+                    otpRecord.AttemptCount >= MAX_ATTEMPTS)
+                {
+                    _logger.LogWarning("OTP verification failed for {Email}", email);
+                    return false;
+                }
+
+                otpRecord.AttemptCount++;
+
+                if (otpRecord.OtpCode != otp)
+                {
+                    await _emailOtpRepository.UpdateAsync(otpRecord);
+                    _logger.LogWarning("Invalid OTP attempt for {Email}", email);
+                    return false;
+                }
+
+                otpRecord.IsUsed = true;
+                otpRecord.UsedAt = DateTime.UtcNow;
+                await _emailOtpRepository.UpdateAsync(otpRecord);
+
+                _logger.LogInformation("OTP verified successfully for {Email}", email);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to verify OTP for {Email}", email);
+                return false;
+            }
+        }
+
+        public async Task<bool> IsOtpValidAsync(string email)
+        {
+            var otpRecord = await _emailOtpRepository.GetLatestValidOtpAsync(email);
+            return otpRecord != null && !otpRecord.IsUsed && DateTime.UtcNow <= otpRecord.ExpiresAt;
+        }
+
+        // ─── Brevo HTTP API Sender ────────────────────────────────────────────────
+
+        private async Task<bool> SendOtpEmailAsync(string toEmail, string otpCode)
+        {
+            try
+            {
+                var apiKey   = _configuration["Brevo:ApiKey"];
+                var fromEmail = _configuration["EmailSettings:FromEmail"] ?? "sivini.lawhouse@gmail.com";
+                var fromName  = _configuration["EmailSettings:FromName"]  ?? "ShopAI";
+
+                if (string.IsNullOrWhiteSpace(apiKey))
+                {
+                    _logger.LogError("❌ Brevo:ApiKey is not configured");
+                    return false;
+                }
+
+                // Brevo API payload format
+                var payload = new
+                {
+                    sender = new { name = fromName, email = fromEmail },
+                    to     = new[] { new { email = toEmail } },
+                    subject = "Your OTP Verification Code — ShopAI",
+                    htmlContent = BuildOtpEmailHtml(otpCode)
+                };
+
+                var client  = _httpClientFactory.CreateClient();
+                var json    = JsonSerializer.Serialize(payload);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                // Brevo uses api-key header (not Bearer)
+                client.DefaultRequestHeaders.Clear();
+                client.DefaultRequestHeaders.Add("api-key", apiKey);
+                client.DefaultRequestHeaders.Accept.Add(
+                    new MediaTypeWithQualityHeaderValue("application/json"));
+
+                var response = await client.PostAsync(BrevoApiUrl, content);
+                var body     = await response.Content.ReadAsStringAsync();
+
+                if (response.IsSuccessStatusCode)
+                {
+                    _logger.LogInformation("✅ Brevo API success for {Email}", toEmail);
+                    return true;
+                }
+
+                _logger.LogError("❌ Brevo API error {StatusCode} for {Email}: {Body}",
+                    response.StatusCode, toEmail, body);
+                return false;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ Brevo HTTP call failed for {Email}", toEmail);
+                return false;
+            }
+        }
+
+        // ─── HTML Builder (original template — unchanged) ─────────────────────────
+
+        private string BuildOtpEmailHtml(string otpCode)
+        {
+            return $@"<!DOCTYPE html>
+            <html lang='en'>
+            <head>
+            <meta charset='UTF-8' />
+            <meta name='viewport' content='width=device-width, initial-scale=1.0'/>
+            <title>ShopAI - OTP Verification</title>
+            </head>
+            <body style='margin:0;padding:0;background-color:#f0fdfa;font-family:Arial,sans-serif;'>
+            <table width='100%' cellpadding='0' cellspacing='0' style='background-color:#f0fdfa;padding:40px 0;'>
+                <tr><td align='center'>
+                    <table width='520' cellpadding='0' cellspacing='0'
+                           style='background:#ffffff;border-radius:16px;overflow:hidden;
+                                  box-shadow:0 8px 30px rgba(20,184,166,0.12);'>
+                    <tr>
+                        <td style='background:linear-gradient(to right,#14b8a6,#0891b2);
+                                   padding:36px 40px;text-align:center;'>
+                        <h1 style='margin:0;color:#ffffff;font-size:28px;font-weight:800;letter-spacing:1px;'>
+                            🛍️ ShopAI</h1>
+                        <p style='margin:8px 0 0;color:#ccfbf1;font-size:14px;letter-spacing:0.5px;'>
+                            Your Smart Shopping Companion</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style='padding:40px 40px 20px;'>
+                        <h2 style='margin:0 0 8px;font-size:22px;color:#134e4a;font-weight:700;'>
+                            Verify Your Identity</h2>
+                        <p style='margin:0 0 28px;color:#6b7280;font-size:15px;line-height:1.6;'>
+                            Hi there! 👋 We received a request to verify your email address.
+                            Use the OTP below to complete your verification. This code is valid for
+                            <strong style='color:#0f766e;'>{OTP_VALIDITY_MINUTES} minutes</strong> only.
+                        </p>
+                        <div style='background:linear-gradient(to right,#f0fdfa,#ecfeff);
+                                    border:2px dashed #14b8a6;border-radius:12px;
+                                    padding:28px;text-align:center;margin-bottom:28px;'>
+                            <p style='margin:0 0 8px;font-size:12px;color:#6b7280;
+                                      text-transform:uppercase;letter-spacing:2px;font-weight:600;'>
+                            Your One-Time Password</p>
+                            <div style='font-size:44px;font-weight:800;letter-spacing:12px;
+                                        color:#0f766e;margin:8px 0;
+                                        font-family:""Courier New"",monospace;'>
+                            {otpCode}</div>
+                            <p style='margin:8px 0 0;font-size:12px;color:#9ca3af;'>
+                            ⏱ Expires in {OTP_VALIDITY_MINUTES} minutes</p>
+                        </div>
+                        <div style='background:#fef9c3;border-left:4px solid #eab308;
+                                    border-radius:8px;padding:14px 18px;margin-bottom:28px;'>
+                            <p style='margin:0;font-size:13px;color:#854d0e;line-height:1.5;'>
+                            🔒 <strong>Never share this OTP</strong> with anyone, including ShopAI support.
+                            If you didn't request this, please ignore this email.</p>
+                        </div>
+                        <hr style='border:none;border-top:1px solid #e5e7eb;margin:0 0 24px;'/>
+                        <p style='margin:0;font-size:13px;color:#9ca3af;line-height:1.6;'>
+                            Having trouble? Contact us at
+                            <a href='mailto:support@shopai.com'
+                               style='color:#0891b2;text-decoration:none;font-weight:600;'>
+                               support@shopai.com</a>
+                        </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style='background:#f8fafc;padding:24px 40px;text-align:center;
+                                   border-top:1px solid #e5e7eb;'>
+                        <p style='margin:0 0 6px;font-size:13px;color:#6b7280;'>
+                            © {DateTime.UtcNow.Year}
+                            <strong style='color:#0f766e;'>ShopAI</strong>. All rights reserved.</p>
+                        <p style='margin:0;font-size:12px;color:#9ca3af;'>
+                            This is an automated email. Please do not reply directly.</p>
+                        </td>
+                    </tr>
+                    </table>
+                </td></tr>
+            </table>
+            </body>
+            </html>";
         }
     }
 }
