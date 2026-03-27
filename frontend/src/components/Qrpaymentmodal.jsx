@@ -111,6 +111,9 @@ const QRPaymentModal = ({ orderId, orderNumber, amount, onSuccess, onClose }) =>
   };
 
   const urgency = timeLeft < 120 ? 'text-rose-500' : timeLeft < 300 ? 'text-amber-500' : 'text-teal-600';
+  const qrImageUrl = paymentData?.qrPayload
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=208x208&data=${encodeURIComponent(paymentData.qrPayload)}`
+    : '';
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
@@ -169,16 +172,12 @@ const QRPaymentModal = ({ orderId, orderNumber, amount, onSuccess, onClose }) =>
               {/* QR Image */}
               <div className="flex flex-col items-center gap-3">
                 <div className="p-4 bg-white border-4 border-violet-100 rounded-2xl shadow-inner">
-                  {/* 
-                    The QR payload is currently the static PhonePe QR URL (an image).
-                    Once you have a real UPI deeplink, swap the <img> for a QR-code library:
-                      import QRCode from 'qrcode.react';
-                      <QRCode value={paymentData.qrPayload} size={220} />
-                  */}
                   <img
-                    src={paymentData.qrPayload}
-                    alt="Scan to pay via PhonePe / UPI"
-                    className="w-52 h-52 object-contain"
+                    src={qrImageUrl}
+                    alt="Scan this QR code to pay"
+                    width={208}
+                    height={208}
+                    className="block"
                   />
                 </div>
                 <p className="text-xs text-slate-400 font-medium text-center">

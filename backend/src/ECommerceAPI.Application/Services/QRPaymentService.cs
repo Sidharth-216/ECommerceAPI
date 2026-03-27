@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using ECommerceAPI.Application.DTOs.QRPayment;
 using ECommerceAPI.Application.Interfaces;
 using ECommerceAPI.Domain.Entities.Mongo;
 using ECommerceAPI.Infrastructure.Repositories.Interfaces;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace ECommerceAPI.Application.Services
@@ -23,11 +25,6 @@ namespace ECommerceAPI.Application.Services
     /// </summary>
     public class QRPaymentService : IQRPaymentService
     {
-        // ── Replace this URL with your actual PhonePe / UPI QR image URL
-        // or build a dynamic UPI deeplink like:
-        //   upi://pay?pa=YOUR_VPA&pn=ShopAI&am={amount}&cu=INR&tn={ref}
-        private const string STATIC_PHONEPAY_QR_URL =
-            "http://localhost:5033/images/sidhu_qr.jpeg";
         // How long a QR session stays valid (30 minutes)
         private static readonly TimeSpan QR_EXPIRY = TimeSpan.FromMinutes(30);
 
@@ -35,17 +32,22 @@ namespace ECommerceAPI.Application.Services
         private readonly IMongoOrderRepository _orderRepo;
         private readonly IMongoUserRepository  _userRepo;
         private readonly ILogger<QRPaymentService> _logger;
+        private readonly string _upiId;
+        private readonly string _upiPayeeName;
 
         public QRPaymentService(
             IQRPaymentRepository  qrRepo,
             IMongoOrderRepository orderRepo,
             IMongoUserRepository  userRepo,
-            ILogger<QRPaymentService> logger)
+            ILogger<QRPaymentService> logger,
+            IConfiguration configuration)
         {
             _qrRepo    = qrRepo;
             _orderRepo = orderRepo;
             _userRepo  = userRepo;
             _logger    = logger;
+            _upiId = configuration["Payment:UpiId"] ?? string.Empty;
+            _upiPayeeName = configuration["Payment:UpiPayeeName"] ?? "ShopAI";
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -277,17 +279,24 @@ namespace ECommerceAPI.Application.Services
         // ─────────────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Build the QR payload string.
-        /// Currently returns the static PhonePe QR URL.
-        /// Replace with a UPI deeplink once you have a VPA:
-        ///   upi://pay?pa=YOUR_VPA@ybl&pn=ShopAI&am={amount:F2}&cu=INR&tn={reference}
+        /// Build the QR payload as a UPI deeplink.
+        /// Example:
+        ///   upi://pay?pa=shop@upi&pn=ShopAI&am=123.45&cu=INR&tn=SHOPAI-ORDER123
         /// </summary>
-        private static string BuildQRPayload(decimal amount, string reference)
+        private string BuildQRPayload(decimal amount, string reference)
         {
-            // ── SWAP THIS when you have a real UPI VPA ──────────────────────
-            // return $"upi://pay?pa=YOUR_VPA@ybl&pn=ShopAI&am={amount:F2}&cu=INR&tn={reference}";
-            // ────────────────────────────────────────────────────────────────
-            return STATIC_PHONEPAY_QR_URL;
+            if (string.IsNullOrWhiteSpace(_upiId))
+            {
+                throw new InvalidOperationException(
+                    "UPI ID is not configured. Set Payment:UpiId in appsettings.");
+            }
+
+            var formattedAmount = amount.ToString("0.00", CultureInfo.InvariantCulture);
+            var escapedUpiId = Uri.EscapeDataString(_upiId.Trim());
+            var escapedPayeeName = Uri.EscapeDataString(_upiPayeeName.Trim());
+            var escapedReference = Uri.EscapeDataString(reference);
+
+            return $"upi://pay?pa={escapedUpiId}&pn={escapedPayeeName}&am={formattedAmount}&cu=INR&tn={escapedReference}";
         }
 
         private static QRPaymentResponseDto BuildResponse(MongoQRPayment s, string orderNumber)
