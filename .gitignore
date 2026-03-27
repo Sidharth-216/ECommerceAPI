@@ -1,2 +1,42 @@
+# Environment & Configuration
 appsettings.json
+appsettings.*.json
 backend/src/ECommerceAPI.API/bin/Debug/net8.0/appsettings.json
+
+# .NET Build Output
+**/bin/
+**/obj/
+**/*.dll
+**/*.exe
+**/*.pdb
+
+# Node modules and dependencies
+node_modules/
+frontend/node_modules/
+frontend/node_modules/.cache/
+**/npm-debug.log
+package-lock.json
+
+# Frontend builds
+frontend/build/
+frontend/dist/
+
+# IDE files
+.vs/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+venv/
+env/
+
+# Logs
+logs/
+*.log
