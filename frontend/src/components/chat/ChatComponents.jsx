@@ -17,7 +17,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Bot, Send, X, Loader2, ShoppingCart, Star,
   Package, CheckCircle, Clock, Sparkles, MessageSquare,
-  Trash2, RotateCcw, MapPin, CreditCard, TrendingUp
+  TrendingUp, Mic, MicOff
 } from 'lucide-react';
 
 const AI_AGENT_URL = process.env.REACT_APP_AI_AGENT_URL || 'http://localhost:7860';
@@ -38,6 +38,33 @@ export const callAIAgent = async (message, history, userId) => {
   });
   if (!res.ok) throw new Error(`Agent error: ${res.status}`);
   return res.json();
+};
+
+const transcribeVoice = async (audioBase64, mimeType = 'audio/webm', language = 'en') => {
+  const res = await fetch(`${AI_AGENT_URL}/speech/transcribe`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      audio_base64: audioBase64,
+      mime_type: mimeType,
+      language,
+    }),
+  });
+
+  let payload = {};
+  try {
+    payload = await res.json();
+  } catch {
+    payload = {};
+  }
+
+  if (!res.ok) {
+    if (res.status === 404) {
+      throw new Error('Voice API route missing on AI server. Please deploy latest ai_agent service.');
+    }
+    throw new Error(payload.detail || payload.message || 'Transcription failed');
+  }
+  return payload;
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -223,7 +250,7 @@ const parseCartFromText = (text) => {
     items.push({ name: m[1].trim(), price: parseInt(m[2].replace(/,/g, ''), 10), qty: 1 });
   }
   // Also try "• Name — ₹price × qty = ₹subtotal" format
-  const bulletRe = /[•\-]\s+\*\*(.+?)\*\*\s*(?:—|-)\s*(?:₹|Rs\.?)([\d,]+)\s*×\s*(\d+)\s*=\s*(?:₹|Rs\.?)([\d,]+)/g;
+  const bulletRe = /[•-]\s+\*\*(.+?)\*\*\s*(?:—|-)\s*(?:₹|Rs\.?)([\d,]+)\s*×\s*(\d+)\s*=\s*(?:₹|Rs\.?)([\d,]+)/g;
   while ((m = bulletRe.exec(text)) !== null) {
     items.push({ name: m[1].trim(), price: parseInt(m[2].replace(/,/g,''),10), qty: parseInt(m[3],10), subtotal: parseInt(m[4].replace(/,/g,''),10) });
   }
@@ -270,7 +297,7 @@ const OrderSuccessBlock = ({ parsed, onViewOrders }) => {
 
   // Failure state
   if (isFail) {
-    const [, reason, msg] = (orderNum + '|' + total + '|' + (items[0]?.name||'')).split('|');
+    const [, , msg] = (orderNum + '|' + total + '|' + (items[0]?.name||'')).split('|');
     return (
       <div style={{ background:'#fef2f2', border:'1.5px solid #fca5a5', borderRadius:16, padding:'14px 16px' }}>
         <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
@@ -448,8 +475,8 @@ const RichMessage = ({ content, onViewOrders }) => {
         }
 
         // Bullet point  "• text" or "- text"
-        if (/^[•\-\*]/.test(trimmed)) {
-          const rest = trimmed.replace(/^[•\-\*]\s*/, '');
+        if (/^[•*-]/.test(trimmed)) {
+          const rest = trimmed.replace(/^[•*-]\s*/, '');
           return (
             <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
               <span style={{ width: 6, height: 6, background: '#2dd4bf', borderRadius: '50%', flexShrink: 0, marginTop: 8 }} />
@@ -504,19 +531,251 @@ const TypingIndicator = () => (
 export const FullPageChat = ({ user, chatMessages = [], setChatMessages, onClose, addToCart, setError, setCurrentPage }) => {
   const [msg, setMsg] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [voiceHint, setVoiceHint] = useState('');
+  const [voiceError, setVoiceError] = useState('');
   const endRef   = useRef(null);
   const inputRef = useRef(null);
+  const recognitionRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const mediaStreamRef = useRef(null);
+  const audioChunksRef = useRef([]);
+
+  const SpeechRecognition = typeof window !== 'undefined'
+    ? (window.SpeechRecognition || window.webkitSpeechRecognition)
+    : null;
+  const voiceSupported = !!SpeechRecognition;
+  const mediaRecorderSupported = typeof window !== 'undefined'
+    && !!window.MediaRecorder
+    && !!navigator.mediaDevices
+    && typeof navigator.mediaDevices.getUserMedia === 'function';
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chatMessages, isTyping]);
   useEffect(() => {
     inputRef.current?.focus();
     document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = ''; };
+    return () => {
+      document.body.style.overflow = '';
+      if (recognitionRef.current) {
+        recognitionRef.current.onstart = null;
+        recognitionRef.current.onresult = null;
+        recognitionRef.current.onerror = null;
+        recognitionRef.current.onend = null;
+        recognitionRef.current.stop();
+        recognitionRef.current = null;
+      }
+
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach(track => track.stop());
+        mediaStreamRef.current = null;
+      }
+    };
   }, []);
+
+  const stopListening = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+  };
+
+  const blobToBase64 = (blob) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const dataUrl = reader.result ? String(reader.result) : '';
+      const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
+      resolve(base64);
+    };
+    reader.onerror = () => reject(new Error('Unable to read audio blob'));
+    reader.readAsDataURL(blob);
+  });
+
+  const startFallbackRecording = async () => {
+    if (!mediaRecorderSupported) {
+      setVoiceError('Voice input is not supported in this browser/device.');
+      return;
+    }
+
+    try {
+      setIsListening(true);
+      setVoiceHint('Starting microphone...');
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream;
+
+      let mimeType = 'audio/webm';
+      if (window.MediaRecorder && window.MediaRecorder.isTypeSupported) {
+        if (window.MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+          mimeType = 'audio/webm;codecs=opus';
+        } else if (window.MediaRecorder.isTypeSupported('audio/webm')) {
+          mimeType = 'audio/webm';
+        } else if (window.MediaRecorder.isTypeSupported('audio/mp4')) {
+          mimeType = 'audio/mp4';
+        } else if (window.MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) {
+          mimeType = 'audio/ogg;codecs=opus';
+        } else {
+          mimeType = '';
+        }
+      }
+
+      const recorder = mimeType ? new window.MediaRecorder(stream, { mimeType }) : new window.MediaRecorder(stream);
+      audioChunksRef.current = [];
+
+      recorder.onstart = () => {
+        setIsListening(true);
+        setVoiceHint('Recording... tap mic again to stop.');
+      };
+
+      recorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      recorder.onerror = () => {
+        setIsListening(false);
+        setVoiceError('Voice recording failed. Please try again.');
+      };
+
+      recorder.onstop = async () => {
+        setIsListening(false);
+        if (mediaStreamRef.current) {
+          mediaStreamRef.current.getTracks().forEach(track => track.stop());
+          mediaStreamRef.current = null;
+        }
+
+        try {
+          if (!audioChunksRef.current.length) {
+            setVoiceError('No audio captured. Please try again.');
+            return;
+          }
+
+          const audioBlob = new Blob(audioChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+          audioChunksRef.current = [];
+          setVoiceHint('Transcribing voice command...');
+
+          const audioBase64 = await blobToBase64(audioBlob);
+          const result = await transcribeVoice(audioBase64, recorder.mimeType || 'audio/webm', 'en');
+          const transcript = (result.text || '').trim();
+
+          if (!transcript) {
+            setVoiceError('Could not understand audio. Please try again.');
+            return;
+          }
+
+          setMsg(transcript);
+          setVoiceHint('Voice captured. Press send to continue.');
+          setVoiceError('');
+        } catch (e) {
+          const msg = (e && e.message) ? e.message : 'Could not transcribe audio. Please type or try again.';
+          setVoiceError(msg);
+        } finally {
+          mediaRecorderRef.current = null;
+        }
+      };
+
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+    } catch {
+      setVoiceError('Microphone permission denied. Please allow access and try again.');
+      setIsListening(false);
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach(track => track.stop());
+        mediaStreamRef.current = null;
+      }
+    }
+  };
+
+  const toggleVoiceInput = () => {
+    setVoiceError('');
+
+    if (isTyping) {
+      return;
+    }
+
+    if (isListening) {
+      stopListening();
+      setVoiceHint(voiceSupported ? 'Voice capture stopped.' : 'Recording stopped. Transcribing...');
+      return;
+    }
+
+    if (!voiceSupported) {
+      if (mediaRecorderSupported) {
+        startFallbackRecording();
+      } else {
+        setVoiceError('Voice input is not supported in this browser. Try Chrome/Edge or use text input.');
+      }
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'en-IN';
+      recognition.interimResults = true;
+      recognition.continuous = false;
+      recognition.maxAlternatives = 1;
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        setVoiceHint('Listening... speak your command.');
+      };
+
+      recognition.onresult = (event) => {
+        let interim = '';
+        let finalText = '';
+
+        for (let i = event.resultIndex; i < event.results.length; i += 1) {
+          const transcript = event.results[i][0]?.transcript || '';
+          if (event.results[i].isFinal) {
+            finalText += transcript;
+          } else {
+            interim += transcript;
+          }
+        }
+
+        const text = (finalText || interim).trim();
+        if (text) {
+          setMsg(text);
+        }
+
+        if (finalText.trim()) {
+          setVoiceHint('Voice captured. Press send to continue.');
+        }
+      };
+
+      recognition.onerror = (event) => {
+        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+          setVoiceError('Microphone permission denied. Please allow access and try again.');
+        } else if (event.error === 'no-speech') {
+          setVoiceError('No speech detected. Please try again.');
+        } else {
+          setVoiceError('Voice capture failed. Please try again.');
+        }
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch {
+      setIsListening(false);
+      setVoiceError('Unable to start voice input on this device.');
+    }
+  };
 
   const sendMessage = async (text) => {
     const t = (text || msg).trim();
     if (!t || isTyping) return;
+    if (isListening) stopListening();
+    setVoiceHint('');
+    setVoiceError('');
     setChatMessages(prev => [...prev, { role: 'user', content: t, ts: Date.now() }]);
     setMsg('');
     setIsTyping(true);
@@ -721,6 +980,13 @@ export const FullPageChat = ({ user, chatMessages = [], setChatMessages, onClose
             style={{ flex: 1, border: '1.5px solid #99f6e4', borderRadius: 16, padding: '14px 20px', fontSize: 14, outline: 'none', background: '#f8fffe', color: '#064e3b', fontFamily: 'inherit', transition: 'all .2s' }}
             onFocus={e => { e.currentTarget.style.borderColor='#2dd4bf'; e.currentTarget.style.background='white'; e.currentTarget.style.boxShadow='0 0 0 4px rgba(45,212,191,.12)'; }}
             onBlur={e => { e.currentTarget.style.borderColor='#99f6e4'; e.currentTarget.style.background='#f8fffe'; e.currentTarget.style.boxShadow='none'; }} />
+          <button onClick={toggleVoiceInput} disabled={isTyping}
+            title={isListening ? 'Stop voice capture' : voiceSupported ? 'Start voice capture' : mediaRecorderSupported ? 'Record voice command' : 'Voice input not supported in this browser'}
+            style={{ width: 52, height: 52, borderRadius: 16, border: 'none', background: isTyping ? '#f1f5f9' : isListening ? 'linear-gradient(135deg,#ef4444,#dc2626)' : 'linear-gradient(135deg,#67e8f9,#06b6d4)', color: isTyping ? '#94a3b8' : 'white', cursor: isTyping ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all .2s', boxShadow: isTyping ? 'none' : isListening ? '0 6px 18px rgba(239,68,68,.35)' : '0 6px 18px rgba(6,182,212,.3)' }}
+            onMouseEnter={e => { if (!isTyping) e.currentTarget.style.transform='scale(1.08)'; }}
+            onMouseLeave={e => { e.currentTarget.style.transform='none'; }}>
+            {isListening ? <MicOff size={20} /> : <Mic size={20} />}
+          </button>
           <button onClick={() => sendMessage()} disabled={!msg.trim() || isTyping}
             style={{ width: 52, height: 52, borderRadius: 16, border: 'none', background: !msg.trim() || isTyping ? '#e2f7f3' : 'linear-gradient(135deg,#2dd4bf,#0d9488)', color: !msg.trim() || isTyping ? '#94a3b8' : 'white', cursor: !msg.trim() || isTyping ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all .2s', boxShadow: !msg.trim() || isTyping ? 'none' : '0 6px 18px rgba(13,148,136,.4)' }}
             onMouseEnter={e => { if (msg.trim() && !isTyping) e.currentTarget.style.transform='scale(1.08)'; }}
@@ -728,6 +994,16 @@ export const FullPageChat = ({ user, chatMessages = [], setChatMessages, onClose
             {isTyping ? <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={20} />}
           </button>
         </div>
+        {(voiceHint || voiceError) && (
+          <div style={{ background: 'white', padding: '0 36px 12px', borderTop: '1px dashed #e2f7f3' }}>
+            {voiceHint && !voiceError && (
+              <p style={{ margin: 0, fontSize: 12, color: '#0891b2', fontWeight: 600 }}>{voiceHint}</p>
+            )}
+            {voiceError && (
+              <p style={{ margin: 0, fontSize: 12, color: '#dc2626', fontWeight: 600 }}>{voiceError}</p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

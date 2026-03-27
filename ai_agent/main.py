@@ -9,16 +9,28 @@ On HF Spaces: started automatically via Dockerfile CMD.
 
 import os
 import logging
+import base64
 from datetime import datetime
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+from pydantic import BaseModel
 
 load_dotenv()
 
 from models       import ChatRequest, ChatResponse, SearchRequest, SearchResponse
 from orchestrator import ShoppingAgentOrchestrator
 from semantic_search import SemanticSearchService
+
+
+class SpeechTranscribeRequest(BaseModel):
+    audio_base64: str
+    mime_type: str = "audio/webm"
+    language: str = "en"
+
+
+class SpeechTranscribeResponse(BaseModel):
+    text: str
 
 # ─────────────────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -101,6 +113,7 @@ async def root():
         "endpoints": {
             "chat":   "POST /chat",
             "search": "POST /search",
+            "speech": "POST /speech/transcribe",
             "health": "GET  /health",
             "docs":   "GET  /docs",
         }
@@ -149,3 +162,71 @@ async def semantic_search(request: SearchRequest):
     except Exception as e:
         logger.error(f"Search error for query='{request.query}': {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/speech/transcribe", response_model=SpeechTranscribeResponse)
+async def speech_transcribe(request: SpeechTranscribeRequest):
+    """
+    Voice fallback endpoint used by the frontend when browser speech recognition
+    is unavailable. Accepts base64-encoded audio and returns transcript text.
+    """
+    if not request.audio_base64 or not request.audio_base64.strip():
+        raise HTTPException(status_code=400, detail="audio_base64 is required")
+
+    groq_key = os.getenv("GROQ_API_KEY", "")
+    if not groq_key:
+        raise HTTPException(status_code=503, detail="Speech transcription is not configured")
+
+    b64_payload = request.audio_base64.strip()
+    if "," in b64_payload:
+        b64_payload = b64_payload.split(",", 1)[1]
+
+    try:
+        audio_bytes = base64.b64decode(b64_payload, validate=True)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid base64 audio payload")
+
+    if not audio_bytes:
+        raise HTTPException(status_code=400, detail="Audio payload is empty")
+
+    max_bytes = 10 * 1024 * 1024
+    if len(audio_bytes) > max_bytes:
+        raise HTTPException(status_code=413, detail="Audio payload too large")
+
+    extension = "webm"
+    mime = (request.mime_type or "").lower()
+    if "wav" in mime:
+        extension = "wav"
+    elif "mp4" in mime or "m4a" in mime:
+        extension = "m4a"
+    elif "ogg" in mime:
+        extension = "ogg"
+
+    model = os.getenv("STT_MODEL", "whisper-large-v3")
+
+    try:
+        from groq import Groq
+
+        client = Groq(api_key=groq_key)
+        transcription = client.audio.transcriptions.create(
+            file=(f"voice.{extension}", audio_bytes),
+            model=model,
+            language=(request.language or "en")[:8],
+            response_format="json",
+            temperature=0,
+        )
+
+        text = getattr(transcription, "text", None)
+        if text is None and isinstance(transcription, dict):
+            text = transcription.get("text")
+
+        text = (text or "").strip()
+        if not text:
+            raise HTTPException(status_code=422, detail="Could not transcribe audio")
+
+        return SpeechTranscribeResponse(text=text)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Speech transcription error: {e}", exc_info=True)
+        raise HTTPException(status_code=502, detail="Speech transcription failed")
