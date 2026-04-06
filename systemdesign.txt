@@ -1,0 +1,677 @@
+SHOPAI SYSTEM DESIGN DOCUMENT
+=============================
+
+Project summary
+---------------
+ShopAI is a three-tier e-commerce platform with:
+- React frontend for customer and admin UI
+- ASP.NET Core backend for authentication, catalog, cart, orders, address, admin, QR payment, and AI bridge endpoints
+- Python FastAPI AI agent for conversational shopping, semantic product search, and voice transcription
+
+The backend is the central business API. The frontend talks to the backend for normal commerce features and talks to the Python AI agent for chat and speech. The AI agent, in turn, calls the backend AI routes to read or modify cart, orders, addresses, and products.
+
+
+1. Traditional Flowchart Legend
+-------------------------------
+Use these shapes consistently in any flowchart tool:
+
+- (Terminator)  Start / End
+- [Process]     Action, computation, service call, state update
+- <Decision?>   Branching logic with Yes / No outcomes
+- [/Input/]     User input, request payload, form data, query, token, or audio
+- \Output\     Displayed result, response payload, notification, or generated artifact
+
+
+2. Complete Project Flowchart
+-----------------------------
+
+(Terminator) START
+	|
+	v
+[/Input/] User opens ShopAI in browser
+	|
+	v
+[Process] React app loads and restores session state from sessionStorage/localStorage
+	|
+	v
+<Decision?> Is there a valid authenticated session?
+	|Yes                                      |No
+	v                                         v
+[Process] Validate token with backend       [Process] Route to public home page
+	|                                         |
+	v                                         v
+<Decision?> Server boot ID matches?         [/Input/] User chooses Login or Register
+	|Yes                                      |
+	|                                         v
+	|                                      [Process] Submit auth form to backend Mongo auth routes
+	|                                         |
+	|                                         v
+	|                                      <Decision?> Auth success?
+	|                                         |Yes                        |No
+	|                                         v                           v
+	|                                      [Process] Store JWT, user, boot ID   \Output\ Show auth error
+	|                                         |
+	|                                         v
+	|                                   [Process] Load profile, orders, cart, products
+	|                                         |
+	|                                         v
+	+-----------------------------+-----------+
+																|
+																v
+[Process] Render customer dashboard or admin dashboard based on role
+																|
+																v
+<Decision?> Which workflow is active?
+	|Products/Catalog              |Cart/Checkout                 |Orders/Profile                 |Admin                       |AI Chat
+	v                              v                              v                              v                            v
+[Process] Fetch products         [Process] Read cart state       [Process] Read orders/profile   [Process] Load admin stats    [Process] Open chat UI
+	|                              |                              |                              |                            |
+	v                              v                              v                              v                            v
+[/Input/] Search/filter query    [/Input/] Cart change           [/Input/] View order/address    [/Input/] Admin action        [/Input/] Message or voice
+	|                              |                              |                              |                            |
+	v                              v                              v                              v                            v
+[Process] Call backend search    [Process] Add/update/remove     [Process] Update profile/address [Process] Manage products     [Process] Send to Python AI agent
+	|                              |                              |                              |                            |
+	v                              v                              v                              v                            |
+\Output\ Matching products       \Output\ Updated cart          \Output\ Order/address view     \Output\ Updated analytics    v
+																																																	 [Process] AI agent interprets intent
+																																																						 |
+																																																						 v
+																																																	 <Decision?> Needs tool/action?
+																																																						 |Yes                |No
+																																																						 v                   v
+																																																	 [Process] Call backend API tools   [Process] Generate plain response
+																																																						 |
+																																																						 v
+																																																	 \Output\ Chat reply with products,
+																																																						 cart, order, or search result
+																|
+																v
+<Decision?> Payment required at checkout?
+	|Yes                                                   |No
+	v                                                      v
+[Process] Create order from cart and selected address     [Process] Continue browsing or manage profile/orders
+	|
+	v
+<Decision?> Payment method selected?
+	|COD                   |QR / UPI                    |Online Card/Netbanking
+	v                      v                            v
+[Process] Confirm order  [Process] Clear cart and show QR modal  [Process] Create Razorpay payment flow
+	|                      |                            |
+	v                      v                            v
+\Output\ Order placed    [Process] Wait for payment confirmation  \Output\ Payment gateway response
+												 |
+												 v
+								<Decision?> Payment confirmed?
+												 |Yes                   |No
+												 v                      v
+								[Process] Mark payment received  \Output\ Payment pending/rejected message
+												 |
+												 v
+								\Output\ Order becomes active
+	|
+	v
+(Terminator) END
+
+
+3. Individual Feature Flowcharts
+--------------------------------
+
+3.1 Authentication and Session Restoration
+-----------------------------------------
+
+(Terminator) Start app
+	|
+	v
+[Process] Read token, user, and serverBootId from sessionStorage/localStorage
+	|
+	v
+<Decision?> Token and user exist?
+	|Yes                                      |No
+	v                                         v
+[Process] Call backend validate endpoint     [Process] Show public home page
+	|
+	v
+<Decision?> Token accepted by backend?
+	|Yes                                      |No
+	v                                         v
+<Decision?> Boot ID matches stored value?   [Process] Clear session data
+	|Yes                                      |No
+	v                                         v
+[Process] Restore user session              [Process] Force home page
+	|
+	v
+\Output\ User lands on correct authenticated page
+
+
+3.2 User Registration and Login
+-------------------------------
+
+(Terminator) User opens login/register form
+	|
+	v
+[/Input/] Email, password, name, mobile, gender
+	|
+	v
+[Process] Submit request to backend Mongo auth controller
+	|
+	v
+<Decision?> Login or register?
+	|Login                                   |Register
+	v                                        v
+[Process] Validate credentials             [Process] Create user account
+	|                                        |
+	v                                        v
+<Decision?> Credentials valid?            <Decision?> Account created?
+	|Yes               |No                   |Yes              |No
+	v                  v                     v                 v
+[Process] Issue JWT and role               \Output\ Error     [Process] Return JWT and profile
+	|                                        |
+	v                                        v
+[Process] Save session state               [Process] Save session state
+	|
+	v
+\Output\ User redirected to products or admin dashboard
+
+
+3.3 Product Catalog and Search
+------------------------------
+
+(Terminator) User opens products page
+	|
+	v
+[Process] Load products from MongoDB backend
+	|
+	v
+<Decision?> Search query entered?
+	|Yes                                      |No
+	v                                         v
+[/Input/] Search text / filter parameters    [Process] Render default product grid
+	|
+	v
+[Process] Call semantic search endpoint
+	|
+	v
+[Process] Normalize product data for UI
+	|
+	v
+<Decision?> Results found?
+	|Yes                                      |No
+	v                                         v
+\Output\ Display search results             \Output\ Show no-result state
+
+
+3.4 AI Chat Assistant and Semantic Search
+-----------------------------------------
+
+(Terminator) User opens AI chat
+	|
+	v
+[/Input/] Message, quick chip, or voice audio
+	|
+	v
+[Process] Frontend sends chat payload to Python FastAPI /chat
+	|
+	v
+[Process] Orchestrator passes JWT and history to AI agent
+	|
+	v
+[Process] LLM decides whether to call tools
+	|
+	v
+<Decision?> Tool required?
+	|Yes                                      |No
+	v                                         v
+[Process] Call semantic search or backend AI routes  [Process] Produce final natural-language reply
+	|
+	v
+<Decision?> Voice input used?
+	|Yes                                      |No
+	v                                         v
+[Process] Send audio to /speech/transcribe   [Process] Render text response only
+	|
+	v
+\Output\ Reply plus product cards, cart cards, or order cards
+
+
+3.5 Shopping Cart Management
+----------------------------
+
+(Terminator) User clicks Add to Cart
+	|
+	v
+[/Input/] Product and quantity
+	|
+	v
+[Process] Extract product ID and user ID
+	|
+	v
+<Decision?> Logged in?
+	|Yes                                      |No
+	v                                         v
+[Process] Persist cart to backend           [Process] Store guest cart in sessionStorage
+	|
+	v
+[Process] Refresh cart state in UI
+	|
+	v
+<Decision?> Quantity updated or item removed?
+	|Yes                                      |No
+	v                                         v
+[Process] Send update/remove request         [Process] Keep existing cart state
+	|
+	v
+\Output\ Cart totals, item counts, and item rows refresh
+
+
+3.6 Checkout and Payment
+------------------------
+
+(Terminator) User clicks checkout
+	|
+	v
+[/Input/] Shipping address and payment method
+	|
+	v
+[Process] Validate cart, address, and user session
+	|
+	v
+<Decision?> Cart has items and address selected?
+	|Yes                                      |No
+	v                                         v
+[Process] Create order from cart             \Output\ Show validation error
+	|
+	v
+<Decision?> Payment method
+	|COD                      |QR / UPI                    |Online
+	v                         v                            v
+[Process] Confirm order      [Process] Clear cart and show QR modal  [Process] Start Razorpay flow
+	|                         |
+	v                         v
+\Output\ Order history updated  <Decision?> QR payment received?
+															 |Yes                     |No
+															 v                        v
+												[Process] Mark payment received  \Output\ Pending payment state
+															 |
+															 v
+												\Output\ Active paid order
+
+
+3.7 Order History and Cancellation
+----------------------------------
+
+(Terminator) User opens orders page
+	|
+	v
+[Process] Fetch order history from backend
+	|
+	v
+<Decision?> Orders available?
+	|Yes                                      |No
+	v                                         v
+[Process] Render order cards and filters     \Output\ Empty order state
+	|
+	v
+<Decision?> User opens order details?
+	|Yes                                      |No
+	v                                         v
+[Process] Show full order contents           [Process] Keep list view
+	|
+	v
+<Decision?> Cancel requested and allowed?
+	|Yes                                      |No
+	v                                         v
+[Process] Call cancel endpoint               [Process] Continue browsing
+	|
+	v
+\Output\ Updated order status
+
+
+3.8 Profile and Address Management
+----------------------------------
+
+(Terminator) User opens profile page
+	|
+	v
+[Process] Load profile data, addresses, and order data
+	|
+	v
+<Decision?> Add or edit address?
+	|Add/Edit                                 |No
+	v                                         v
+[/Input/] Address form data                  [Process] Display profile summary
+	|
+	v
+[Process] Save address to backend
+	|
+	v
+<Decision?> Set as default?
+	|Yes                                      |No
+	v                                         v
+[Process] Mark address as default            [Process] Keep existing default
+	|
+	v
+\Output\ Profile and address book updated
+
+
+3.9 Admin Dashboard
+--------------------
+
+(Terminator) Admin logs in
+	|
+	v
+[Process] Verify Admin role from JWT and session
+	|
+	v
+<Decision?> Role is Admin?
+	|Yes                                      |No
+	v                                         v
+[Process] Open admin dashboard               \Output\ Block access and redirect
+	|
+	v
+[Process] Load overview, customers, orders, products, stock, sales, QR payments
+	|
+	v
+<Decision?> Which tab selected?
+	|Overview |Customers |Orders |Products |Stock Analysis |Sales Report |QR Payments
+	v
+[Process] Fetch tab-specific data and render management UI
+	|
+	v
+<Decision?> Admin action performed?
+	|Yes                                      |No
+	v                                         v
+[Process] Update product/order/payment state  [Process] Continue monitoring
+	|
+	v
+\Output\ Dashboard metrics and back-office changes saved
+
+
+3.10 AI Agent Voice Transcription
+---------------------------------
+
+(Terminator) User presses microphone button
+	|
+	v
+[/Input/] Browser audio stream or recorded clip
+	|
+	v
+[Process] Encode audio to base64 and send to FastAPI /speech/transcribe
+	|
+	v
+<Decision?> Audio valid and Groq configured?
+	|Yes                                      |No
+	v                                         v
+[Process] Send to transcription model        \Output\ Voice error message
+	|
+	v
+\Output\ Transcribed text inserted into chat input
+
+
+4. Low Level Design Pseudocode
+------------------------------
+
+4.1 Authentication and Session Workflow
+---------------------------------------
+Pseudocode:
+
+START
+	read token, user, bootId from sessionStorage/localStorage
+	if token and user exist:
+			call backend validate endpoint with bearer token
+			if validation fails:
+					clear session and redirect to home
+			else:
+					compare stored bootId with current server bootId
+					if mismatch:
+							clear session and redirect to home
+					else:
+							rebuild user object and continue
+	else:
+			show public pages
+END
+
+
+4.2 Login and Registration
+--------------------------
+Pseudocode:
+
+START
+	user submits login or registration form
+	validate required fields on client
+	if login:
+			send email and password to backend auth login endpoint
+			if JWT and role returned:
+					check role matches selected login type
+					extract userId from JWT or response
+					store token, user, and bootId in sessionStorage and localStorage
+					route user by role
+			else:
+					show error
+	if register:
+			send fullName, email, mobile, password, gender to backend register endpoint
+			if successful:
+					store token, user, and bootId
+					initialize profile data
+					route user to products
+			else:
+					show error
+END
+
+
+4.3 Product Catalog and Search
+------------------------------
+Pseudocode:
+
+START
+	load all products from backend Mongo product endpoint
+	normalize response fields so frontend always gets id, name, price, imageUrl, category, stockQuantity
+	when search query changes:
+			call backend semantic search endpoint with query and topK
+			receive ranked product list
+			map each result to a uniform product object
+	render products in grid and allow opening product details
+END
+
+
+4.4 AI Chat Assistant
+---------------------
+Pseudocode:
+
+START
+	user enters chat text or voice input
+	if voice input:
+			send audio to speech transcription endpoint
+			replace input text with transcript
+	send message, userId, history, and JWT to AI agent /chat
+	AI orchestrator loads semantic search service and agent tools
+	LLM inspects user intent
+	if action requires product lookup:
+			call semantic search
+	if action requires cart/order/address data:
+			call backend AI routes through authenticated API client
+	trim sensitive data from tool results
+	generate final reply and optional product cards
+	return reply to frontend
+END
+
+
+4.5 Shopping Cart
+-----------------
+Pseudocode:
+
+START
+	if authenticated user exists:
+			fetch cart from backend by userId
+			cache cart in sessionStorage
+	else:
+			load guest cart from sessionStorage
+
+	on add item:
+			extract productId
+			if user is authenticated:
+					call backend add-item endpoint
+					update local cart cache from response
+			else:
+					add or increment item in guest cart cache
+
+	on update quantity:
+			if quantity <= 0:
+					remove item
+			else:
+					call backend update endpoint or update guest cache
+
+	on remove or clear:
+			call backend if authenticated, otherwise update guest cache only
+END
+
+
+4.6 Checkout and Order Placement
+-------------------------------
+Pseudocode:
+
+START
+	user opens checkout page
+	verify cart has items
+	verify profile has at least one shipping address
+	get selected address and payment method
+	create order using backend order confirm endpoint
+	if payment method is COD:
+			clear cart
+			load orders
+			navigate to profile/orders
+	else if payment method is QR:
+			clear cart immediately
+			open QR payment modal
+			wait for payment confirmation callback
+			if confirmed:
+					reload orders and show success state
+	else if payment method is Online:
+			open Razorpay flow
+			on success:
+					reload orders and show confirmation
+END
+
+
+4.7 Order History and Cancellation
+----------------------------------
+Pseudocode:
+
+START
+	load order history from backend
+	show filters for status
+	if user opens an order:
+			show order items, amount, status, and timestamps
+	if user cancels an eligible order:
+			call cancel endpoint with orderId
+			refresh order history
+END
+
+
+4.8 Profile and Address Management
+----------------------------------
+Pseudocode:
+
+START
+	load profile data from backend
+	load addresses and normalize casing differences
+	if user edits profile:
+			submit updated fields to backend
+			sync session user object
+	if user adds address:
+			open address modal
+			collect street, city, state, postal code, country, label, default flag
+			send address payload to backend
+			refresh address list
+	if user sets default address:
+			update default flag on backend and refresh list
+END
+
+
+4.9 Admin Dashboard and Inventory Management
+-------------------------------------------
+Pseudocode:
+
+START
+	verify logged-in user role is Admin
+	open admin dashboard
+	fetch customers, orders, and products in parallel
+	compute overview metrics such as revenue, order count, customer count, product count
+	when admin switches tabs:
+			if customers tab:
+					list customers
+			if orders tab:
+					list all orders and allow status updates
+			if products tab:
+					add, edit, or delete products
+			if stock analysis tab:
+					calculate low stock and category stock summaries
+			if sales report tab:
+					load report or compute date range metrics
+			if QR payments tab:
+					review pending payments and confirm or reject them
+END
+
+
+4.10 Semantic Search Engine
+---------------------------
+Pseudocode:
+
+START
+	receive query and topK
+	encode query using sentence-transformer model
+	build MongoDB vector search pipeline
+	apply price filters inside aggregation when needed
+	project numeric fields as doubles
+	execute pipeline against products collection
+	map results to product DTOs with score and stock data
+	return ranked list to caller
+END
+
+
+5. Prompt for Generating an Overall Project Image
+-------------------------------------------------
+
+Use this prompt in any image generator or diagram tool:
+
+Create a clean, professional system architecture illustration for a project called ShopAI. Show a three-tier e-commerce platform with three primary blocks: React frontend on the left, ASP.NET Core backend in the center, and Python FastAPI AI agent on the right. Add a MongoDB Atlas primary data store connected to the backend, and a MongoDB Atlas vector-search data store connected to the AI agent. Draw directional arrows from frontend to backend for login, product browsing, cart, checkout, profile, orders, and admin dashboard. Draw directional arrows from frontend to AI agent for chat and voice transcription. Clearly annotate semantic search, JWT authentication, QR payment lifecycle, order management, and admin analytics. Use a modern flat design style with teal and cyan accents, neutral background, strong typography, and clean spacing. Include small icons for user, shopping cart, admin dashboard, AI chat, payment, and database. Keep the layout wide, readable, and presentation-ready, with clear labels for request and response paths. Do not clutter the diagram with low-level code details.
+
+Additional prompt for an abstract, non-technical project poster:
+
+Design a visually striking poster for a project named ShopAI that explains the product at a high level without technical depth. The poster should communicate that ShopAI is an AI-powered shopping experience where users can discover products, get personalized recommendations, chat with an assistant, manage cart and orders, and make seamless payments. Use an attractive hero composition with human interaction scenes: one shopper using a phone, one person browsing products on a laptop, and a support-like AI assistant visual element. Emphasize trust, convenience, speed, and smart discovery. Include feature callouts using simple words only: Smart Search, AI Shopping Assistant, Easy Checkout, Order Tracking, Admin Insights. Avoid mentioning frameworks, databases, APIs, or architecture internals. Use modern lifestyle branding, bright teal and cyan accents, warm complementary tones, smooth gradients, clean iconography, and premium startup-style layout. Make it suitable for pitch decks, landing pages, and social promotion.
+
+Additional prompt for a feature-focused 3-block poster:
+
+Create a premium marketing poster for ShopAI that clearly showcases exactly three core experiences in one composition. Use a three-panel layout from left to right: (1) Agentic AI Chat Feature, (2) Semantic Search Feature, (3) Website Homepage Experience. In panel 1, show a user chatting with an intelligent shopping assistant that can take actions, give recommendations, and help complete tasks. In panel 2, show smart product discovery with intent-based search results, relevant matching products, and highlighted personalization. In panel 3, show a polished e-commerce homepage with featured products, categories, offers, and a modern shopping interface. Add short callout titles only: Agentic AI Chat, Semantic Search, Smart Homepage. Keep the design non-technical and visually attractive, with human interaction cues, clean typography, teal-cyan brand accents, soft gradients, and high contrast readability. Make it look like a launch poster suitable for presentations and social media banners.
+
+
+6. Prompt for Overall Traditional Flowchart
+-------------------------------------------
+
+If you want a flowchart image instead of text, use this prompt:
+
+Draw a complete traditional flowchart for a full-stack e-commerce application with AI assistant. Use standard flowchart shapes: terminator for start and end, process rectangles for actions, decision diamonds for yes/no checks, input parallelograms for form or query entry, and output parallelograms for responses. The flow should cover authentication, session restore, product browsing, semantic search, AI chat, cart management, checkout, payment selection, order history, profile and address management, admin dashboard, and QR payment confirmation. Show the frontend, backend, and AI agent as separate swimlanes or grouped sections. Use clear arrows and readable labels. Emphasize the AI agent branch where user messages go to an LLM orchestrator that can call semantic search and backend tools, then return a response with product cards or action results.
+
+
+7. Feature Flowchart Prompts
+----------------------------
+
+You can paste these prompts into a diagram generator one by one if you want separate images:
+
+- Authentication flowchart prompt: Draw a traditional flowchart for login, registration, JWT storage, session restore, and server boot ID validation.
+- Product catalog flowchart prompt: Draw a flowchart for product loading, search query handling, semantic search, result normalization, and product detail viewing.
+- AI chat flowchart prompt: Draw a flowchart for chat message input, voice transcription fallback, AI orchestrator routing, tool calling, and response rendering.
+- Cart flowchart prompt: Draw a flowchart for add-to-cart, update quantity, remove item, clear cart, and guest versus authenticated cart storage.
+- Checkout flowchart prompt: Draw a flowchart for shipping address selection, payment method selection, order creation, COD, QR, and Razorpay branches.
+- Orders flowchart prompt: Draw a flowchart for loading order history, filtering orders, viewing details, and cancelling eligible orders.
+- Profile flowchart prompt: Draw a flowchart for loading profile data, editing profile, adding address, setting default address, and syncing state.
+- Admin flowchart prompt: Draw a flowchart for admin login, dashboard metrics, customer management, order management, product management, stock analysis, sales report, and QR payment confirmation.
+
+
+8. Notes on Workflow Ownership
+------------------------------
+The frontend owns view state, page navigation, local session restoration, and UI interactions.
+The backend owns authentication, persistence, business rules, and the AI bridge routes under /api/ai.
+The Python AI agent owns natural language interpretation, semantic product search orchestration, tool selection, and voice transcription.
+MongoDB stores users, products, carts, addresses, and orders, while the vector index supports semantic retrieval.
+
