@@ -45,6 +45,16 @@ The **.NET backend** acts as the central hub: it serves all REST endpoints and a
 
 ## Project Visuals
 
+### ShopAI
+
+![ShopAI Marketing Poster](images/poster.jpeg)
+
+
+
+### Feature Poster (3 Core Experiences)
+
+![ShopAI Feature Poster](images/poster_2.jpeg)
+
 ### End-to-End Flowchart
 
 ![ShopAI End-to-End Flowchart](images/flowchart.jpeg)
@@ -52,14 +62,6 @@ The **.NET backend** acts as the central hub: it serves all REST endpoints and a
 ### System Architecture
 
 ![ShopAI System Architecture](images/system_architecture.jpeg)
-
-### Marketing Poster (Abstract)
-
-![ShopAI Marketing Poster](images/poster.jpeg)
-
-### Feature Poster (3 Core Experiences)
-
-![ShopAI Feature Poster](images/poster_2.jpeg)
 
 ---
 
