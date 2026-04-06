@@ -7,6 +7,7 @@ A production-ready, three-tier e-commerce application combining a **.NET 8 REST 
 ## Table of Contents
 
 - [Architecture Overview](#architecture-overview)
+- [Project Visuals](#project-visuals)
 - [Features](#features)
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
@@ -39,6 +40,26 @@ A production-ready, three-tier e-commerce application combining a **.NET 8 REST 
 ```
 
 The **.NET backend** acts as the central hub: it serves all REST endpoints and also proxies requests to the Python AI agent. The **AI agent** uses semantic vector search (sentence-transformers) and pluggable LLMs (Groq, OpenAI, Anthropic, Ollama) for conversational responses.
+
+---
+
+## Project Visuals
+
+### End-to-End Flowchart
+
+![ShopAI End-to-End Flowchart](images/flowchart.jpeg)
+
+### System Architecture
+
+![ShopAI System Architecture](images/system_architecture.jpeg)
+
+### Marketing Poster (Abstract)
+
+![ShopAI Marketing Poster](images/poster.jpeg)
+
+### Feature Poster (3 Core Experiences)
+
+![ShopAI Feature Poster](images/poster_2.jpeg)
 
 ---
 
