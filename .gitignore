@@ -1,6 +1,14 @@
 # Environment & Configuration
+.env
+.env.local
+.env.*.local
+*.env
+ai_agent/.env
+frontend/.env
+backend/**/.env
 appsettings.json
 appsettings.*.json
+appsettings.Development.json
 backend/src/ECommerceAPI.API/bin/Debug/net8.0/appsettings.json
 
 # .NET Build Output
