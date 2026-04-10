@@ -6,9 +6,29 @@ const defaultApiBaseUrl = isLocalhost
   : 'https://ecommerceapi-er8d.onrender.com/api';
 
 const rawApiBaseUrl = (process.env.REACT_APP_API_URL || defaultApiBaseUrl).trim();
-const API_BASE_URL = rawApiBaseUrl.endsWith('/api')
-  ? rawApiBaseUrl
-  : `${rawApiBaseUrl.replace(/\/$/, '')}/api`;
+const normalizeApiBaseUrl = (url) => {
+  let normalized = (url || '').trim();
+  if (!normalized) return normalized;
+
+  // If frontend is served on HTTPS, avoid mixed-content or upgrade issues
+  // by forcing non-local API endpoints to HTTPS.
+  if (typeof window !== 'undefined' && window.location.protocol === 'https:' && normalized.startsWith('http://')) {
+    try {
+      const parsed = new URL(normalized);
+      if (!/^(localhost|127\.0\.0\.1)$/i.test(parsed.hostname)) {
+        normalized = normalized.replace(/^http:\/\//i, 'https://');
+      }
+    } catch {
+      normalized = normalized.replace(/^http:\/\//i, 'https://');
+    }
+  }
+  return normalized;
+};
+
+const normalizedApiBaseUrl = normalizeApiBaseUrl(rawApiBaseUrl);
+const API_BASE_URL = normalizedApiBaseUrl.endsWith('/api')
+  ? normalizedApiBaseUrl
+  : `${normalizedApiBaseUrl.replace(/\/$/, '')}/api`;
 const API_TIMEOUT_MS = Number(process.env.REACT_APP_API_TIMEOUT_MS || 60000);
 
 const api = axios.create({
@@ -50,7 +70,21 @@ api.interceptors.request.use(
 // Response Interceptor — clear tokens on 401 to force re-login
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
+    const config = error?.config;
+
+    // Retry once after protocol upgrade when upstream/proxy asks for upgrade.
+    if (error?.response?.status === 426 && config && !config._retry426) {
+      config._retry426 = true;
+
+      const currentBase = (config.baseURL || API_BASE_URL || '').toString();
+      if (currentBase.startsWith('http://')) {
+        config.baseURL = currentBase.replace(/^http:\/\//i, 'https://');
+      }
+
+      return api(config);
+    }
+
     if (error.response?.status === 401) {
       console.error('Unauthorized — clearing tokens');
       sessionStorage.removeItem('token');

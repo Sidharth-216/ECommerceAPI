@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from './hooks/useAuth';
 import { useCart } from './hooks/useCart';
 import { useProducts } from './hooks/useProducts';
@@ -22,6 +22,7 @@ const App = () => {
   const auth         = useAuth();
   const cartHook     = useCart(auth.user);
   const productsHook = useProducts();
+  const lastLoadedUserIdRef = useRef(null);
 
   // ── After rehydration finishes, restore the correct page ───────────────
   // We wait for isInitializing=false so we KNOW whether the session is valid
@@ -49,7 +50,7 @@ const App = () => {
       // Customer — block admin page
       setCurrentPage(saved === 'admin' ? 'products' : saved);
     }
-  }, [auth.isInitializing, auth.user]); // runs exactly once when auth check completes
+  }, [auth.isInitializing, auth.user, auth.user?.id, auth.user?.role]);
 
   // ── Persist currentPage ─────────────────────────────────────────────────
   useEffect(() => {
@@ -59,21 +60,28 @@ const App = () => {
   }, [currentPage, auth.isInitializing]);
 
   // ── Load data when user becomes available ───────────────────────────────
-  const loadUserData = useCallback(async () => {
-    if (!auth.user) return;
-    try {
-      await Promise.all([
-        productsHook.loadProducts().catch(e => console.warn('⚠️ products:', e)),
-        cartHook.loadCart().catch(e =>         console.warn('⚠️ cart:', e)),
-        auth.loadProfile().catch(e =>          console.warn('⚠️ profile:', e)),
-        auth.loadOrders().catch(e =>           console.warn('⚠️ orders:', e))
-      ]);
-    } catch (e) { console.error('❌ loadUserData:', e); }
-  }, [auth, productsHook, cartHook]);
-
   useEffect(() => {
-    if (auth.user) loadUserData();
-  }, [auth.user, loadUserData]);
+    const uid = auth.user?.id || auth.user?.userId || null;
+    if (!uid) {
+      lastLoadedUserIdRef.current = null;
+      return;
+    }
+
+    // Guard against repeated re-fetch loops from unstable function/object refs.
+    if (lastLoadedUserIdRef.current === uid) return;
+    lastLoadedUserIdRef.current = uid;
+
+    (async () => {
+      try {
+        await Promise.all([
+          productsHook.loadProducts().catch(e => console.warn('⚠️ products:', e)),
+          cartHook.loadCart().catch(e =>         console.warn('⚠️ cart:', e)),
+          auth.loadProfile().catch(e =>          console.warn('⚠️ profile:', e)),
+          auth.loadOrders().catch(e =>           console.warn('⚠️ orders:', e))
+        ]);
+      } catch (e) { console.error('❌ loadUserData:', e); }
+    })();
+  }, [auth.user?.id, auth.user?.userId, productsHook, cartHook, auth]);
 
   const pageProps = {
     currentPage, setCurrentPage,

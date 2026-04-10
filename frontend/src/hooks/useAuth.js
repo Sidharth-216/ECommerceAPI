@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { mongoAuthAPI, ordersAPI, addressAPI } from '../api';
 
 const API_BASE_URL = (process.env.REACT_APP_API_URL || 'http://localhost:5033/api').endsWith('/api')
@@ -239,16 +239,16 @@ export const useAuth = () => {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     clearAuthSession();
     sessionStorage.setItem('currentPage', 'home');
     localStorage.setItem('currentPage',   'home');
     setUser(null);
     setOrders([]);
     setProfileData({ fullName: '', email: '', mobile: '', gender: '', addresses: [] });
-  };
+  }, []);
 
-  const loadProfile = async () => {
+  const loadProfile = useCallback(async () => {
     if (!user) return;
     try {
       let addresses = [];
@@ -277,9 +277,9 @@ export const useAuth = () => {
       console.error('❌ loadProfile:', err);
       setProfileData(prev => ({ ...prev, addresses: [] }));
     }
-  };
+  }, [user]);
 
-  const loadOrders = async () => {
+  const loadOrders = useCallback(async () => {
     if (!user) return;
     try {
       const res = await ordersAPI.history();
@@ -288,7 +288,7 @@ export const useAuth = () => {
       console.error('❌ loadOrders:', err);
       setOrders([]);
     }
-  };
+  }, [user]);
 
   return {
     user, setUser, orders, setOrders, profileData, setProfileData,

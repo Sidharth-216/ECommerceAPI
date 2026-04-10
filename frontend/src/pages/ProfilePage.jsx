@@ -234,12 +234,6 @@ const ProfilePage = ({
     if (!user) return;
     try {
       let res;
-      let currentUserId = null;
-      try {
-        const profileRes = await authAPI.getProfile();
-        currentUserId = profileRes.data?.id || profileRes.data?.userId || profileRes.data?.Id;
-      } catch { currentUserId = user?.id || user?.userId; }
-
       if (typeof addressAPI?.getAll === 'function') res = await addressAPI.getAll();
       else {
         const profileRes = await authAPI.getProfile();
@@ -247,9 +241,12 @@ const ProfilePage = ({
       }
 
       const rawAddresses = Array.isArray(res.data) ? res.data : (res.data?.addresses || res.data?.addressList || []);
-      const userAddresses = currentUserId
-        ? rawAddresses.filter(a => { const uid = a.userId||a.UserId||a.user_id||a.UserID; return uid===currentUserId||uid===String(currentUserId); })
-        : rawAddresses;
+      const currentUserId = user?.id || user?.userId || null;
+      const userAddresses = rawAddresses.filter(a => {
+        const uid = a.userId || a.UserId || a.user_id || a.UserID;
+        if (!uid || !currentUserId) return true;
+        return String(uid) === String(currentUserId);
+      });
 
       const normalized = userAddresses.map((a, index) => {
         const addrLine1=a.AddressLine1||a.addressLine1||a.line1||'';
