@@ -2,6 +2,55 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Package, TrendingUp, AlertCircle, BarChart3, Download, RefreshCw } from 'lucide-react';
 import { adminAPI } from '../../api.js';
 
+const getNumber = (value, defaultVal = 0) => {
+    const num = parseFloat(value);
+    return isNaN(num) ? defaultVal : num;
+};
+
+const getCategoryString = (item) => {
+    if (!item) return 'Uncategorized';
+
+    const cat = item.category || item.categoryName || item.Category;
+
+    if (typeof cat === 'string') {
+        return cat;
+    } else if (cat && typeof cat === 'object') {
+        return String(cat.name || cat.Name || 'Uncategorized');
+    }
+
+    return 'Uncategorized';
+};
+
+const groupByCategory = (products) => {
+    if (!Array.isArray(products) || products.length === 0) return [];
+
+    const grouped = products.reduce((acc, item) => {
+        const category = getCategoryString(item);
+
+        if (!acc[category]) {
+            acc[category] = {
+                category: category,
+                productCount: 0,
+                totalStock: 0,
+                totalValue: 0,
+                items: []
+            };
+        }
+
+        const qty = getNumber(item.quantity || item.stockQuantity);
+        const price = getNumber(item.price);
+
+        acc[category].productCount++;
+        acc[category].totalStock += qty;
+        acc[category].totalValue += qty * price;
+        acc[category].items.push(item);
+
+        return acc;
+    }, {});
+
+    return Object.values(grouped).sort((a, b) => b.totalValue - a.totalValue);
+};
+
 const StockAnalysisTab = () => {
     const [stockAnalysis, setStockAnalysis] = useState([]);
     const [lowStockProducts, setLowStockProducts] = useState([]);
@@ -77,58 +126,6 @@ const StockAnalysisTab = () => {
     useEffect(() => {
         fetchStockAnalysis();
     }, [fetchStockAnalysis]);
-
-    // Helper: Group products by category
-    const groupByCategory = (products) => {
-        if (!Array.isArray(products) || products.length === 0) return [];
-
-        const grouped = products.reduce((acc, item) => {
-            const category = getCategoryString(item);
-            
-            if (!acc[category]) {
-                acc[category] = {
-                    category: category,
-                    productCount: 0,
-                    totalStock: 0,
-                    totalValue: 0,
-                    items: []
-                };
-            }
-
-            const qty = getNumber(item.quantity || item.stockQuantity);
-            const price = getNumber(item.price);
-
-            acc[category].productCount++;
-            acc[category].totalStock += qty;
-            acc[category].totalValue += qty * price;
-            acc[category].items.push(item);
-
-            return acc;
-        }, {});
-
-        return Object.values(grouped).sort((a, b) => b.totalValue - a.totalValue);
-    };
-
-    // Helper: Safe number extraction
-    const getNumber = (value, defaultVal = 0) => {
-        const num = parseFloat(value);
-        return isNaN(num) ? defaultVal : num;
-    };
-
-    // Helper: Safe category string extraction
-    const getCategoryString = (item) => {
-        if (!item) return 'Uncategorized';
-        
-        const cat = item.category || item.categoryName || item.Category;
-        
-        if (typeof cat === 'string') {
-            return cat;
-        } else if (cat && typeof cat === 'object') {
-            return String(cat.name || cat.Name || 'Uncategorized');
-        }
-        
-        return 'Uncategorized';
-    };
 
     // Helper: Safe product name extraction
     const getProductName = (item) => {

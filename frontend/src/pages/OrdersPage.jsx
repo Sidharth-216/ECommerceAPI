@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
-  Package, Calendar, MapPin, Clock, X, AlertCircle, 
+    Package, Clock, AlertCircle, 
   ChevronRight, ArrowLeft, ShoppingBag, Trash2, 
-  CheckCircle2, Truck, RefreshCcw 
+    RefreshCcw 
 } from 'lucide-react';
-import { ordersAPI, getUserIdFromToken } from '../api';
+import { ordersAPI } from '../api';
 
 const OrdersPage = ({ user, orders = [], setOrders, setCurrentPage }) => {
     const [loading, setLoading] = useState(false);
@@ -12,9 +12,7 @@ const OrdersPage = ({ user, orders = [], setOrders, setCurrentPage }) => {
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [filterStatus, setFilterStatus] = useState('all');
 
-    useEffect(() => { loadOrders(); }, []);
-
-    const loadOrders = async () => {
+    const loadOrders = useCallback(async () => {
         try {
             setLoading(true);
             setError('');
@@ -23,7 +21,9 @@ const OrdersPage = ({ user, orders = [], setOrders, setCurrentPage }) => {
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to load orders');
         } finally { setLoading(false); }
-    };
+    }, [setOrders]);
+
+    useEffect(() => { loadOrders(); }, [loadOrders]);
 
     const handleCancelOrder = async (order) => {
         const orderId = order._id || order.id || order.Id;

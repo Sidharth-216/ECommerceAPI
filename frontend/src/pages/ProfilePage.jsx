@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   ShoppingBag, ShoppingCart, LogOut, User, MapPin, Package,
   Clock, Plus, Trash2, ChevronRight, X, Home, Briefcase, Star
@@ -197,16 +197,12 @@ const ProfilePage = ({
   setCurrentPage, handleLogout, setError, loadOrders, loading, setLoading
 }) => {
   const [editMode, setEditMode] = useState(false);
-  const [loadingProfile, setLoadingProfile] = useState(false);
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [activeTab, setActiveTab] = useState('profile');
 
-  useEffect(() => { if (!user) return; fetchAddresses(); fetchProfile(); }, [user]);
-  useEffect(() => { if (!user) return; fetchOrders(); }, [user]);
-
-  const fetchProfile = async () => {
+  const fetchProfile = useCallback(async () => {
+    if (!user) return;
     try {
-      setLoadingProfile(true);
       const res = await authAPI.getProfile();
       const data = res.data;
       // Backend UserProfileDto uses PascalCase (FullName) — handle both casings
@@ -231,10 +227,11 @@ const ProfilePage = ({
         gender:   user.Gender   || user.gender   || '',
         addresses: []
       });
-    } finally { setLoadingProfile(false); }
-  };
+    }
+  }, [setProfileData, user]);
 
-  const fetchAddresses = async () => {
+  const fetchAddresses = useCallback(async () => {
+    if (!user) return;
     try {
       let res;
       let currentUserId = null;
@@ -272,7 +269,7 @@ const ProfilePage = ({
       });
       setProfileData(prev => ({ ...prev, addresses: normalized }));
     } catch { setProfileData(prev => ({ ...prev, addresses: [] })); }
-  };
+  }, [setProfileData, user]);
 
   const handleSaveProfile = async () => {
     try {
@@ -291,7 +288,10 @@ const ProfilePage = ({
     } finally { setLoading(false); }
   };
 
-  const fetchOrders = async () => { try { await loadOrders(); } catch {} };
+  const fetchOrders = useCallback(async () => { try { await loadOrders(); } catch {} }, [loadOrders]);
+
+  useEffect(() => { if (!user) return; fetchAddresses(); fetchProfile(); }, [user, fetchAddresses, fetchProfile]);
+  useEffect(() => { if (!user) return; fetchOrders(); }, [user, fetchOrders]);
 
   const displayName = profileData.fullName || user?.FullName || user?.fullName || user?.name || 'User';
   const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);

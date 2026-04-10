@@ -335,7 +335,7 @@ const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCu
       finally  { setSearchLoading(false); }
     }, 300);
     return () => clearTimeout(debounceTimer.current);
-  }, [searchQuery]);
+  }, [searchQuery, setError]);
 
   const handleFullSearch = useCallback(async (override) => {
     const q = (override || searchQuery).trim();

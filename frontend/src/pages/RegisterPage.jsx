@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { 
-  ShoppingBag, User, Mail, Phone, Eye, EyeOff, 
-  ArrowRight, CheckCircle2, ShieldCheck, 
-  Globe, Truck, CreditCard, ChevronLeft 
+  ShoppingBag, User, Mail, Phone, Eye, CheckCircle2,
+  ArrowRight, ShieldCheck, 
+  Globe, Truck, ChevronLeft 
 } from 'lucide-react';
 
 const RegisterPage = ({ 
@@ -14,7 +14,6 @@ const RegisterPage = ({
   loading, 
   setLoading 
 }) => {
-  const [showPassword, setShowPassword] = useState(false);
   const [registerData, setRegisterData] = useState({
     fullName: '',
     email: '',
@@ -205,7 +204,7 @@ const RegisterPage = ({
                 <div className="relative group">
                   <Eye className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-teal-500 transition-colors" size={18} />
                   <input 
-                    type={showPassword ? "text" : "password"} required className={inputStyle} placeholder="••••••••"
+                    type="password" required className={inputStyle} placeholder="••••••••"
                     value={registerData.password}
                     onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
                   />
@@ -218,7 +217,7 @@ const RegisterPage = ({
                 <div className="relative group">
                   <CheckCircle2 className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-teal-500 transition-colors" size={18} />
                   <input 
-                    type={showPassword ? "text" : "password"} required className={inputStyle} placeholder="••••••••"
+                    type="password" required className={inputStyle} placeholder="••••••••"
                     value={registerData.confirmPassword}
                     onChange={(e) => setRegisterData({ ...registerData, confirmPassword: e.target.value })}
                   />
