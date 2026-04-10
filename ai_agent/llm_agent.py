@@ -236,6 +236,16 @@ def sanitise_input(text: str):
 # ===========================================================================
 _MONGO_ID_RE = re.compile(r"^[0-9a-f]{24}$", re.IGNORECASE)
 
+def _coerce_mongo_id(value: Any) -> Optional[str]:
+    if not isinstance(value, str):
+        return None
+    candidate = value.strip()
+    if _MONGO_ID_RE.match(candidate):
+        return candidate
+    # Recover valid IDs embedded in noisy text such as "id: <...>"
+    m = re.search(r"([0-9a-f]{24})", candidate, re.IGNORECASE)
+    return m.group(1) if m else None
+
 def validate_tool_call(name: str, args: dict):
     if args is None:
         args = {}
@@ -244,15 +254,21 @@ def validate_tool_call(name: str, args: dict):
     for field in ("product_id", "order_id", "shipping_address_id"):
         val = args.get(field)
         if val is not None:
-            if not isinstance(val, str) or not _MONGO_ID_RE.match(val):
+            coerced = _coerce_mongo_id(val)
+            if not coerced:
                 return False, f"Invalid {field}: must be 24-char hex MongoDB ID"
+            args[field] = coerced
     if "product_ids" in args:
         ids = args["product_ids"]
         if not isinstance(ids, list) or not (2 <= len(ids) <= 4):
             return False, "product_ids must be a list of 2-4 IDs"
+        clean_ids = []
         for pid in ids:
-            if not isinstance(pid, str) or not _MONGO_ID_RE.match(pid):
+            coerced = _coerce_mongo_id(pid)
+            if not coerced:
                 return False, f"Invalid product_id in list: {pid!r}"
+            clean_ids.append(coerced)
+        args["product_ids"] = clean_ids
     qty = args.get("quantity")
     if qty is not None:
         try:
@@ -511,6 +527,7 @@ class ShoppingAgent:
         ]
 
         last_action = "other"
+        recent_search_results: List[Dict[str, Any]] = []
 
         # Agent loop
         for iteration in range(MAX_ITERATIONS):
@@ -609,6 +626,10 @@ class ShoppingAgent:
                 except (json.JSONDecodeError, TypeError):
                     args = {}
 
+                # Recovery: if model passes a bad product_id, map from latest search results.
+                if name == "add_to_cart":
+                    args = self._repair_add_to_cart_args(args, recent_search_results, cleaned)
+
                 # Validate
                 valid, err = validate_tool_call(name, args)
                 if not valid:
@@ -617,6 +638,11 @@ class ShoppingAgent:
                 else:
                     logger.info("Tool: %s(%s)", name, _safe_args(args))
                     result = self._execute_tool(name, args, api_client)
+
+                if name == "search_products" and result.get("success"):
+                    data = result.get("data")
+                    if isinstance(data, list):
+                        recent_search_results = data
 
                 messages.append({
                     "role":         "tool",
@@ -673,6 +699,50 @@ class ShoppingAgent:
         except Exception as e:
             logger.error("Tool %s error: %s", name, e)
             return {"success": False, "message": str(e)[:200]}
+
+    def _repair_add_to_cart_args(self, args: dict, search_results: List[Dict[str, Any]], user_query: str) -> dict:
+        if not isinstance(args, dict):
+            args = {}
+
+        # Already valid; no repair needed.
+        current_id = _coerce_mongo_id(args.get("product_id"))
+        if current_id:
+            args["product_id"] = current_id
+            return args
+
+        if not search_results:
+            return args
+
+        target = " ".join(re.findall(r"[a-z0-9]+", (user_query or "").lower())).strip()
+        best_id = None
+        best_score = -1
+
+        for p in search_results:
+            pid = _coerce_mongo_id(p.get("id"))
+            if not pid:
+                continue
+            name = str(p.get("name") or "")
+            name_norm = " ".join(re.findall(r"[a-z0-9]+", name.lower())).strip()
+            score = 0
+            if target and name_norm:
+                if target in name_norm or name_norm in target:
+                    score += 10
+                tset = set(target.split())
+                nset = set(name_norm.split())
+                score += len(tset.intersection(nset))
+            if score > best_score:
+                best_score = score
+                best_id = pid
+
+        if not best_id:
+            best_id = _coerce_mongo_id(search_results[0].get("id"))
+
+        if best_id:
+            args["product_id"] = best_id
+            if "quantity" not in args:
+                args["quantity"] = 1
+            logger.info("Recovered add_to_cart product_id from search results: ...%s", best_id[-6:])
+        return args
 
     def _search(self, query: str, max_price=None, top_k: int = 5) -> dict:
         if self._search_service:

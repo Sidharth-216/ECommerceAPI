@@ -85,32 +85,60 @@ class APIClient:
             return {'success': False, 'message': str(e), 'data': None}
 
     def _put(self, path: str, params: dict = None) -> Dict[str, Any]:
+        url = f"{self.base_url}{path}"
         try:
             resp = requests.put(
-                f"{self.base_url}{path}",
+                url,
                 params=params,
                 headers=self.headers,
                 timeout=self.timeout
             )
-            resp.raise_for_status()
+            logger.info(f"PUT {path} → {resp.status_code}")
+            if not resp.ok:
+                logger.error(f"PUT {path} FAILED {resp.status_code}: {resp.text[:500]}")
+                try:
+                    err_body = resp.json()
+                    msg = (err_body.get('message') or err_body.get('title') or 
+                           err_body.get('detail') or str(err_body))
+                except Exception:
+                    msg = resp.text[:300]
+                return {'success': False, 'message': f"[{resp.status_code}] {msg}", 'data': None}
             return resp.json()
-        except requests.exceptions.HTTPError as e:
-            return {'success': False, 'message': str(e), 'data': None}
+        except requests.exceptions.Timeout:
+            logger.error(f"PUT {path} TIMEOUT after {self.timeout}s")
+            return {'success': False, 'message': f'Request timed out. Please try again.', 'data': None}
         except requests.exceptions.RequestException as e:
+            logger.error(f"PUT {path} ERROR: {e}")
             return {'success': False, 'message': str(e), 'data': None}
 
     def _delete(self, path: str) -> Dict[str, Any]:
+        url = f"{self.base_url}{path}"
         try:
             resp = requests.delete(
-                f"{self.base_url}{path}",
+                url,
                 headers=self.headers,
                 timeout=self.timeout
             )
-            resp.raise_for_status()
-            return resp.json()
-        except requests.exceptions.HTTPError as e:
-            return {'success': False, 'message': str(e), 'data': None}
+            logger.info(f"DELETE {path} → {resp.status_code}")
+            if not resp.ok:
+                logger.error(f"DELETE {path} FAILED {resp.status_code}: {resp.text[:500]}")
+                try:
+                    err_body = resp.json()
+                    msg = (err_body.get('message') or err_body.get('title') or 
+                           err_body.get('detail') or str(err_body))
+                except Exception:
+                    msg = resp.text[:300]
+                return {'success': False, 'message': f"[{resp.status_code}] {msg}", 'data': None}
+            try:
+                return resp.json()
+            except:
+                # Some delete endpoints return no body, just status
+                return {'success': True, 'message': 'Deleted successfully', 'data': None}
+        except requests.exceptions.Timeout:
+            logger.error(f"DELETE {path} TIMEOUT after {self.timeout}s")
+            return {'success': False, 'message': f'Request timed out. Please try again.', 'data': None}
         except requests.exceptions.RequestException as e:
+            logger.error(f"DELETE {path} ERROR: {e}")
             return {'success': False, 'message': str(e), 'data': None}
 
     # ── Context (session bootstrap) ───────────────────────────────────────────

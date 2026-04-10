@@ -36,7 +36,11 @@ namespace ECommerceAPI.API
             var environment = Configuration["ASPNETCORE_ENVIRONMENT"] ?? Configuration["DOTNET_ENVIRONMENT"] ?? Environments.Production;
             var isDevelopment = string.Equals(environment, Environments.Development, StringComparison.OrdinalIgnoreCase);
 
-            services.AddControllers();
+            services.AddControllers().AddJsonOptions(options =>
+            {
+                options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+                options.JsonSerializerOptions.WriteIndented = isDevelopment;
+            });
             services.AddScoped<JwtHelper>();
             services.AddMemoryCache();
 
