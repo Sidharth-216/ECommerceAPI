@@ -212,21 +212,25 @@ const ProfilePage = ({
       const resolvedEmail  = data.Email  || data.email  || user?.Email  || user?.email  || '';
       const resolvedMobile = data.Mobile || data.mobile || user?.Mobile || user?.mobile || '+91 00000 00000';
       const resolvedGender = data.Gender || data.gender || user?.Gender || user?.gender || '';
-      setProfileData({
+      setProfileData(prev => ({
+        ...prev,
         fullName: resolvedName,
         email:    resolvedEmail,
         mobile:   resolvedMobile,
         gender:   resolvedGender,
-        addresses: data.addresses || []
-      });
+        // Keep current addresses if profile payload doesn't include them.
+        addresses: Array.isArray(data.addresses) && data.addresses.length > 0
+          ? data.addresses
+          : (prev.addresses || [])
+      }));
     } catch (err) {
-      if (user) setProfileData({
+      if (user) setProfileData(prev => ({
+        ...prev,
         fullName: user.FullName || user.fullName || user.name || '',
         email:    user.Email    || user.email    || '',
         mobile:   user.Mobile   || user.mobile   || '+91 00000 00000',
-        gender:   user.Gender   || user.gender   || '',
-        addresses: []
-      });
+        gender:   user.Gender   || user.gender   || ''
+      }));
     }
   }, [setProfileData, user]);
 

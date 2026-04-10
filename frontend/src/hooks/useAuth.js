@@ -1,9 +1,33 @@
 import { useState, useEffect, useCallback } from 'react';
 import { mongoAuthAPI, ordersAPI, addressAPI } from '../api';
 
-const API_BASE_URL = (process.env.REACT_APP_API_URL || 'http://localhost:5033/api').endsWith('/api')
-  ? (process.env.REACT_APP_API_URL || 'http://localhost:5033/api')
-  : `${(process.env.REACT_APP_API_URL || 'http://localhost:5033/api').replace(/\/$/, '')}/api`;
+const isLocalhost = typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1)$/.test(window.location.hostname);
+const defaultApiBaseUrl = isLocalhost
+  ? 'http://localhost:5033/api'
+  : 'https://ecommerceapi-er8d.onrender.com/api';
+
+const normalizeApiBaseUrl = (url) => {
+  let normalized = (url || '').trim();
+  if (!normalized) return normalized;
+
+  if (typeof window !== 'undefined' && window.location.protocol === 'https:' && normalized.startsWith('http://')) {
+    try {
+      const parsed = new URL(normalized);
+      if (!/^(localhost|127\.0\.0\.1)$/i.test(parsed.hostname)) {
+        normalized = normalized.replace(/^http:\/\//i, 'https://');
+      }
+    } catch {
+      normalized = normalized.replace(/^http:\/\//i, 'https://');
+    }
+  }
+  return normalized;
+};
+
+const rawApiBaseUrl = process.env.REACT_APP_API_URL || defaultApiBaseUrl;
+const normalizedApiBaseUrl = normalizeApiBaseUrl(rawApiBaseUrl);
+const API_BASE_URL = normalizedApiBaseUrl.endsWith('/api')
+  ? normalizedApiBaseUrl
+  : `${normalizedApiBaseUrl.replace(/\/$/, '')}/api`;
 
 const writeTabSession = (token, userData, bootId) => {
   sessionStorage.setItem('token', token);
@@ -73,15 +97,24 @@ const callValidate = async (token) => {
       method: 'GET',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
     });
-    if (!res.ok) return { ok: false, bootId: null };
+    if (!res.ok) {
+      return {
+        ok: false,
+        bootId: null,
+        hardFail: res.status === 401 || res.status === 403,
+      };
+    }
     try {
       const json = await res.json();
       const bootId = json?.bootId || res.headers.get('X-Server-Boot-Id') || null;
-      return { ok: true, bootId };
-    } catch { return { ok: true, bootId: null }; }
+      return { ok: true, bootId, hardFail: false };
+    } catch {
+      return { ok: true, bootId: null, hardFail: false };
+    }
   } catch (err) {
     console.warn('⚠️ validate unreachable:', err.message);
-    return { ok: false, bootId: null };
+    // Network/cold-start issue: do not force logout on refresh.
+    return { ok: false, bootId: null, hardFail: false };
   }
 };
 
@@ -100,8 +133,8 @@ export const useAuth = () => {
         if (!resolved) return;
         const { token, userData, source } = resolved;
 
-        const { ok, bootId: currentBootId } = await callValidate(token);
-        if (!ok) {
+        const { ok, bootId: currentBootId, hardFail } = await callValidate(token);
+        if (!ok && hardFail) {
           clearAuthSession();
           sessionStorage.setItem('currentPage', 'home');
           localStorage.setItem('currentPage',   'home');
@@ -275,7 +308,8 @@ export const useAuth = () => {
       setProfileData(prev => ({ ...prev, addresses }));
     } catch (err) {
       console.error('❌ loadProfile:', err);
-      setProfileData(prev => ({ ...prev, addresses: [] }));
+      // Keep last known addresses on transient backend failures.
+      setProfileData(prev => ({ ...prev }));
     }
   }, [user]);
 
@@ -286,7 +320,8 @@ export const useAuth = () => {
       setOrders(res?.data || []);
     } catch (err) {
       console.error('❌ loadOrders:', err);
-      setOrders([]);
+      // Do not wipe existing orders for temporary network/rate-limit failures.
+      setOrders(prev => prev);
     }
   }, [user]);
 

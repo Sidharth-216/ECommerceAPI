@@ -23,6 +23,11 @@ const normalizeProduct = (product) => {
 export const useProducts = () => {
   const [products, setProducts] = useState([]);
 
+  const isTransientError = (err) => {
+    const status = err?.response?.status;
+    return [426, 429, 502, 503, 504].includes(status);
+  };
+
   const loadProducts = async () => {
     try {
       console.log('📦 Loading products from MongoDB...');
@@ -39,8 +44,21 @@ export const useProducts = () => {
       
       return normalizedProducts;
     } catch (err) {
+      if (isTransientError(err)) {
+        try {
+          console.warn('⚠️ Transient products load error, retrying once...', err?.response?.status);
+          await new Promise(resolve => setTimeout(resolve, 800));
+          const retryResponse = await productsAPI.getAll();
+          const retryProducts = (retryResponse?.data || []).map(normalizeProduct);
+          setProducts(retryProducts);
+          return retryProducts;
+        } catch (retryErr) {
+          console.error('❌ Products retry failed:', retryErr);
+          throw new Error(retryErr.response?.data?.message || retryErr.message || 'Failed to load products');
+        }
+      }
+
       console.error('❌ Error loading products:', err);
-      setProducts([]);
       throw new Error(err.response?.data?.message || err.message || 'Failed to load products');
     }
   };
@@ -62,8 +80,29 @@ export const useProducts = () => {
         totalPages: payload.totalPages || 1
       };
     } catch (err) {
+      if (isTransientError(err)) {
+        try {
+          console.warn('⚠️ Transient paged products error, retrying once...', err?.response?.status);
+          await new Promise(resolve => setTimeout(resolve, 800));
+          const retryResponse = await productsAPI.getPaged(page, pageSize);
+          const retryPayload = retryResponse?.data || {};
+          const retryRawProducts = Array.isArray(retryPayload.items) ? retryPayload.items : [];
+          const retryProducts = retryRawProducts.map(normalizeProduct);
+          setProducts(retryProducts);
+          return {
+            items: retryProducts,
+            page: retryPayload.page || page,
+            pageSize: retryPayload.pageSize || pageSize,
+            totalCount: retryPayload.totalCount || retryProducts.length,
+            totalPages: retryPayload.totalPages || 1
+          };
+        } catch (retryErr) {
+          console.error('❌ Paged products retry failed:', retryErr);
+          throw new Error(retryErr.response?.data?.message || retryErr.message || 'Failed to load paged products');
+        }
+      }
+
       console.error('❌ Error loading paged products:', err);
-      setProducts([]);
       throw new Error(err.response?.data?.message || err.message || 'Failed to load paged products');
     }
   };
