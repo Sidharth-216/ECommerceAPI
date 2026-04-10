@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 GROQ_API_KEY    = os.getenv("GROQ_API_KEY", "")
 LLM_MODEL       = os.getenv("LLM_MODEL", "llama-3.1-8b-instant")
 MAX_ITERATIONS  = int(os.getenv("LLM_MAX_ITERATIONS", "6"))
-RATE_LIMIT_RPM  = int(os.getenv("LLM_RATE_LIMIT_RPM", "20"))
+RATE_LIMIT_RPM  = int(os.getenv("LLM_RATE_LIMIT_RPM", "90"))
 MAX_INPUT_CHARS = 2000
 MAX_HISTORY     = 8       # turns kept (each turn = user + assistant)
 MAX_TOOL_RESULT = 4000    # chars of any single tool result fed back to Groq

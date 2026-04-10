@@ -132,12 +132,16 @@ namespace ECommerceAPI.API
             {
                 options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
+                var globalPermitLimit = ReadEnvInt("RATE_LIMIT_GLOBAL_RPM", 300);
+                var authPermitLimit = ReadEnvInt("RATE_LIMIT_AUTH_RPM", 12);
+                var searchPermitLimit = ReadEnvInt("RATE_LIMIT_SEARCH_RPM", 120);
+
                 options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
                     RateLimitPartition.GetFixedWindowLimiter(
-                        partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "global",
+                        partitionKey: BuildRateLimitPartitionKey(httpContext, "global"),
                         factory: _ => new FixedWindowRateLimiterOptions
                         {
-                            PermitLimit = 120,
+                            PermitLimit = globalPermitLimit,
                             Window = TimeSpan.FromMinutes(1),
                             QueueLimit = 0,
                             AutoReplenishment = true
@@ -145,10 +149,10 @@ namespace ECommerceAPI.API
 
                 options.AddPolicy("AuthOtpPolicy", httpContext =>
                     RateLimitPartition.GetFixedWindowLimiter(
-                        partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "auth",
+                        partitionKey: BuildRateLimitPartitionKey(httpContext, "auth"),
                         factory: _ => new FixedWindowRateLimiterOptions
                         {
-                            PermitLimit = 8,
+                            PermitLimit = authPermitLimit,
                             Window = TimeSpan.FromMinutes(1),
                             QueueLimit = 0,
                             AutoReplenishment = true
@@ -156,14 +160,39 @@ namespace ECommerceAPI.API
 
                 options.AddPolicy("SearchPolicy", httpContext =>
                     RateLimitPartition.GetFixedWindowLimiter(
-                        partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "search",
+                        partitionKey: BuildRateLimitPartitionKey(httpContext, "search"),
                         factory: _ => new FixedWindowRateLimiterOptions
                         {
-                            PermitLimit = 30,
+                            PermitLimit = searchPermitLimit,
                             Window = TimeSpan.FromMinutes(1),
                             QueueLimit = 0,
                             AutoReplenishment = true
                         }));
+
+                int ReadEnvInt(string key, int fallback)
+                {
+                    var raw = Environment.GetEnvironmentVariable(key);
+                    return int.TryParse(raw, out var parsed) && parsed > 0 ? parsed : fallback;
+                }
+
+                string BuildRateLimitPartitionKey(HttpContext context, string scope)
+                {
+                    var userId = context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                                 ?? context.User?.FindFirst("sub")?.Value;
+                    if (!string.IsNullOrWhiteSpace(userId))
+                    {
+                        return $"{scope}:user:{userId}";
+                    }
+
+                    var forwarded = context.Request.Headers["X-Forwarded-For"].FirstOrDefault();
+                    var clientIp = forwarded?.Split(',').FirstOrDefault()?.Trim();
+                    if (string.IsNullOrWhiteSpace(clientIp))
+                    {
+                        clientIp = context.Connection.RemoteIpAddress?.ToString();
+                    }
+
+                    return $"{scope}:ip:{clientIp ?? "unknown"}";
+                }
             });
 
             services.Configure<MongoDbSettings>(Configuration.GetSection("MongoDbSettings"));

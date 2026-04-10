@@ -22,20 +22,43 @@ import {
 
 const AI_AGENT_URL = process.env.REACT_APP_AI_AGENT_URL || 'http://localhost:7860';
 
+const getStableGuestId = () => {
+  let guestId = sessionStorage.getItem('shopai_guest_id');
+  if (guestId) return guestId;
+
+  const randomPart = typeof window !== 'undefined' && window.crypto?.randomUUID
+    ? window.crypto.randomUUID()
+    : `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+
+  guestId = `guest_${randomPart}`;
+  sessionStorage.setItem('shopai_guest_id', guestId);
+  return guestId;
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // callAIAgent — unchanged API contract
 // ─────────────────────────────────────────────────────────────────────────────
 export const callAIAgent = async (message, history, userId) => {
   const token = sessionStorage.getItem('token') || localStorage.getItem('token') || '';
-  const res = await fetch(`${AI_AGENT_URL}/chat`, {
+  const effectiveUserId = userId || getStableGuestId();
+
+  const doRequest = () => fetch(`${AI_AGENT_URL}/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      message, userId,
+      message,
+      userId: effectiveUserId,
       history: history.map(m => ({ role: m.role, content: m.content })),
       jwt_token: token,
     }),
   });
+
+  let res = await doRequest();
+  if (res.status === 429) {
+    await new Promise(resolve => setTimeout(resolve, 1200));
+    res = await doRequest();
+  }
+
   if (!res.ok) throw new Error(`Agent error: ${res.status}`);
   return res.json();
 };
