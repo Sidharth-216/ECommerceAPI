@@ -1,11 +1,14 @@
 import axios from 'axios';
 
-const rawApiBaseUrl = (process.env.REACT_APP_API_URL || 'https://ecommerceapi-er8d.onrender.com/api').trim();
+const isLocalhost = typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1)$/.test(window.location.hostname);
+const defaultApiBaseUrl = isLocalhost
+  ? 'http://localhost:5033/api'
+  : 'https://ecommerceapi-er8d.onrender.com/api';
+
+const rawApiBaseUrl = (process.env.REACT_APP_API_URL || defaultApiBaseUrl).trim();
 const API_BASE_URL = rawApiBaseUrl.endsWith('/api')
   ? rawApiBaseUrl
   : `${rawApiBaseUrl.replace(/\/$/, '')}/api`;
-//https://ecommerceapi-er8d.onrender.com/api 
-//http://localhost:5033/api
 const API_TIMEOUT_MS = Number(process.env.REACT_APP_API_TIMEOUT_MS || 60000);
 
 const api = axios.create({
