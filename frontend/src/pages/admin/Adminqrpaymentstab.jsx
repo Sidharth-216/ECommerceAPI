@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { qrPaymentAPI } from '/home/sidhu/Desktop/ECommerceAPI/frontend/src/api.js';
+import { qrPaymentAPI } from '../../api.js';
 import {
   QrCode, CheckCircle, XCircle, Clock, RefreshCw,
   AlertCircle, User, Calendar, DollarSign, Hash,

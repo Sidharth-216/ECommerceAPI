@@ -3,9 +3,9 @@ import {
   MapPin, CreditCard, ShoppingBag, ArrowLeft, 
   ShieldCheck, Truck, Lock, ChevronRight, RefreshCcw
 } from 'lucide-react';
-import { ordersAPI, cartAPI, getUserIdFromToken } from '/home/sidhu/Desktop/ECommerceAPI/frontend/src/api.js';
+import { ordersAPI, cartAPI, getUserIdFromToken } from '../api.js';
 import { openRazorpay } from '../utils/helpers';
-import QRPaymentModal from '/home/sidhu/Desktop/ECommerceAPI/frontend/src/components/Qrpaymentmodal.jsx';
+import QRPaymentModal from '../components/Qrpaymentmodal.jsx';
 
 const CheckoutPage = ({
   user,

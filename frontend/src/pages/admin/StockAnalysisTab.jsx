@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Package, TrendingUp, AlertCircle, BarChart3, Download, RefreshCw } from 'lucide-react';
-import { adminAPI } from '/home/sidhu/Desktop/ECommerceAPI/frontend/src/api.js';
+import { adminAPI } from '../../api.js';
 
 const StockAnalysisTab = () => {
     const [stockAnalysis, setStockAnalysis] = useState([]);

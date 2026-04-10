@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Package, Search, Plus, Edit2, Trash2, RefreshCw, AlertCircle, X } from 'lucide-react';
-import { adminAPI } from '/home/sidhu/Desktop/ECommerceAPI/frontend/src/api.js'; // adjust path if needed
+import { adminAPI } from '../../api.js';
 
 // ─────────────────────────────────────────────────────────────────
 // ProductModal is defined OUTSIDE ProductsTab so it is never

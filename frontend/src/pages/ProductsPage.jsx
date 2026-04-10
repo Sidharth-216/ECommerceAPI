@@ -11,7 +11,7 @@ import { productsAPI } from '../api.js';
 
 // ── Import all chat components from ChatComponents.jsx
 // ChatComponents.jsx must be in the SAME folder as ProductsPage.jsx
-import { FullPageChat } from '/home/sidhu/Desktop/ECommerceAPI/frontend/src/components/chat/ChatComponents.jsx';
+import { FullPageChat } from '../components/chat/ChatComponents.jsx';
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 const getCategoryName = (product) => {
