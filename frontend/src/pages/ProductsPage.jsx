@@ -351,7 +351,7 @@ const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCu
       setError('Search failed.');
       setIsSemanticMode(false);
     } finally { setSearchLoading(false); }
-  }, [searchQuery]);
+  }, [searchQuery, setError]);
 
   const applyCategory = async (cat) => {
     if (!cat) { setSearchQuery(''); setIsSemanticMode(false); setSemanticResults([]); return; }

@@ -1,8 +1,7 @@
 import React from 'react';
 import { 
   ShoppingBag, TrendingUp, Package, CreditCard, 
-  Users, MapPin, BarChart3, ArrowRight, Sparkles, 
-  ShieldCheck, Zap 
+  ArrowRight, Sparkles, ShieldCheck, Zap 
 } from 'lucide-react';
 import { getSampleProducts } from '../utils/helpers';
 

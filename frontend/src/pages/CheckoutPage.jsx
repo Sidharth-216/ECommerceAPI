@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { 
-  MapPin, CreditCard, ShoppingBag, ArrowLeft, 
-  ShieldCheck, Truck, Lock, ChevronRight, RefreshCcw
+  ArrowLeft, ShieldCheck, Truck, Lock, ChevronRight, RefreshCcw
 } from 'lucide-react';
 import { ordersAPI, cartAPI, getUserIdFromToken } from '../api.js';
 import { openRazorpay } from '../utils/helpers';

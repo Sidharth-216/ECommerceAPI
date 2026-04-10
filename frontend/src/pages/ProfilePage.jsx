@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   ShoppingBag, ShoppingCart, LogOut, User, MapPin, Package,
-  Clock, Plus, Trash2, ChevronRight, X, Home, Briefcase, Star
+  Plus, Trash2, ChevronRight, X, Home, Briefcase, Star
 } from 'lucide-react';
 import { authAPI, addressAPI } from '../api';
 

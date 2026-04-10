@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { cartAPI, getUserIdFromToken, getMongoId } from '../api';
 
 /**
@@ -48,16 +48,6 @@ const loadCartFromSession = () => {
 export const useCart = (user) => {
   const [cart, setCart] = useState([]);
 
-  // Fetch cart whenever the user changes (login, logout, rehydration)
-  useEffect(() => {
-    if (user) {
-      fetchCart();
-    } else {
-      // Guest — load from this tab's sessionStorage only
-      loadGuestCart();
-    }
-  }, [user]);
-
   // ── Guest cart (tab-scoped) ───────────────────────────────────────────
   const loadGuestCart = () => {
     const items = loadCartFromSession();
@@ -65,7 +55,7 @@ export const useCart = (user) => {
   };
 
   // ── Authenticated cart ────────────────────────────────────────────────
-  const fetchCart = async () => {
+  const fetchCart = useCallback(async () => {
     if (!user) {
       loadGuestCart();
       return;
@@ -96,7 +86,17 @@ export const useCart = (user) => {
       const cached = loadCartFromSession();
       setCart(cached);
     }
-  };
+  }, [user]);
+
+  // Fetch cart whenever the user changes (login, logout, rehydration)
+  useEffect(() => {
+    if (user) {
+      fetchCart();
+    } else {
+      // Guest — load from this tab's sessionStorage only
+      loadGuestCart();
+    }
+  }, [user, fetchCart]);
 
   const loadCart = async () => {
     await fetchCart();

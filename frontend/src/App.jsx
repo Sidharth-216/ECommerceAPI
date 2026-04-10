@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from './hooks/useAuth';
 import { useCart } from './hooks/useCart';
 import { useProducts } from './hooks/useProducts';
@@ -49,7 +49,7 @@ const App = () => {
       // Customer — block admin page
       setCurrentPage(saved === 'admin' ? 'products' : saved);
     }
-  }, [auth.isInitializing]); // runs exactly once when auth check completes
+  }, [auth.isInitializing, auth.user]); // runs exactly once when auth check completes
 
   // ── Persist currentPage ─────────────────────────────────────────────────
   useEffect(() => {
@@ -59,11 +59,7 @@ const App = () => {
   }, [currentPage, auth.isInitializing]);
 
   // ── Load data when user becomes available ───────────────────────────────
-  useEffect(() => {
-    if (auth.user) loadUserData();
-  }, [auth.user]);
-
-  const loadUserData = async () => {
+  const loadUserData = useCallback(async () => {
     if (!auth.user) return;
     try {
       await Promise.all([
@@ -73,7 +69,11 @@ const App = () => {
         auth.loadOrders().catch(e =>           console.warn('⚠️ orders:', e))
       ]);
     } catch (e) { console.error('❌ loadUserData:', e); }
-  };
+  }, [auth, productsHook, cartHook]);
+
+  useEffect(() => {
+    if (auth.user) loadUserData();
+  }, [auth.user, loadUserData]);
 
   const pageProps = {
     currentPage, setCurrentPage,
