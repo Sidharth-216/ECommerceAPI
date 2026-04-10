@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Package, TrendingUp, AlertCircle, BarChart3, Download, RefreshCw } from 'lucide-react';
 import { adminAPI } from '../../api.js';
 
@@ -11,13 +11,8 @@ const StockAnalysisTab = () => {
     const [filterCategory, setFilterCategory] = useState('');
     const [sortBy, setSortBy] = useState('stock-asc');
 
-    // Load stock analysis on mount
-    useEffect(() => {
-        fetchStockAnalysis();
-    }, []);
-
     // ✅ FIXED: Proper stock analysis fetching
-    const fetchStockAnalysis = async () => {
+    const fetchStockAnalysis = useCallback(async () => {
         console.group('📊 Fetching Stock Analysis');
         setLoading(true);
         setError('');
@@ -76,7 +71,12 @@ const StockAnalysisTab = () => {
             setLoading(false);
             console.groupEnd();
         }
-    };
+    }, []);
+
+    // Load stock analysis on mount
+    useEffect(() => {
+        fetchStockAnalysis();
+    }, [fetchStockAnalysis]);
 
     // Helper: Group products by category
     const groupByCategory = (products) => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { TrendingUp, DollarSign, ShoppingCart, Calendar, RefreshCw, AlertCircle, Download } from 'lucide-react';
 import { adminAPI } from '../../api.js';
 
@@ -20,11 +20,7 @@ const SalesReportTab = ({ error, setError }) => {
   
   const [dateRange, setDateRange] = useState(getDefaultDateRange());
 
-  useEffect(() => {
-    fetchReport();
-  }, []);
-
-  const fetchReport = async () => {
+  const fetchReport = useCallback(async () => {
     setLoading(true);
     setError('');
 
@@ -39,7 +35,11 @@ const SalesReportTab = ({ error, setError }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [dateRange.endDate, dateRange.startDate, setError]);
+
+  useEffect(() => {
+    fetchReport();
+  }, [fetchReport]);
 
   const handleDateChange = (field, value) => {
     setDateRange(prev => ({ ...prev, [field]: value }));

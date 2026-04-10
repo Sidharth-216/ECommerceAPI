@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Users, Search, RefreshCw, Trash2, Mail, Phone, Calendar, AlertCircle, UserX } from 'lucide-react';
 import { adminAPI } from '../../api';
 import api from '../../api';
@@ -9,15 +9,7 @@ const CustomersTab = ({ error, setError, loading, setLoading }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    fetchCustomers();
-  }, []);
-
-  useEffect(() => {
-    filterCustomers();
-  }, [searchQuery, customers]);
-
-  const fetchCustomers = async () => {
+  const fetchCustomers = useCallback(async () => {
     setRefreshing(true);
     setError('');
     
@@ -55,9 +47,9 @@ const CustomersTab = ({ error, setError, loading, setLoading }) => {
     } finally {
       setRefreshing(false);
     }
-  };
+  }, [setError]);
 
-  const filterCustomers = () => {
+  const filterCustomers = useCallback(() => {
     if (!searchQuery.trim()) {
       setFilteredCustomers(customers);
       return;
@@ -72,7 +64,15 @@ const CustomersTab = ({ error, setError, loading, setLoading }) => {
     );
     
     setFilteredCustomers(filtered);
-  };
+  }, [customers, searchQuery]);
+
+  useEffect(() => {
+    fetchCustomers();
+  }, [fetchCustomers]);
+
+  useEffect(() => {
+    filterCustomers();
+  }, [filterCustomers]);
 
   const deleteCustomer = async (customerId, customerName) => {
     if (!window.confirm(`Are you sure you want to delete ${customerName}? This action cannot be undone.`)) {

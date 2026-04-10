@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { DollarSign, ShoppingCart, Package, Users, TrendingUp, TrendingDown, Activity, Calendar, ArrowUp, ArrowDown, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { DollarSign, ShoppingCart, Package, Users, TrendingUp, TrendingDown, Activity, ArrowUp, ArrowDown } from 'lucide-react';
 import { adminAPI } from '../../api';
 
 const OverviewTab = () => {
@@ -19,11 +19,7 @@ const OverviewTab = () => {
   const [recentOrders, setRecentOrders] = useState([]);
   const [categoryData, setCategoryData] = useState([]);
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
-
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -185,7 +181,11 @@ const OverviewTab = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
   const generateSalesData = () => {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];

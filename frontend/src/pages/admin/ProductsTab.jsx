@@ -2,6 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { Package, Search, Plus, Edit2, Trash2, RefreshCw, AlertCircle, X } from 'lucide-react';
 import { adminAPI } from '../../api.js';
 
+const safeStr = (v) => (v == null ? '' : String(v));
+
+const getCatStr = (product) => {
+  if (!product) return 'Uncategorized';
+  if (typeof product.categoryName === 'string' && product.categoryName) return product.categoryName;
+  if (typeof product.category === 'string' && product.category) return product.category;
+  if (product.category && typeof product.category === 'object')
+    return safeStr(product.category.name || product.category.Name) || 'Uncategorized';
+  return 'Uncategorized';
+};
+
 // ─────────────────────────────────────────────────────────────────
 // ProductModal is defined OUTSIDE ProductsTab so it is never
 // re-created on every keystroke. Defining it inside caused React to
@@ -199,18 +210,6 @@ const ProductsTab = ({ products, loadProducts, error, setError, loading, setLoad
       })
     );
   }, [searchQuery, products]);
-
-  // ── Helpers ────────────────────────────────────────────────────
-  const safeStr = (v) => (v == null ? '' : String(v));
-
-  const getCatStr = (product) => {
-    if (!product) return 'Uncategorized';
-    if (typeof product.categoryName === 'string' && product.categoryName) return product.categoryName;
-    if (typeof product.category === 'string' && product.category) return product.category;
-    if (product.category && typeof product.category === 'object')
-      return safeStr(product.category.name || product.category.Name) || 'Uncategorized';
-    return 'Uncategorized';
-  };
 
   const getProductId = (product) => {
     if (!product) return null;

@@ -2,8 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { qrPaymentAPI } from '../../api.js';
 import {
   QrCode, CheckCircle, XCircle, Clock, RefreshCw,
-  AlertCircle, User, Calendar, DollarSign, Hash,
-  ChevronDown, ChevronUp, Eye, Filter
+  AlertCircle, ChevronDown, ChevronUp
 } from 'lucide-react';
 
 /**
