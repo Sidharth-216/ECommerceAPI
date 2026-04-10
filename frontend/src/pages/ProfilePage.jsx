@@ -306,7 +306,7 @@ const ProfilePage = ({
     <div className="min-h-screen" style={{ background: 'linear-gradient(135deg,#f0fdfa 0%,#ecfeff 40%,#f0fdf4 100%)' }}>
       {/* HEADER */}
       <header className="sticky top-0 z-40 bg-white/80 border-b border-teal-100" style={{ backdropFilter: 'blur(16px)' }}>
-        <div className="max-w-6xl mx-auto px-6 py-3.5 flex justify-between items-center">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3.5 flex justify-between items-center gap-3">
           {/* Logo */}
           <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => setCurrentPage('products')}>
             <div className="w-9 h-9 bg-gradient-to-br from-teal-500 to-cyan-500 rounded-xl flex items-center justify-center shadow-md shadow-teal-200">
@@ -347,9 +347,9 @@ const ProfilePage = ({
         </div>
       </header>
 
-      <div className="max-w-6xl mx-auto px-6 py-10">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
         {/* ── HERO ROW ── */}
-        <div className="relative bg-gradient-to-br from-teal-500 via-cyan-500 to-teal-400 rounded-3xl p-8 mb-8 overflow-hidden text-white shadow-2xl shadow-teal-200">
+        <div className="relative bg-gradient-to-br from-teal-500 via-cyan-500 to-teal-400 rounded-3xl p-5 sm:p-8 mb-8 overflow-hidden text-white shadow-2xl shadow-teal-200">
           {/* Decorative blobs */}
           <div className="absolute -top-12 -right-12 w-56 h-56 bg-white/10 rounded-full" />
           <div className="absolute top-8 -right-4 w-32 h-32 bg-white/10 rounded-full" />
@@ -364,7 +364,7 @@ const ProfilePage = ({
             {/* Info */}
             <div className="flex-1">
               <p className="text-slate-900 text-sm font-semibold mb-1">Welcome back 👋</p>
-              <h1 className="text-3xl font-black tracking-tight mb-1 text-slate-900">{displayName}</h1>
+              <h1 className="text-2xl sm:text-3xl font-black tracking-tight mb-1 text-slate-900">{displayName}</h1>
               <p className="text-slate-900 text-sm">{profileData.email || user?.email}</p>
             </div>
 
@@ -389,10 +389,10 @@ const ProfilePage = ({
               </div>
 
             {/* ── TABS ── */}
-        <div className="flex gap-1 bg-white rounded-2xl p-1.5 shadow-sm border border-slate-100 mb-8 w-fit">
+        <div className="flex gap-1 bg-white rounded-2xl p-1.5 shadow-sm border border-slate-100 mb-8 w-full sm:w-fit overflow-x-auto">
           {tabs.map(({ id, label, icon: Icon }) => (
             <button key={id} onClick={() => setActiveTab(id)}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 ${
+              className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 whitespace-nowrap ${
                 activeTab === id
                   ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-md shadow-teal-200'
                   : 'text-slate-900 hover:text-teal-600 hover:bg-teal-50'
@@ -406,7 +406,7 @@ const ProfilePage = ({
         {/* ── PROFILE TAB ── */}
         {activeTab === 'profile' && (
           <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-            <div className="flex items-center justify-between px-8 py-6 border-b border-slate-100">
+            <div className="flex flex-wrap gap-3 items-center justify-between px-4 sm:px-8 py-6 border-b border-slate-100">
               <div>
                 <h2 className="text-xl font-black text-slate-900">Personal Information</h2>
                 <p className="text-slate-900 text-sm mt-0.5">Manage your personal details</p>
@@ -422,7 +422,7 @@ const ProfilePage = ({
               </button>
             </div>
 
-            <div className="p-8">
+            <div className="p-4 sm:p-8">
               <div className="grid md:grid-cols-2 gap-6">
                 {[
                   { key: 'fullName', label: 'Full Name', type: 'text', editable: true },
@@ -468,7 +468,7 @@ const ProfilePage = ({
               </div>
 
               {editMode && (
-                <div className="flex gap-4 mt-8 pt-6 border-t border-slate-100">
+                <div className="flex flex-col sm:flex-row gap-4 mt-8 pt-6 border-t border-slate-100">
                   <button onClick={handleSaveProfile} disabled={loading}
                     className="flex-1 py-3.5 bg-gradient-to-r from-emerald-500 to-green-500 text-white rounded-2xl font-black text-sm shadow-lg shadow-green-200 hover:shadow-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2">
                     {loading ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Saving…</> : '✓ Save Changes'}
@@ -486,7 +486,7 @@ const ProfilePage = ({
         {/* ── ADDRESSES TAB ── */}
         {activeTab === 'addresses' && (
           <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-            <div className="flex items-center justify-between px-8 py-6 border-b border-slate-100">
+            <div className="flex flex-wrap gap-3 items-center justify-between px-4 sm:px-8 py-6 border-b border-slate-100">
               <div>
                 <h2 className="text-xl font-black text-slate-900">Saved Addresses</h2>
                 <p className="text-slate-900 text-sm mt-0.5">{profileData.addresses?.length || 0} address{profileData.addresses?.length !== 1 ? 'es' : ''} saved</p>
@@ -510,7 +510,7 @@ const ProfilePage = ({
               </div>
             </div>
 
-            <div className="p-8">
+            <div className="p-4 sm:p-8">
               {!profileData.addresses || profileData.addresses.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
                   <div className="w-20 h-20 bg-gradient-to-br from-teal-50 to-cyan-100 rounded-3xl flex items-center justify-center mb-5 border-2 border-dashed border-teal-200">
@@ -565,7 +565,7 @@ const ProfilePage = ({
         {/* ── ORDERS TAB ── */}
         {activeTab === 'orders' && (
           <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-            <div className="flex items-center justify-between px-8 py-6 border-b border-slate-100">
+            <div className="flex flex-wrap gap-3 items-center justify-between px-4 sm:px-8 py-6 border-b border-slate-100">
               <div>
                 <h2 className="text-xl font-black text-slate-900">Order History</h2>
                 <p className="text-slate-900 text-sm mt-0.5">{orders.length} order{orders.length !== 1 ? 's' : ''} placed</p>
@@ -599,7 +599,7 @@ const ProfilePage = ({
                   };
                   const st = statusStyles[order.status] || 'bg-slate-50 text-slate-600 border-slate-200';
                   return (
-                    <div key={order.id} className="flex items-center justify-between px-8 py-5 hover:bg-slate-50 transition-all group">
+                    <div key={order.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 sm:px-8 py-5 hover:bg-slate-50 transition-all group">
                       <div className="flex items-center gap-4">
                         <div className="w-11 h-11 bg-gradient-to-br from-teal-50 to-cyan-100 rounded-2xl flex items-center justify-center text-sm font-black text-teal-700 border border-teal-100">
                           #{order.id % 100}
@@ -612,7 +612,7 @@ const ProfilePage = ({
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-start">
                         <p className="font-black text-teal-600">₹{(order.totalAmount||0).toLocaleString()}</p>
                         <span className={`text-[11px] font-bold px-3 py-1 rounded-full border ${st}`}>{order.status||'Processing'}</span>
                         <button onClick={() => setCurrentPage('orders')}

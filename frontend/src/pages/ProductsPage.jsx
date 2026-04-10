@@ -454,20 +454,30 @@ const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCu
             {/* Profile + Cart */}
             <div style={{ display:'flex',alignItems:'center',gap:10,marginLeft:'auto',flexShrink:0,width:isMobile?'100%':'auto',justifyContent:isMobile?'space-between':'flex-end' }}>
               <button onClick={()=>setCurrentPage('profile')}
-                style={{ display:'flex',alignItems:'center',gap:8,background:'white',border:'1.5px solid #99f6e4',borderRadius:14,padding:isMobile?'8px 10px':'8px 14px',cursor:'pointer',transition:'all .2s',boxShadow:'0 2px 8px rgba(13,148,136,.1)' }}
+                style={{ display:'flex',alignItems:'center',gap:isMobile?6:8,background:'white',border:'1.5px solid #99f6e4',borderRadius:14,padding:isMobile?'8px 10px':'8px 14px',cursor:'pointer',transition:'all .2s',boxShadow:'0 2px 8px rgba(13,148,136,.1)',flex:isMobile?'1 1 0':'initial' }}
                 onMouseEnter={e=>{e.currentTarget.style.borderColor='#2dd4bf';e.currentTarget.style.boxShadow='0 4px 14px rgba(13,148,136,.2)'}}
                 onMouseLeave={e=>{e.currentTarget.style.borderColor='#99f6e4';e.currentTarget.style.boxShadow='0 2px 8px rgba(13,148,136,.1)'}}>
                 <div style={{ width:32,height:32,borderRadius:'50%',background:'linear-gradient(135deg,#99f6e4,#5eead4)',display:'flex',alignItems:'center',justifyContent:'center' }}>
                   <UserCircle size={18} color="#065f46"/>
                 </div>
-                <div>
+                <div style={{ display:isMobile?'none':'block' }}>
                   <div style={{ fontSize:10,color:'#64748b',lineHeight:1 }}>Hello,</div>
                   <div style={{ fontSize:13,fontWeight:800,color:'#064e3b',lineHeight:1.2 }}>{user?.name||user?.fullName||'User'}</div>
                 </div>
               </button>
 
+              {isMobile && (
+                <button onClick={()=>setChatOpen(true)}
+                  aria-label="Open AI chat"
+                  style={{ display:'flex',alignItems:'center',justifyContent:'center',gap:6,background:'white',border:'1.5px solid #99f6e4',borderRadius:14,padding:'8px 12px',cursor:'pointer',transition:'all .2s',boxShadow:'0 2px 8px rgba(13,148,136,.1)',flex:'0 0 auto' }}
+                  onMouseEnter={e=>{e.currentTarget.style.borderColor='#2dd4bf';e.currentTarget.style.boxShadow='0 4px 14px rgba(13,148,136,.2)'}}
+                  onMouseLeave={e=>{e.currentTarget.style.borderColor='#99f6e4';e.currentTarget.style.boxShadow='0 2px 8px rgba(13,148,136,.1)'}}>
+                  <MessageSquare size={16} color="#0d9488" />
+                </button>
+              )}
+
               <button onClick={()=>setCurrentPage('cart')}
-                style={{ background:'linear-gradient(135deg,#2dd4bf,#0d9488)',border:'none',borderRadius:14,padding:isMobile?'10px 12px':'10px 16px',cursor:'pointer',display:'flex',alignItems:'center',gap:8,transition:'all .2s',color:'white',boxShadow:'0 4px 14px rgba(13,148,136,.35)',position:'relative',animation:cart.length>0?'pulseRing 2.5s infinite':'none' }}
+                style={{ background:'linear-gradient(135deg,#2dd4bf,#0d9488)',border:'none',borderRadius:14,padding:isMobile?'10px 12px':'10px 16px',cursor:'pointer',display:'flex',alignItems:'center',gap:8,transition:'all .2s',color:'white',boxShadow:'0 4px 14px rgba(13,148,136,.35)',position:'relative',animation:cart.length>0?'pulseRing 2.5s infinite':'none',flex:isMobile?'1 1 0':'initial' }}
                 onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-2px)';e.currentTarget.style.boxShadow='0 8px 20px rgba(13,148,136,.5)'}}
                 onMouseLeave={e=>{e.currentTarget.style.transform='none';e.currentTarget.style.boxShadow='0 4px 14px rgba(13,148,136,.35)'}}>
                 <div style={{ position:'relative' }}>
@@ -496,12 +506,14 @@ const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCu
               </button>
             ))}
             <div style={{ marginLeft:isMobile?0:'auto',display:'flex',gap:6,padding:'6px 0',flexShrink:0 }}>
+              {!isMobile && (
               <button onClick={()=>setChatOpen(true)}
                 style={{ display:'flex',alignItems:'center',gap:6,color:'#064e3b',background:'white',border:'none',borderRadius:20,padding:'8px 16px',cursor:'pointer',fontSize:13,fontWeight:800,transition:'all .2s',fontFamily:'inherit' }}
                 onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-1px)';e.currentTarget.style.boxShadow='0 6px 16px rgba(0,0,0,.15)'}}
                 onMouseLeave={e=>{e.currentTarget.style.transform='none';e.currentTarget.style.boxShadow='none'}}>
                 <MessageSquare size={14}/> AI Chat
               </button>
+              )}
               <button onClick={handleLogout}
                 style={{ color:'white',background:'rgba(255,255,255,.15)',border:'1px solid rgba(255,255,255,.3)',borderRadius:20,padding:'8px 14px',cursor:'pointer',fontSize:13,fontWeight:700,display:'flex',alignItems:'center',gap:5,fontFamily:'inherit' }}>
                 <LogOut size={14}/> Logout
@@ -690,9 +702,10 @@ const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCu
       )}
 
       {/* FLOATING CHAT BUTTON */}
-      {!chatOpen && (
+      {!chatOpen && !isMobile && (
         <button onClick={()=>setChatOpen(true)}
-          style={{ position:'fixed',bottom:isMobile?16:28,right:isMobile?16:28,width:isMobile?54:62,height:isMobile?54:62,background:'linear-gradient(135deg,#2dd4bf,#0d9488)',borderRadius:isMobile?16:20,border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',zIndex:40,boxShadow:'0 8px 28px rgba(13,148,136,.5)',transition:'all .3s cubic-bezier(.34,1.56,.64,1)',animation:'pulseRing 2.5s infinite' }}
+          aria-label="Open AI chat"
+          style={{ position:'fixed',bottom:isMobile?'calc(14px + env(safe-area-inset-bottom, 0px))':'28px',right:isMobile?'calc(14px + env(safe-area-inset-right, 0px))':'28px',width:isMobile?56:62,height:isMobile?56:62,background:'linear-gradient(135deg,#2dd4bf,#0d9488)',borderRadius:isMobile?16:20,border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1300,boxShadow:'0 8px 28px rgba(13,148,136,.5)',transition:'all .3s cubic-bezier(.34,1.56,.64,1)',animation:'pulseRing 2.5s infinite',WebkitTransform:'translateZ(0)',transform:'translateZ(0)' }}
           onMouseEnter={e=>{e.currentTarget.style.transform='scale(1.15) rotate(-5deg)';e.currentTarget.style.boxShadow='0 14px 36px rgba(13,148,136,.65)'}}
           onMouseLeave={e=>{e.currentTarget.style.transform='scale(1)';e.currentTarget.style.boxShadow='0 8px 28px rgba(13,148,136,.5)'}}>
           <Bot size={isMobile?22:26} color="white"/>

@@ -17,18 +17,18 @@ const CartPage = ({
     <div className="min-h-screen bg-slate-50">
       {/* Header - Teal Theme */}
       <header className="bg-gradient-to-r from-teal-600 to-cyan-600 text-white sticky top-0 z-40 shadow-lg">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-wrap gap-3 justify-between items-center">
           <button 
             onClick={() => setCurrentPage('products')} 
-            className="flex items-center gap-2 text-white hover:bg-white/20 px-4 py-2 rounded-lg font-semibold transition-all group"
+            className="flex items-center gap-2 text-white hover:bg-white/20 px-3 sm:px-4 py-2 rounded-lg font-semibold transition-all group"
           >
             <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-            <span>Continue Shopping</span>
+            <span className="text-sm sm:text-base">Continue Shopping</span>
           </button>
           
           <div className="flex items-center gap-3">
             <ShoppingCart className="w-7 h-7" />
-            <h1 className="text-2xl font-bold">Shopping Cart</h1>
+            <h1 className="text-lg sm:text-2xl font-bold">Shopping Cart</h1>
           </div>
           
           <button 
@@ -41,10 +41,10 @@ const CartPage = ({
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         {cart.length === 0 ? (
           // Empty Cart State
-          <div className="bg-white rounded-xl shadow-md p-16 text-center">
+          <div className="bg-white rounded-xl shadow-md p-8 sm:p-16 text-center">
             <div className="w-32 h-32 mx-auto mb-6 bg-gradient-to-br from-teal-100 to-cyan-100 rounded-full flex items-center justify-center">
               <ShoppingCart className="w-16 h-16 text-teal-600" />
             </div>
@@ -85,10 +85,10 @@ const CartPage = ({
                   return (
                     <div 
                       key={itemId} 
-                      className={`p-6 flex gap-6 items-start hover:bg-teal-50/50 transition-all duration-300 ${idx !== cart.length - 1 ? 'border-b border-slate-200' : ''}`}
+                      className={`p-4 sm:p-6 flex flex-col sm:flex-row gap-4 sm:gap-6 items-start hover:bg-teal-50/50 transition-all duration-300 ${idx !== cart.length - 1 ? 'border-b border-slate-200' : ''}`}
                     >
                       {/* Product Image */}
-                      <div className="w-32 h-32 bg-slate-100 rounded-lg overflow-hidden flex-shrink-0 border border-slate-200">
+                      <div className="w-24 h-24 sm:w-32 sm:h-32 bg-slate-100 rounded-lg overflow-hidden flex-shrink-0 border border-slate-200">
                         <img 
                           src={item.imageUrl || 'https://via.placeholder.com/150'} 
                           alt={item.productName} 
@@ -100,8 +100,8 @@ const CartPage = ({
                       </div>
 
                       {/* Product Details */}
-                      <div className="flex-1">
-                        <div className="flex justify-between items-start mb-3">
+                      <div className="flex-1 w-full">
+                        <div className="flex justify-between items-start mb-3 gap-3">
                           <div>
                             <h3 className="font-bold text-lg text-slate-900 mb-1">{item.productName}</h3>
                             <p className="text-sm text-slate-500">In Stock</p>
@@ -129,7 +129,7 @@ const CartPage = ({
                         </div>
 
                         {/* Quantity Controls */}
-                        <div className="flex items-center gap-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
                           <div className="flex items-center gap-3 bg-slate-100 rounded-lg p-1 border border-slate-200">
                             <button 
                               onClick={() => {
@@ -178,7 +178,7 @@ const CartPage = ({
 
             {/* Order Summary Sidebar */}
             <div className="lg:col-span-1">
-              <div className="bg-white rounded-lg shadow-lg p-6 border border-slate-200 sticky top-24 space-y-6">
+              <div className="bg-white rounded-lg shadow-lg p-6 border border-slate-200 lg:sticky lg:top-24 space-y-6">
                 <h3 className="text-xl font-bold text-slate-900 pb-4 border-b border-slate-200">Order Summary</h3>
                 
                 {/* Price Breakdown */}

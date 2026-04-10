@@ -121,13 +121,13 @@ const CheckoutPage = ({
       <div className="min-h-screen bg-[#F8FAFC]">
         {/* --- Simple Header --- */}
         <header className="bg-white/80 backdrop-blur-md sticky top-0 z-40 border-b border-slate-100">
-          <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
             <button 
               onClick={() => setCurrentPage('cart')} 
               className="flex items-center gap-2 text-slate-500 hover:text-teal-600 font-bold transition-colors group"
             >
               <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
-              <span>Back to Cart</span>
+              <span className="text-sm sm:text-base">Back to Cart</span>
             </button>
             <div className="flex items-center gap-2">
               <ShieldCheck size={18} className="text-teal-500" />
@@ -136,7 +136,7 @@ const CheckoutPage = ({
           </div>
         </header>
 
-        <main className="max-w-7xl mx-auto px-6 py-10">
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
           {error && (
             <div className="mb-8 p-4 bg-rose-50 border-l-4 border-rose-500 text-rose-700 rounded-r-xl flex items-center gap-3">
               <Lock size={18} />
@@ -156,7 +156,7 @@ const CheckoutPage = ({
                   <h2 className="text-xl font-black text-slate-900 tracking-tight">Shipping Address</h2>
                 </div>
                 
-                <div className={`${cardStyle} p-6`}>
+                <div className={`${cardStyle} p-4 sm:p-6`}>
                   {profileData.addresses?.length > 0 ? (
                     <div className="grid gap-4">
                       {profileData.addresses.map((addr) => (
@@ -199,7 +199,7 @@ const CheckoutPage = ({
                   <h2 className="text-xl font-black text-slate-900 tracking-tight">Payment Method</h2>
                 </div>
                 
-                <div className={`${cardStyle} p-6 grid md:grid-cols-3 gap-4`}>
+                <div className={`${cardStyle} p-4 sm:p-6 grid md:grid-cols-3 gap-4`}>
                   {/* COD */}
                   <label className="relative flex items-center p-5 rounded-2xl border-2 cursor-pointer transition-all has-[:checked]:border-teal-500 has-[:checked]:bg-teal-50/30 border-slate-100 hover:border-slate-200">
                     <input type="radio" name="paymentMethod" value="COD" defaultChecked className="w-5 h-5 accent-teal-600" />
@@ -241,7 +241,7 @@ const CheckoutPage = ({
                 <div className={`${cardStyle}`}>
                   <div className="divide-y divide-slate-50">
                     {cart.map((item) => (
-                      <div key={item.productId} className="p-6 flex items-center justify-between bg-white hover:bg-slate-50 transition-colors">
+                      <div key={item.productId} className="p-4 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white hover:bg-slate-50 transition-colors">
                         <div className="flex items-center gap-4">
                           <div className="w-16 h-16 bg-slate-100 rounded-xl overflow-hidden">
                              <img src={item.imageUrl || item.image} alt="" className="w-full h-full object-cover" />
@@ -262,7 +262,7 @@ const CheckoutPage = ({
             {/* --- Right: Order Summary Sticky --- */}
             <div className="lg:col-span-4">
               <div className="sticky top-28 space-y-6">
-                <div className={`${cardStyle} p-8 border-t-4 border-t-teal-500`}>
+                <div className={`${cardStyle} p-5 sm:p-8 border-t-4 border-t-teal-500`}>
                   <h3 className="text-lg font-black text-slate-900 mb-6">Order Summary</h3>
                   
                   <div className="space-y-4 mb-8">

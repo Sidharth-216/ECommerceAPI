@@ -59,7 +59,7 @@ const OrdersPage = ({ user, orders = [], setOrders, setCurrentPage }) => {
         <div className="min-h-screen bg-[#F8FAFC]">
             {/* --- Premium Header --- */}
             <header className="bg-white/80 backdrop-blur-md sticky top-0 z-40 border-b border-slate-100">
-                <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-wrap gap-3 justify-between items-center">
                     <div className="flex items-center gap-4">
                         <div className={`${primaryGradient} p-2.5 rounded-2xl shadow-lg shadow-teal-200/50`}>
                             <Package className="w-6 h-6" />
@@ -82,7 +82,7 @@ const OrdersPage = ({ user, orders = [], setOrders, setCurrentPage }) => {
                 </div>
             </header>
 
-            <main className="max-w-5xl mx-auto px-6 py-10">
+            <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
                 {error && (
                     <div className="mb-8 p-4 bg-rose-50 border-l-4 border-rose-500 text-rose-700 rounded-r-xl flex items-center gap-3">
                         <AlertCircle size={20} />
@@ -117,10 +117,10 @@ const OrdersPage = ({ user, orders = [], setOrders, setCurrentPage }) => {
                             </div>
                         ) : filteredOrders.length === 0 ? (
                             <div className="bg-white rounded-[32px] p-16 text-center border-2 border-dashed border-slate-200">
-                                <div className="bg-slate-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+                                <div className="bg-slate-50 w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center mx-auto mb-6">
                                     <Package className="w-10 h-10 text-slate-300" />
                                 </div>
-                                <h2 className="text-2xl font-black text-slate-900">No orders here yet</h2>
+                                <h2 className="text-xl sm:text-2xl font-black text-slate-900">No orders here yet</h2>
                                 <p className="text-slate-500 mt-2 mb-8">Looks like you haven't placed any orders in this category.</p>
                                 <button onClick={() => setCurrentPage('products')} className={`${primaryGradient} px-8 py-3 rounded-2xl font-bold`}>
                                     Start Shopping
@@ -157,7 +157,7 @@ const OrdersPage = ({ user, orders = [], setOrders, setCurrentPage }) => {
                                                 </div>
                                             </div>
 
-                                            <div className="flex items-center justify-between pt-6 border-t border-slate-50">
+                                            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-6 border-t border-slate-50">
                                                 <div className="flex -space-x-3 overflow-hidden">
                                                     {(order.items || []).slice(0, 4).map((item, idx) => (
                                                         <img 
@@ -195,21 +195,21 @@ const OrdersPage = ({ user, orders = [], setOrders, setCurrentPage }) => {
 
                         <div className="bg-white rounded-[32px] border border-slate-100 overflow-hidden shadow-xl shadow-slate-200/40">
                             {/* Summary Header */}
-                            <div className="p-8 md:p-12 bg-slate-900 text-white">
+                            <div className="p-6 md:p-12 bg-slate-900 text-white">
                                 <div className="flex flex-col md:flex-row justify-between gap-6">
                                     <div>
                                         <p className="text-teal-400 font-black uppercase tracking-widest text-xs mb-2">Order Confirmed</p>
-                                        <h2 className="text-4xl font-black tracking-tight mb-2">#{selectedOrder.orderNumber || (selectedOrder._id || selectedOrder.id).substring(0,8)}</h2>
+                                        <h2 className="text-2xl sm:text-4xl font-black tracking-tight mb-2">#{selectedOrder.orderNumber || (selectedOrder._id || selectedOrder.id).substring(0,8)}</h2>
                                         <p className="text-slate-400 font-medium">Placed on {new Date(selectedOrder.createdAt).toLocaleString()}</p>
                                     </div>
                                     <div className="md:text-right">
                                         <p className="text-slate-400 text-sm font-bold uppercase mb-1">Total Amount</p>
-                                        <p className="text-4xl font-black text-teal-400">₹{selectedOrder.totalAmount?.toLocaleString()}</p>
+                                        <p className="text-2xl sm:text-4xl font-black text-teal-400">₹{selectedOrder.totalAmount?.toLocaleString()}</p>
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="p-8 md:p-12 space-y-10">
+                            <div className="p-5 sm:p-8 md:p-12 space-y-8 sm:space-y-10">
                                 {/* Order Items Table */}
                                 <div>
                                     <h3 className="text-lg font-black text-slate-900 mb-6 flex items-center gap-2">
@@ -217,7 +217,7 @@ const OrdersPage = ({ user, orders = [], setOrders, setCurrentPage }) => {
                                     </h3>
                                     <div className="space-y-4">
                                         {(selectedOrder.items || []).map((item, idx) => (
-                                            <div key={idx} className="flex items-center gap-6 p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                                            <div key={idx} className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 p-4 rounded-2xl bg-slate-50 border border-slate-100">
                                                 <img src={item.imageUrl || item.productImage} className="w-16 h-16 rounded-xl object-cover bg-white" alt="" />
                                                 <div className="flex-1">
                                                     <h4 className="font-bold text-slate-900">{item.productName}</h4>

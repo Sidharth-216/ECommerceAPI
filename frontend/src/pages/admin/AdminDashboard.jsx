@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ShoppingBag, LogOut, Package, BarChart3, Users, ShoppingCart, TrendingUp, FileText, Menu, X, Bell, Search, QrCode } from 'lucide-react';
 import OverviewTab from './OverviewTab';
 import CustomersTab from './CustomersTab';
@@ -12,6 +12,14 @@ const AdminDashboard = (props) => {
   const { user, handleLogout, setCurrentPage } = props;
   const [activeTab, setActiveTab] = useState('overview');
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 1024 : false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 1024);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const tabs = [
     { id: 'overview',       label: 'Overview',       icon: BarChart3,  color: 'teal' },
@@ -49,8 +57,12 @@ const AdminDashboard = (props) => {
 
   return (
     <div className="min-h-screen bg-slate-50 flex">
+      {isMobile && mobileNavOpen && (
+        <div className="fixed inset-0 bg-black/45 z-30" onClick={() => setMobileNavOpen(false)} />
+      )}
+
       {/* Sidebar */}
-      <aside className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-white border-r border-slate-200 transition-all duration-300 flex flex-col fixed h-full z-40`}>
+      <aside className={`${isMobile ? 'w-72' : (sidebarOpen ? 'w-64' : 'w-20')} ${isMobile ? (mobileNavOpen ? 'translate-x-0' : '-translate-x-full') : 'translate-x-0'} bg-white border-r border-slate-200 transition-all duration-300 flex flex-col fixed h-full z-40`}>
         {/* Logo Section */}
         <div className="p-6 border-b border-slate-200 flex items-center justify-between">
           {sidebarOpen ? (
@@ -78,7 +90,10 @@ const AdminDashboard = (props) => {
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => {
+                  setActiveTab(tab.id);
+                  if (isMobile) setMobileNavOpen(false);
+                }}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all font-medium ${getTabColorClasses(tab, isActive)} ${!sidebarOpen && 'justify-center'}`}
                 title={!sidebarOpen ? tab.label : ''}
               >
@@ -117,22 +132,36 @@ const AdminDashboard = (props) => {
         {/* Sidebar Toggle */}
         <div className="p-4 border-t border-slate-200">
           <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
+            onClick={() => {
+              if (isMobile) {
+                setMobileNavOpen(false);
+              } else {
+                setSidebarOpen(!sidebarOpen);
+              }
+            }}
             className="w-full flex items-center justify-center gap-2 px-4 py-3 text-slate-600 hover:bg-slate-100 rounded-lg transition-all"
           >
-            {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            {sidebarOpen && <span className="text-sm font-medium">Collapse</span>}
+            {isMobile ? <X className="w-5 h-5" /> : sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            {(sidebarOpen || isMobile) && <span className="text-sm font-medium">{isMobile ? 'Close' : 'Collapse'}</span>}
           </button>
         </div>
       </aside>
 
       {/* Main Content Area */}
-      <div className={`flex-1 ${sidebarOpen ? 'ml-64' : 'ml-20'} transition-all duration-300`}>
+      <div className={`flex-1 ${isMobile ? 'ml-0' : (sidebarOpen ? 'ml-64' : 'ml-20')} transition-all duration-300`}>
         {/* Top Header */}
         <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
-          <div className="px-8 py-4 flex items-center justify-between">
+          <div className="px-4 md:px-8 py-4 flex items-center justify-between gap-4">
             {/* Page Title */}
-            <div>
+            <div className="min-w-0">
+              {isMobile && (
+                <button
+                  onClick={() => setMobileNavOpen(true)}
+                  className="mb-2 p-2 rounded-lg border border-slate-200 text-slate-700"
+                >
+                  <Menu className="w-5 h-5" />
+                </button>
+              )}
               <h2 className="text-2xl font-bold text-slate-900">
                 {tabs.find(t => t.id === activeTab)?.label || 'Dashboard'}
               </h2>
@@ -140,7 +169,7 @@ const AdminDashboard = (props) => {
             </div>
 
             {/* Right Side Actions */}
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 md:gap-4">
               {/* Search */}
               <div className="hidden md:flex items-center gap-2 bg-slate-100 rounded-lg px-4 py-2 w-80">
                 <Search className="w-4 h-4 text-slate-400" />
@@ -160,7 +189,7 @@ const AdminDashboard = (props) => {
               </button>
 
               {/* User Profile */}
-              <div className="flex items-center gap-3 pl-4 border-l border-slate-200">
+              <div className="flex items-center gap-3 pl-2 md:pl-4 border-l border-slate-200">
                 <div className="text-right hidden lg:block">
                   <p className="text-sm font-semibold text-slate-900">{user?.fullName || user?.name || 'Admin'}</p>
                   <p className="text-xs text-slate-500">{user?.role || 'Administrator'}</p>
@@ -182,7 +211,7 @@ const AdminDashboard = (props) => {
               {/* Logout */}
               <button
                 onClick={handleLogout}
-                className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition-all"
+                className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-3 md:px-4 py-2 rounded-lg text-sm font-bold transition-all"
               >
                 <LogOut className="w-4 h-4" />
                 <span className="hidden sm:inline">Logout</span>
@@ -192,7 +221,7 @@ const AdminDashboard = (props) => {
         </header>
 
         {/* Tab Content */}
-        <main className="p-8">
+        <main className="p-4 md:p-8">
           {activeTab === 'overview'       && <OverviewTab        {...props} />}
           {activeTab === 'customers'      && <CustomersTab       {...props} />}
           {activeTab === 'orders'         && <OrdersTab          {...props} />}
