@@ -38,6 +38,10 @@ const extractUserIdFromToken = (token) => {
   } catch { return null; }
 };
 
+const getBootIdSync = () => {
+  return sessionStorage.getItem('serverBootId') || localStorage.getItem('serverBootId') || null;
+};
+
 const resolveTabSession = () => {
   const ssToken = sessionStorage.getItem('token');
   const ssUser  = sessionStorage.getItem('user');
@@ -132,7 +136,7 @@ export const useAuth = () => {
 
         const rehydratedUser = { ...userData, id: finalUserId, userId: finalUserId };
         if (source === 'local') {
-          writeTabSession(token, rehydratedUser, localStorage.getItem('serverBootId'));
+          writeTabSession(token, rehydratedUser, getBootIdSync());
         }
         setUser(rehydratedUser);
         console.log(`✅ Session restored (${source}) for: ${rehydratedUser.email}`);
@@ -171,14 +175,8 @@ export const useAuth = () => {
 
       const userData = { ...data, role: userRole, userId: finalUserId, id: finalUserId };
 
-      let bootId = null;
-      try {
-        const { ok, bootId: bid } = await callValidate(data.token);
-        if (ok && bid) bootId = bid;
-      } catch { /* non-fatal */ }
-
-      writeTabSession(data.token, userData, bootId);
-      writeLocalHint(data.token, userData, bootId);
+      writeTabSession(data.token, userData);
+      writeLocalHint(data.token, userData);
 
       setUser({
         id: finalUserId, userId: finalUserId,
@@ -186,7 +184,7 @@ export const useAuth = () => {
         name: data.fullName || data.name || '',
         mobile: data.mobile || '', gender: data.gender || ''
       });
-      console.log('✅ Login OK, bootId:', bootId);
+      console.log('✅ Login OK');
       return userRole;
     } catch (err) {
       console.error('❌ Login error:', err);
@@ -220,14 +218,8 @@ export const useAuth = () => {
       if (!finalUserId) throw new Error('User ID not found in token.');
 
       const userData = { ...data, userId: finalUserId, id: finalUserId };
-      let bootId = null;
-      try {
-        const { ok, bootId: bid } = await callValidate(data.token);
-        if (ok && bid) bootId = bid;
-      } catch { /* non-fatal */ }
-
-      writeTabSession(data.token, userData, bootId);
-      writeLocalHint(data.token, userData, bootId);
+      writeTabSession(data.token, userData);
+      writeLocalHint(data.token, userData);
 
       setUser({
         id: finalUserId, userId: finalUserId,
