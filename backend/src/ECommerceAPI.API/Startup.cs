@@ -4,11 +4,15 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.ResponseCompression;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using System.Security.Claims;
 using MongoDB.Driver;
 using System;
+using System.IO.Compression;
+using System.Threading.RateLimiting;
 
 using ECommerceAPI.Application.Helpers;
 using ECommerceAPI.Application.Services;
@@ -28,11 +32,43 @@ namespace ECommerceAPI.API
 
         public void ConfigureServices(IServiceCollection services)
         {
+            var environment = Configuration["ASPNETCORE_ENVIRONMENT"] ?? Configuration["DOTNET_ENVIRONMENT"] ?? Environments.Production;
+            var isDevelopment = string.Equals(environment, Environments.Development, StringComparison.OrdinalIgnoreCase);
+
             services.AddControllers();
             services.AddScoped<JwtHelper>();
+            services.AddMemoryCache();
+
+            services.AddResponseCompression(options =>
+            {
+                options.EnableForHttps = true;
+                options.Providers.Add<GzipCompressionProvider>();
+            });
+            services.Configure<GzipCompressionProviderOptions>(options =>
+            {
+                options.Level = CompressionLevel.Fastest;
+            });
+
+            services.AddResponseCaching();
 
             var jwtKey = Configuration["Jwt:SecretKey"];
-            if (string.IsNullOrWhiteSpace(jwtKey)) throw new Exception("JWT SecretKey missing");
+            if (string.IsNullOrWhiteSpace(jwtKey))
+            {
+                jwtKey = Environment.GetEnvironmentVariable("JWT_SECRET");
+            }
+
+            if (string.IsNullOrWhiteSpace(jwtKey))
+            {
+                if (isDevelopment)
+                {
+                    // Dev-only fallback so local runs don't crash when secrets are not configured yet.
+                    jwtKey = "dev-only-jwt-secret-change-me-at-least-32-chars";
+                }
+                else
+                {
+                    throw new Exception("JWT SecretKey missing. Set Jwt:SecretKey or JWT_SECRET.");
+                }
+            }
 
             services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 .AddJwtBearer(options =>
@@ -53,16 +89,97 @@ namespace ECommerceAPI.API
 
             services.AddCors(options =>
             {
-                options.AddPolicy("AllowAll", builder =>
-                    builder
-                        .AllowAnyOrigin()
-                        .AllowAnyHeader()
-                        .AllowAnyMethod()
-                        .WithExposedHeaders("X-Server-Boot-Id"));
+                options.AddPolicy("AllowFrontend", builder =>
+                {
+                    var allowedOrigins = Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>();
+
+                    if (allowedOrigins != null && allowedOrigins.Length > 0)
+                    {
+                        builder
+                            .WithOrigins(allowedOrigins)
+                            .AllowAnyHeader()
+                            .AllowAnyMethod()
+                            .WithExposedHeaders("X-Server-Boot-Id");
+                    }
+                    else
+                    {
+                        builder
+                            .AllowAnyOrigin()
+                            .AllowAnyHeader()
+                            .AllowAnyMethod()
+                            .WithExposedHeaders("X-Server-Boot-Id");
+                    }
+                });
+            });
+
+            services.AddRateLimiter(options =>
+            {
+                options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+                options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+                    RateLimitPartition.GetFixedWindowLimiter(
+                        partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "global",
+                        factory: _ => new FixedWindowRateLimiterOptions
+                        {
+                            PermitLimit = 120,
+                            Window = TimeSpan.FromMinutes(1),
+                            QueueLimit = 0,
+                            AutoReplenishment = true
+                        }));
+
+                options.AddPolicy("AuthOtpPolicy", httpContext =>
+                    RateLimitPartition.GetFixedWindowLimiter(
+                        partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "auth",
+                        factory: _ => new FixedWindowRateLimiterOptions
+                        {
+                            PermitLimit = 8,
+                            Window = TimeSpan.FromMinutes(1),
+                            QueueLimit = 0,
+                            AutoReplenishment = true
+                        }));
+
+                options.AddPolicy("SearchPolicy", httpContext =>
+                    RateLimitPartition.GetFixedWindowLimiter(
+                        partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "search",
+                        factory: _ => new FixedWindowRateLimiterOptions
+                        {
+                            PermitLimit = 30,
+                            Window = TimeSpan.FromMinutes(1),
+                            QueueLimit = 0,
+                            AutoReplenishment = true
+                        }));
             });
 
             services.Configure<MongoDbSettings>(Configuration.GetSection("MongoDbSettings"));
-            var mongoSettings = Configuration.GetSection("MongoDbSettings").Get<MongoDbSettings>();
+            var mongoSettings = Configuration.GetSection("MongoDbSettings").Get<MongoDbSettings>()
+                ?? throw new Exception("MongoDbSettings section is missing");
+
+            if (string.IsNullOrWhiteSpace(mongoSettings.ConnectionString))
+            {
+                mongoSettings.ConnectionString = Environment.GetEnvironmentVariable("MONGO_CONNECTION_STRING");
+            }
+
+            if (string.IsNullOrWhiteSpace(mongoSettings.DatabaseName))
+            {
+                mongoSettings.DatabaseName = Environment.GetEnvironmentVariable("MONGO_DB_NAME") ?? "ECommerceDB";
+            }
+
+            if (string.IsNullOrWhiteSpace(mongoSettings.ConnectionString))
+            {
+                if (isDevelopment)
+                {
+                    // Dev-only default for local MongoDB.
+                    mongoSettings.ConnectionString = "mongodb://localhost:27017";
+                }
+                else
+                {
+                    throw new Exception("MongoDbSettings:ConnectionString is missing. Set MongoDbSettings:ConnectionString or MONGO_CONNECTION_STRING.");
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(mongoSettings.DatabaseName))
+                throw new Exception("MongoDbSettings:DatabaseName is missing");
+
             services.AddSingleton<IMongoClient>(_ => new MongoClient(mongoSettings.ConnectionString));
             services.AddScoped<IMongoDatabase>(sp => {
                 var client = sp.GetRequiredService<IMongoClient>();
@@ -104,12 +221,28 @@ namespace ECommerceAPI.API
                 app.UseSwagger();
                 app.UseSwaggerUI();
             }
+            else
+            {
+                app.UseHsts();
+            }
+
+            app.Use(async (context, next) =>
+            {
+                context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+                context.Response.Headers["X-Frame-Options"] = "DENY";
+                context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+                context.Response.Headers["X-XSS-Protection"] = "0";
+                await next();
+            });
 
             app.UseMiddleware<ErrorHandlerMiddleware>();
             app.UseHttpsRedirection();
+            app.UseResponseCompression();
             app.UseStaticFiles();
             app.UseRouting();
-            app.UseCors("AllowAll");
+            app.UseCors("AllowFrontend");
+            app.UseRateLimiter();
+            app.UseResponseCaching();
             app.UseAuthentication();
             app.UseAuthorization();
             app.UseEndpoints(endpoints => { endpoints.MapControllers(); });

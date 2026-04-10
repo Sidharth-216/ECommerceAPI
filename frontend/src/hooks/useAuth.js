@@ -1,6 +1,10 @@
 import { useState, useEffect } from 'react';
 import { mongoAuthAPI, ordersAPI, addressAPI } from '../api';
 
+const API_BASE_URL = (process.env.REACT_APP_API_URL || 'http://localhost:5033/api').endsWith('/api')
+  ? (process.env.REACT_APP_API_URL || 'http://localhost:5033/api')
+  : `${(process.env.REACT_APP_API_URL || 'http://localhost:5033/api').replace(/\/$/, '')}/api`;
+
 const writeTabSession = (token, userData, bootId) => {
   sessionStorage.setItem('token', token);
   sessionStorage.setItem('user',  JSON.stringify(userData));
@@ -61,7 +65,7 @@ const resolveTabSession = () => {
 
 const callValidate = async (token) => {
   try {
-    const res = await fetch('/api/mongo/auth/validate', {
+    const res = await fetch(`${API_BASE_URL}/mongo/auth/validate`, {
       method: 'GET',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
     });

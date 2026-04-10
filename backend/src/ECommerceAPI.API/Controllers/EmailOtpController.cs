@@ -1,5 +1,6 @@
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using ECommerceAPI.Application.Interfaces;
 using ECommerceAPI.Application.DTOs.Auth;  
 
@@ -20,6 +21,7 @@ namespace ECommerceAPI.API.Controllers
         /// Request an OTP to be sent to the given email
         /// </summary>
         [HttpPost("request-otp")]
+        [EnableRateLimiting("AuthOtpPolicy")]
         public async Task<IActionResult> RequestOtp([FromBody] RequestEmailOtpDto dto)
         {
             if (string.IsNullOrWhiteSpace(dto?.Email))
@@ -37,6 +39,7 @@ namespace ECommerceAPI.API.Controllers
         /// Verify the OTP entered by the user
         /// </summary>
         [HttpPost("verify-otp")]
+        [EnableRateLimiting("AuthOtpPolicy")]
         public async Task<IActionResult> VerifyOtp([FromBody] VerifyEmailOtpDto dto)
         {
             if (string.IsNullOrWhiteSpace(dto?.Email) || string.IsNullOrWhiteSpace(dto?.Otp))

@@ -36,8 +36,6 @@ class ShoppingAgentOrchestrator:
         token = request.jwt_token or ""
         if not token:
             logger.warning("No JWT token -- all /api/ai/* calls will return 401")
-        else:
-            logger.info("JWT received: ...%s", token[-12:])
 
         api_client = APIClient(API_BASE, token)
         user_id    = request.userId or "anon"

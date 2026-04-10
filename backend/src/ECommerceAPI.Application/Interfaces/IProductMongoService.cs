@@ -8,6 +8,7 @@ namespace ECommerceAPI.Application.Interfaces
     public interface IProductMongoService
     {
         Task<IEnumerable<ProductMongo>> GetAllAsync();
+        Task<PagedProductsResponseDto> GetPageAsync(int page, int pageSize);
         Task<ProductMongo> GetByIdAsync(string id);
         Task<ProductMongo> CreateAsync(ProductCreateDto dto);
         Task<bool> UpdateAsync(string id, ProductCreateDto dto);

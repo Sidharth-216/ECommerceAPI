@@ -207,7 +207,7 @@ export const ChatProductCard = ({ product, onAddToCart, index = 0 }) => {
 
   return (
     <div onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
-      style={{ background: 'white', border: `1.5px solid ${hov ? '#5eead4' : '#ccfbf1'}`, borderRadius: 18, padding: 0, display: 'flex', flexDirection: 'column', minWidth: 180, maxWidth: 200, boxShadow: hov ? '0 12px 32px rgba(13,148,136,.18)' : '0 2px 12px rgba(13,148,136,.07)', transition: 'all .2s', flexShrink: 0, transform: hov ? 'translateY(-3px)' : 'none', overflow: 'hidden', animation: `slideInMsg .25s ease ${index * 0.08}s both` }}>
+      style={{ background: 'white', border: `1.5px solid ${hov ? '#5eead4' : '#ccfbf1'}`, borderRadius: 18, padding: 0, display: 'flex', flexDirection: 'column', minWidth: 150, width: 'min(200px, 62vw)', maxWidth: 200, boxShadow: hov ? '0 12px 32px rgba(13,148,136,.18)' : '0 2px 12px rgba(13,148,136,.07)', transition: 'all .2s', flexShrink: 0, transform: hov ? 'translateY(-3px)' : 'none', overflow: 'hidden', animation: `slideInMsg .25s ease ${index * 0.08}s both` }}>
       {/* Image */}
       <div style={{ background: 'linear-gradient(135deg,#f0fdfa,#ccfbf1)', padding: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', height: 110 }}>
         <img src={product.imageUrl || 'https://via.placeholder.com/80/ccfbf1/0d9488?text=P'} alt={product.name}
@@ -534,6 +534,7 @@ export const FullPageChat = ({ user, chatMessages = [], setChatMessages, onClose
   const [isListening, setIsListening] = useState(false);
   const [voiceHint, setVoiceHint] = useState('');
   const [voiceError, setVoiceError] = useState('');
+  const [viewportWidth, setViewportWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1280);
   const endRef   = useRef(null);
   const inputRef = useRef(null);
   const recognitionRef = useRef(null);
@@ -549,6 +550,8 @@ export const FullPageChat = ({ user, chatMessages = [], setChatMessages, onClose
     && !!window.MediaRecorder
     && !!navigator.mediaDevices
     && typeof navigator.mediaDevices.getUserMedia === 'function';
+  const isMobile = viewportWidth < 768;
+  const isTablet = viewportWidth >= 768 && viewportWidth < 1024;
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chatMessages, isTyping]);
   useEffect(() => {
@@ -573,6 +576,12 @@ export const FullPageChat = ({ user, chatMessages = [], setChatMessages, onClose
         mediaStreamRef.current = null;
       }
     };
+  }, []);
+
+  useEffect(() => {
+    const onResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
   }, []);
 
   const stopListening = () => {
@@ -809,7 +818,7 @@ export const FullPageChat = ({ user, chatMessages = [], setChatMessages, onClose
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 9000, display: 'flex', animation: 'chatOpen .28s ease', fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9000, display: 'flex', flexDirection: isMobile ? 'column' : 'row', animation: 'chatOpen .28s ease', fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
       <style>{`
         @keyframes dotPulse1 { 0%,80%,100%{transform:scale(0);opacity:.3} 40%{transform:scale(1);opacity:1} }
         @keyframes dotPulse2 { 0%,20%,80%,100%{transform:scale(0);opacity:.3} 50%{transform:scale(1);opacity:1} }
@@ -824,7 +833,8 @@ export const FullPageChat = ({ user, chatMessages = [], setChatMessages, onClose
       `}</style>
 
       {/* ── LEFT SIDEBAR ── */}
-      <div style={{ width: 280, background: 'linear-gradient(180deg,#ccfbf1 0%,#99f6e4 50%,#6ee7b7 100%)', display: 'flex', flexDirection: 'column', padding: '22px 16px', gap: 20, flexShrink: 0, boxShadow: '4px 0 24px rgba(13,148,136,.14)' }}>
+      {!isMobile && (
+      <div style={{ width: isTablet ? 230 : 280, background: 'linear-gradient(180deg,#ccfbf1 0%,#99f6e4 50%,#6ee7b7 100%)', display: 'flex', flexDirection: 'column', padding: isTablet ? '18px 12px' : '22px 16px', gap: 20, flexShrink: 0, boxShadow: '4px 0 24px rgba(13,148,136,.14)' }}>
 
         {/* Bot identity */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -877,28 +887,40 @@ export const FullPageChat = ({ user, chatMessages = [], setChatMessages, onClose
           ))}
         </div>
       </div>
+      )}
 
       {/* ── MAIN CHAT ── */}
       <div style={{ flex: 1, background: '#f0fdfa', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
         {/* Top bar */}
-        <div style={{ background: 'white', padding: '14px 28px', borderBottom: '1px solid #ccfbf1', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 2px 10px rgba(13,148,136,.07)', flexShrink: 0 }}>
+        <div style={{ background: 'white', padding: isMobile ? '12px' : '14px 28px', borderBottom: '1px solid #ccfbf1', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 2px 10px rgba(13,148,136,.07)', flexShrink: 0, gap: 12 }}>
           <div>
-            <h2 style={{ fontSize: 18, fontWeight: 900, color: '#064e3b', margin: 0 }}>AI Shopping Assistant</h2>
+            <h2 style={{ fontSize: isMobile ? 16 : 18, fontWeight: 900, color: '#064e3b', margin: 0 }}>AI Shopping Assistant</h2>
             <p style={{ fontSize: 12, color: '#2dd4bf', margin: 0, fontWeight: 600 }}>
               {isTyping ? '✨ Thinking…' : 'Powered by AI · Ready to help'}
             </p>
           </div>
           <button onClick={onClose}
-            style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#fef2f2', color: '#ef4444', border: '1.5px solid #fca5a5', borderRadius: 12, padding: '9px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 700, transition: 'all .2s', fontFamily: 'inherit' }}
+            style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#fef2f2', color: '#ef4444', border: '1.5px solid #fca5a5', borderRadius: 12, padding: isMobile ? '8px 10px' : '9px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 700, transition: 'all .2s', fontFamily: 'inherit', flexShrink: 0 }}
             onMouseEnter={e => { e.currentTarget.style.background='#ef4444'; e.currentTarget.style.color='white'; e.currentTarget.style.borderColor='#ef4444'; }}
             onMouseLeave={e => { e.currentTarget.style.background='#fef2f2'; e.currentTarget.style.color='#ef4444'; e.currentTarget.style.borderColor='#fca5a5'; }}>
-            <X size={15} /> Close Chat
+            <X size={15} /> {isMobile ? 'Close' : 'Close Chat'}
           </button>
         </div>
 
+        {isMobile && (
+          <div style={{ background: 'linear-gradient(135deg,#ccfbf1,#99f6e4)', borderBottom: '1px solid #99f6e4', padding: '8px 10px', display: 'flex', gap: 8, overflowX: 'auto' }}>
+            {QUICK_CHIPS.map((chip, i) => (
+              <button key={i} onClick={() => sendMessage(chip.msg)}
+                style={{ border: '1px solid rgba(255,255,255,.9)', background: 'rgba(255,255,255,.75)', borderRadius: 999, padding: '6px 10px', whiteSpace: 'nowrap', fontSize: 11, fontWeight: 700, color: '#065f46', cursor: 'pointer', fontFamily: 'inherit' }}>
+                {chip.label}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Messages */}
-        <div className="chat-scroll" style={{ flex: 1, overflowY: 'auto', padding: '28px 36px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div className="chat-scroll" style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '12px' : '28px 36px', display: 'flex', flexDirection: 'column', gap: isMobile ? 14 : 20 }}>
 
           {/* Empty state */}
           {chatMessages.length === 0 && (
@@ -919,12 +941,12 @@ export const FullPageChat = ({ user, chatMessages = [], setChatMessages, onClose
 
               {/* Bot avatar */}
               {m.role === 'assistant' && (
-                <div style={{ width: 40, height: 40, background: 'linear-gradient(135deg,#2dd4bf,#0d9488)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 4, boxShadow: '0 4px 12px rgba(13,148,136,.3)' }}>
+                <div style={{ width: isMobile ? 32 : 40, height: isMobile ? 32 : 40, background: 'linear-gradient(135deg,#2dd4bf,#0d9488)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 4, boxShadow: '0 4px 12px rgba(13,148,136,.3)' }}>
                   <Bot size={19} color="white" />
                 </div>
               )}
 
-              <div style={{ maxWidth: m.role === 'user' ? '55%' : '70%', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ maxWidth: isMobile ? '100%' : (m.role === 'user' ? '55%' : '70%'), display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {/* Bubble */}
                 <div style={{
                   padding: '13px 17px',
@@ -959,7 +981,7 @@ export const FullPageChat = ({ user, chatMessages = [], setChatMessages, onClose
 
               {/* User avatar */}
               {m.role === 'user' && (
-                <div style={{ width: 40, height: 40, background: 'linear-gradient(135deg,#99f6e4,#5eead4)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 4, fontSize: 15, fontWeight: 900, color: '#065f46' }}>
+                <div style={{ width: isMobile ? 32 : 40, height: isMobile ? 32 : 40, background: 'linear-gradient(135deg,#99f6e4,#5eead4)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 4, fontSize: 15, fontWeight: 900, color: '#065f46' }}>
                   {(user?.fullName?.[0] || user?.name?.[0] || 'U').toUpperCase()}
                 </div>
               )}
@@ -971,31 +993,31 @@ export const FullPageChat = ({ user, chatMessages = [], setChatMessages, onClose
         </div>
 
         {/* Input bar */}
-        <div style={{ background: 'white', borderTop: '1px solid #ccfbf1', padding: '16px 36px', display: 'flex', gap: 12, alignItems: 'center', flexShrink: 0, boxShadow: '0 -4px 16px rgba(13,148,136,.05)' }}>
+        <div style={{ background: 'white', borderTop: '1px solid #ccfbf1', padding: isMobile ? '12px' : '16px 36px', display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0, boxShadow: '0 -4px 16px rgba(13,148,136,.05)' }}>
           <input ref={inputRef} type="text" value={msg}
             onChange={e => setMsg(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
             placeholder="Ask about products, cart, orders…"
             disabled={isTyping}
-            style={{ flex: 1, border: '1.5px solid #99f6e4', borderRadius: 16, padding: '14px 20px', fontSize: 14, outline: 'none', background: '#f8fffe', color: '#064e3b', fontFamily: 'inherit', transition: 'all .2s' }}
+            style={{ flex: 1, border: '1.5px solid #99f6e4', borderRadius: 16, padding: isMobile ? '12px 14px' : '14px 20px', fontSize: 14, outline: 'none', background: '#f8fffe', color: '#064e3b', fontFamily: 'inherit', transition: 'all .2s' }}
             onFocus={e => { e.currentTarget.style.borderColor='#2dd4bf'; e.currentTarget.style.background='white'; e.currentTarget.style.boxShadow='0 0 0 4px rgba(45,212,191,.12)'; }}
             onBlur={e => { e.currentTarget.style.borderColor='#99f6e4'; e.currentTarget.style.background='#f8fffe'; e.currentTarget.style.boxShadow='none'; }} />
           <button onClick={toggleVoiceInput} disabled={isTyping}
             title={isListening ? 'Stop voice capture' : voiceSupported ? 'Start voice capture' : mediaRecorderSupported ? 'Record voice command' : 'Voice input not supported in this browser'}
-            style={{ width: 52, height: 52, borderRadius: 16, border: 'none', background: isTyping ? '#f1f5f9' : isListening ? 'linear-gradient(135deg,#ef4444,#dc2626)' : 'linear-gradient(135deg,#67e8f9,#06b6d4)', color: isTyping ? '#94a3b8' : 'white', cursor: isTyping ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all .2s', boxShadow: isTyping ? 'none' : isListening ? '0 6px 18px rgba(239,68,68,.35)' : '0 6px 18px rgba(6,182,212,.3)' }}
+            style={{ width: isMobile ? 46 : 52, height: isMobile ? 46 : 52, borderRadius: 16, border: 'none', background: isTyping ? '#f1f5f9' : isListening ? 'linear-gradient(135deg,#ef4444,#dc2626)' : 'linear-gradient(135deg,#67e8f9,#06b6d4)', color: isTyping ? '#94a3b8' : 'white', cursor: isTyping ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all .2s', boxShadow: isTyping ? 'none' : isListening ? '0 6px 18px rgba(239,68,68,.35)' : '0 6px 18px rgba(6,182,212,.3)' }}
             onMouseEnter={e => { if (!isTyping) e.currentTarget.style.transform='scale(1.08)'; }}
             onMouseLeave={e => { e.currentTarget.style.transform='none'; }}>
             {isListening ? <MicOff size={20} /> : <Mic size={20} />}
           </button>
           <button onClick={() => sendMessage()} disabled={!msg.trim() || isTyping}
-            style={{ width: 52, height: 52, borderRadius: 16, border: 'none', background: !msg.trim() || isTyping ? '#e2f7f3' : 'linear-gradient(135deg,#2dd4bf,#0d9488)', color: !msg.trim() || isTyping ? '#94a3b8' : 'white', cursor: !msg.trim() || isTyping ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all .2s', boxShadow: !msg.trim() || isTyping ? 'none' : '0 6px 18px rgba(13,148,136,.4)' }}
+            style={{ width: isMobile ? 46 : 52, height: isMobile ? 46 : 52, borderRadius: 16, border: 'none', background: !msg.trim() || isTyping ? '#e2f7f3' : 'linear-gradient(135deg,#2dd4bf,#0d9488)', color: !msg.trim() || isTyping ? '#94a3b8' : 'white', cursor: !msg.trim() || isTyping ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all .2s', boxShadow: !msg.trim() || isTyping ? 'none' : '0 6px 18px rgba(13,148,136,.4)' }}
             onMouseEnter={e => { if (msg.trim() && !isTyping) e.currentTarget.style.transform='scale(1.08)'; }}
             onMouseLeave={e => { e.currentTarget.style.transform='none'; }}>
             {isTyping ? <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={20} />}
           </button>
         </div>
         {(voiceHint || voiceError) && (
-          <div style={{ background: 'white', padding: '0 36px 12px', borderTop: '1px dashed #e2f7f3' }}>
+          <div style={{ background: 'white', padding: isMobile ? '0 12px 10px' : '0 36px 12px', borderTop: '1px dashed #e2f7f3' }}>
             {voiceHint && !voiceError && (
               <p style={{ margin: 0, fontSize: 12, color: '#0891b2', fontWeight: 600 }}>{voiceHint}</p>
             )}

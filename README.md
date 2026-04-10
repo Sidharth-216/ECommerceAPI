@@ -18,6 +18,7 @@ A production-ready, three-tier e-commerce application combining a **.NET 8 REST 
   - [AI Agent Setup](#ai-agent-setup)
 - [Environment Variables](#environment-variables)
 - [API Reference](#api-reference)
+- [Security & Performance Hardening](#security--performance-hardening)
 - [AI Agent Details](#ai-agent-details)
 - [Deployment](#deployment)
 
@@ -339,6 +340,42 @@ All backend routes are prefixed with `/api`.
 | Method | Route | Description |
 |---|---|---|
 | GET | `/?q=` | Full-text product search |
+
+---
+
+## Security & Performance Hardening
+
+The backend now includes baseline production hardening in middleware and API behavior:
+
+- Rate limiting:
+     - Global per-IP limiter (120 req/min)
+     - Strict OTP/auth limiter (8 req/min)
+     - Search limiter (30 req/min)
+- HTTP hardening headers:
+     - `X-Content-Type-Options: nosniff`
+     - `X-Frame-Options: DENY`
+     - `Referrer-Policy: strict-origin-when-cross-origin`
+- Compression and response caching enabled for public read routes.
+- Product pagination endpoint for faster storefront/admin data loading:
+     - `GET /api/mongo/products/paged?page=1&pageSize=24`
+
+### Secret Management
+
+- `appsettings.json` and `appsettings.Production.json` are now sanitized.
+- Inject secrets via environment variables (recommended for all deployments).
+- Rotate any keys/tokens that were previously committed.
+
+### Local Load Balancer (Nginx + 2 API replicas)
+
+Run from the `backend` folder:
+
+```bash
+docker compose -f docker-compose.lb.yml up --build
+```
+
+This starts:
+- `api1` and `api2` (two backend replicas)
+- `lb` (Nginx reverse proxy on `http://localhost:8080`)
 
 ---
 

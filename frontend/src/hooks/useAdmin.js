@@ -41,7 +41,7 @@ export const useAdmin = () => {
       
       const products = Array.isArray(productsRes) 
         ? productsRes 
-        : (productsRes?.data || []);
+        : (productsRes?.data?.items || productsRes?.data || []);
 
       console.log('📊 Extracted Data:', {
         customersCount: customers.length,
@@ -109,7 +109,9 @@ export const useAdmin = () => {
       // Fallback: fetch products and calculate locally
       console.log('⚠️ Using fallback stock calculation');
       const productsRes = await adminAPI.getProducts();
-      const products = Array.isArray(productsRes) ? productsRes : (productsRes?.data || []);
+      const products = Array.isArray(productsRes)
+        ? productsRes
+        : (productsRes?.data?.items || productsRes?.data || []);
 
       const lowStock = products.filter(p => {
         const stock = p.stockQuantity || p.StockQuantity || 0;

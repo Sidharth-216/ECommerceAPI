@@ -25,9 +25,31 @@ namespace ECommerceAPI.Application.Helpers
         public JwtHelper(IConfiguration configuration)
         {
             _configuration = configuration;
-            _secretKey     = _configuration["Jwt:SecretKey"]
-                             ?? _configuration["Jwt:Key"]
-                             ?? throw new InvalidOperationException("Jwt:SecretKey or Jwt:Key configuration is missing");
+            var configuredSecret = _configuration["Jwt:SecretKey"]
+                                ?? _configuration["Jwt:Key"];
+
+            if (string.IsNullOrWhiteSpace(configuredSecret))
+            {
+                configuredSecret = Environment.GetEnvironmentVariable("JWT_SECRET");
+            }
+
+            if (string.IsNullOrWhiteSpace(configuredSecret))
+            {
+                var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
+                               ?? Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT")
+                               ?? "Production";
+
+                if (string.Equals(environment, "Development", StringComparison.OrdinalIgnoreCase))
+                {
+                    configuredSecret = "dev-only-jwt-secret-change-me-at-least-32-chars";
+                }
+                else
+                {
+                    throw new InvalidOperationException("Jwt:SecretKey or JWT_SECRET is missing");
+                }
+            }
+
+            _secretKey     = configuredSecret;
             _issuer        = _configuration["Jwt:Issuer"]
                              ?? throw new InvalidOperationException("Jwt:Issuer configuration is missing");
             _audience      = _configuration["Jwt:Audience"]

@@ -64,6 +64,7 @@ const ProductDetailModal = ({ product, onClose, onAddToCart, setError }) => {
   const [qty, setQty] = useState(1);
   const [tab, setTab] = useState('overview');
   const [imgLoaded, setImgLoaded] = useState(false);
+  const [isCompact, setIsCompact] = useState(typeof window !== 'undefined' ? window.innerWidth < 920 : false);
   const price    = getPrice(product);
   const rating   = getRating(product);
   const category = getCategoryName(product);
@@ -73,9 +74,15 @@ const ProductDetailModal = ({ product, onClose, onAddToCart, setError }) => {
     return () => { document.body.style.overflow = ''; };
   }, []);
 
+  useEffect(() => {
+    const onResize = () => setIsCompact(window.innerWidth < 920);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
   return (
     <div onClick={e => { if (e.target === e.currentTarget) onClose(); }}
-      style={{ position:'fixed',inset:0,background:'rgba(186,230,253,0.5)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',padding:20,backdropFilter:'blur(8px)',animation:'chatOpen .25s ease' }}>
+      style={{ position:'fixed',inset:0,background:'rgba(186,230,253,0.5)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',padding:isCompact?12:20,backdropFilter:'blur(8px)',animation:'chatOpen .25s ease' }}>
       <style>{`
         .mtab{padding:8px 18px;border-radius:20px;font-size:13px;font-weight:700;cursor:pointer;border:none;transition:all .2s;font-family:inherit}
         .mtab.on{background:linear-gradient(135deg,#2dd4bf,#0d9488);color:white;box-shadow:0 4px 14px rgba(13,148,136,.3)}
@@ -85,7 +92,7 @@ const ProductDetailModal = ({ product, onClose, onAddToCart, setError }) => {
         .qbtn:hover{background:linear-gradient(135deg,#2dd4bf,#0d9488);color:white;border-color:transparent}
       `}</style>
 
-      <div style={{ background:'white',borderRadius:28,width:'100%',maxWidth:880,maxHeight:'90vh',overflow:'hidden',display:'flex',flexDirection:'column',animation:'scaleIn .3s cubic-bezier(.34,1.56,.64,1)',boxShadow:'0 32px 80px rgba(13,148,136,.2),0 0 0 1px #99f6e4' }}>
+      <div style={{ background:'white',borderRadius:isCompact?20:28,width:'100%',maxWidth:880,maxHeight:isCompact?'94vh':'90vh',overflow:'hidden',display:'flex',flexDirection:'column',animation:'scaleIn .3s cubic-bezier(.34,1.56,.64,1)',boxShadow:'0 32px 80px rgba(13,148,136,.2),0 0 0 1px #99f6e4' }}>
 
         {/* Header */}
         <div style={{ padding:'14px 24px',borderBottom:'1px solid #ccfbf1',display:'flex',justifyContent:'space-between',alignItems:'center',background:'linear-gradient(135deg,#f0fdfa,#ccfbf1)',flexShrink:0 }}>
@@ -103,9 +110,9 @@ const ProductDetailModal = ({ product, onClose, onAddToCart, setError }) => {
           </button>
         </div>
 
-        <div style={{ flex:1,overflowY:'auto',display:'flex' }}>
+        <div style={{ flex:1,overflowY:'auto',display:'flex',flexDirection:isCompact?'column':'row' }}>
           {/* Left image panel */}
-          <div style={{ width:300,flexShrink:0,background:'linear-gradient(160deg,#f0fdfa,#ccfbf1 60%,#99f6e4)',padding:'32px 20px',display:'flex',flexDirection:'column',alignItems:'center',gap:18,overflow:'hidden',position:'relative' }}>
+          <div style={{ width:isCompact?'100%':300,flexShrink:0,background:'linear-gradient(160deg,#f0fdfa,#ccfbf1 60%,#99f6e4)',padding:isCompact?'18px 16px':'32px 20px',display:'flex',flexDirection:'column',alignItems:'center',gap:18,overflow:'hidden',position:'relative' }}>
             <div style={{ position:'absolute',top:-50,right:-50,width:180,height:180,borderRadius:'50%',background:'rgba(56,189,248,.1)' }}/>
             <div style={{ position:'relative',width:210,height:210,background:'white',borderRadius:24,display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 12px 40px rgba(13,148,136,.15)',animation:'floatImg 4s ease-in-out infinite' }}>
               {!imgLoaded && <div style={{ position:'absolute',inset:0,borderRadius:24,background:'linear-gradient(90deg,#ccfbf1 25%,#f0fdfa 50%,#ccfbf1 75%)',backgroundSize:'200% 100%',animation:'shimmerBg 1.5s infinite' }}/>}
@@ -128,7 +135,7 @@ const ProductDetailModal = ({ product, onClose, onAddToCart, setError }) => {
           </div>
 
           {/* Right info */}
-          <div style={{ flex:1,padding:'24px 28px',overflowY:'auto' }}>
+          <div style={{ flex:1,padding:isCompact?'16px':'24px 28px',overflowY:'auto' }}>
             <div style={{ marginBottom:14 }}>
               <div style={{ display:'flex',gap:7,marginBottom:10,flexWrap:'wrap' }}>
                 <span style={{ background:'linear-gradient(135deg,#2dd4bf,#0d9488)',color:'white',fontSize:11,fontWeight:800,padding:'3px 12px',borderRadius:20 }}>{category}</span>
@@ -165,7 +172,7 @@ const ProductDetailModal = ({ product, onClose, onAddToCart, setError }) => {
               {tab==='overview' && (
                 <div>
                   <p style={{ fontSize:13,color:'#475569',lineHeight:1.7,margin:'0 0 14px' }}>{product.description||`Experience the best of ${product.name}.`}</p>
-                  <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:9 }}>
+                  <div style={{ display:'grid',gridTemplateColumns:isCompact?'1fr':'1fr 1fr',gap:9 }}>
                     {[{icon:<CheckCircle size={13}/>,t:'Premium quality'},{icon:<Award size={13}/>,t:'Brand certified'},{icon:<Shield size={13}/>,t:'1 year warranty'},{icon:<Zap size={13}/>,t:'Fast delivery'}].map((f,i)=>(
                       <div key={i} style={{ display:'flex',alignItems:'center',gap:8,padding:'9px 12px',background:'#f0fdfa',borderRadius:12,border:'1px solid #99f6e4' }}>
                         <span style={{ color:'#2dd4bf' }}>{f.icon}</span>
@@ -290,12 +297,21 @@ const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCu
   const [currentBanner,       setCurrentBanner]       = useState(0);
   const [detailProduct,       setDetailProduct]       = useState(null);
   const [viewMode,            setViewMode]            = useState('grid');
+  const [viewportWidth,       setViewportWidth]       = useState(typeof window !== 'undefined' ? window.innerWidth : 1280);
   const debounceTimer = useRef(null);
+  const isMobile = viewportWidth < 768;
+  const isTablet = viewportWidth >= 768 && viewportWidth < 1024;
 
   // Auto-rotate banners
   useEffect(() => {
     const t = setInterval(() => setCurrentBanner(p => (p + 1) % 3), 5000);
     return () => clearInterval(t);
+  }, []);
+
+  useEffect(() => {
+    const onResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
   }, []);
 
   // Debounced suggestion fetch
@@ -363,21 +379,21 @@ const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCu
 
         {/* Top bar */}
         <div style={{ background:'linear-gradient(135deg,#ccfbf1 0%,#99f6e4 60%,#5eead4 100%)',borderBottom:'1px solid rgba(186,230,253,.8)' }}>
-          <div style={{ maxWidth:1500,margin:'0 auto',padding:'10px 20px',display:'flex',alignItems:'center',gap:18 }}>
+          <div style={{ maxWidth:1500,margin:'0 auto',padding:isMobile?'10px 12px':'10px 20px',display:'flex',alignItems:'center',gap:isMobile?10:18,flexWrap:isMobile?'wrap':'nowrap' }}>
 
             {/* Logo */}
             <div style={{ display:'flex',alignItems:'center',gap:10,cursor:'pointer',flexShrink:0 }}>
-              <div style={{ width:44,height:44,background:'linear-gradient(135deg,#2dd4bf,#0d9488)',borderRadius:14,display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 4px 14px rgba(13,148,136,.4)' }}>
+              <div style={{ width:isMobile?38:44,height:isMobile?38:44,background:'linear-gradient(135deg,#2dd4bf,#0d9488)',borderRadius:14,display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 4px 14px rgba(13,148,136,.4)' }}>
                 <ShoppingBag size={20} color="white"/>
               </div>
               <div>
-                <div style={{ fontSize:22,fontWeight:900,color:'#064e3b',letterSpacing:-.5,lineHeight:1 }}>ShopAI</div>
+                <div style={{ fontSize:isMobile?18:22,fontWeight:900,color:'#064e3b',letterSpacing:-.5,lineHeight:1 }}>ShopAI</div>
                 <div style={{ fontSize:9,color:'#065f46',fontWeight:800,letterSpacing:1.5,textTransform:'uppercase' }}>Marketplace</div>
               </div>
             </div>
 
             {/* Search */}
-            <div style={{ flex:1,maxWidth:680,position:'relative' }}>
+            <div style={{ flex:1,maxWidth:isMobile?'100%':680,position:'relative',order:isMobile?3:0,width:isMobile?'100%':'auto' }}>
               <div style={{ display:'flex',borderRadius:16,overflow:'hidden',boxShadow:'0 4px 20px rgba(13,148,136,.18)',border:'1.5px solid #5eead4',background:'white' }}>
                 <div style={{ position:'relative',flex:1,display:'flex',alignItems:'center' }}>
                   <Search size={16} style={{ position:'absolute',left:16,color:'#2dd4bf',pointerEvents:'none' }}/>
@@ -391,10 +407,10 @@ const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCu
                   {searchLoading && <Loader2 size={15} className="spin" style={{ position:'absolute',right:14,color:'#2dd4bf' }}/>}
                 </div>
                 <button onClick={()=>handleFullSearch()}
-                  style={{ background:'linear-gradient(135deg,#2dd4bf,#0d9488)',padding:'0 24px',border:'none',cursor:'pointer',color:'white',fontSize:13,fontWeight:800,display:'flex',alignItems:'center',gap:6,transition:'all .2s',fontFamily:'inherit',flexShrink:0 }}
+                  style={{ background:'linear-gradient(135deg,#2dd4bf,#0d9488)',padding:isMobile?'0 14px':'0 24px',border:'none',cursor:'pointer',color:'white',fontSize:13,fontWeight:800,display:'flex',alignItems:'center',gap:6,transition:'all .2s',fontFamily:'inherit',flexShrink:0 }}
                   onMouseEnter={e=>e.currentTarget.style.background='linear-gradient(135deg,#0d9488,#0f766e)'}
                   onMouseLeave={e=>e.currentTarget.style.background='linear-gradient(135deg,#2dd4bf,#0d9488)'}>
-                  <Search size={16}/> Search
+                  <Search size={16}/>{isMobile ? '' : ' Search'}
                 </button>
               </div>
 
@@ -436,9 +452,9 @@ const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCu
             </div>
 
             {/* Profile + Cart */}
-            <div style={{ display:'flex',alignItems:'center',gap:10,marginLeft:'auto',flexShrink:0 }}>
+            <div style={{ display:'flex',alignItems:'center',gap:10,marginLeft:'auto',flexShrink:0,width:isMobile?'100%':'auto',justifyContent:isMobile?'space-between':'flex-end' }}>
               <button onClick={()=>setCurrentPage('profile')}
-                style={{ display:'flex',alignItems:'center',gap:8,background:'white',border:'1.5px solid #99f6e4',borderRadius:14,padding:'8px 14px',cursor:'pointer',transition:'all .2s',boxShadow:'0 2px 8px rgba(13,148,136,.1)' }}
+                style={{ display:'flex',alignItems:'center',gap:8,background:'white',border:'1.5px solid #99f6e4',borderRadius:14,padding:isMobile?'8px 10px':'8px 14px',cursor:'pointer',transition:'all .2s',boxShadow:'0 2px 8px rgba(13,148,136,.1)' }}
                 onMouseEnter={e=>{e.currentTarget.style.borderColor='#2dd4bf';e.currentTarget.style.boxShadow='0 4px 14px rgba(13,148,136,.2)'}}
                 onMouseLeave={e=>{e.currentTarget.style.borderColor='#99f6e4';e.currentTarget.style.boxShadow='0 2px 8px rgba(13,148,136,.1)'}}>
                 <div style={{ width:32,height:32,borderRadius:'50%',background:'linear-gradient(135deg,#99f6e4,#5eead4)',display:'flex',alignItems:'center',justifyContent:'center' }}>
@@ -451,7 +467,7 @@ const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCu
               </button>
 
               <button onClick={()=>setCurrentPage('cart')}
-                style={{ background:'linear-gradient(135deg,#2dd4bf,#0d9488)',border:'none',borderRadius:14,padding:'10px 16px',cursor:'pointer',display:'flex',alignItems:'center',gap:8,transition:'all .2s',color:'white',boxShadow:'0 4px 14px rgba(13,148,136,.35)',position:'relative',animation:cart.length>0?'pulseRing 2.5s infinite':'none' }}
+                style={{ background:'linear-gradient(135deg,#2dd4bf,#0d9488)',border:'none',borderRadius:14,padding:isMobile?'10px 12px':'10px 16px',cursor:'pointer',display:'flex',alignItems:'center',gap:8,transition:'all .2s',color:'white',boxShadow:'0 4px 14px rgba(13,148,136,.35)',position:'relative',animation:cart.length>0?'pulseRing 2.5s infinite':'none' }}
                 onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-2px)';e.currentTarget.style.boxShadow='0 8px 20px rgba(13,148,136,.5)'}}
                 onMouseLeave={e=>{e.currentTarget.style.transform='none';e.currentTarget.style.boxShadow='0 4px 14px rgba(13,148,136,.35)'}}>
                 <div style={{ position:'relative' }}>
@@ -466,7 +482,7 @@ const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCu
 
         {/* Nav strip */}
         <div style={{ background:'linear-gradient(135deg,#2dd4bf,#0d9488)',borderBottom:'1px solid rgba(255,255,255,.15)' }}>
-          <div style={{ maxWidth:1500,margin:'0 auto',padding:'0 20px',display:'flex',alignItems:'center',overflowX:'auto' }}>
+          <div style={{ maxWidth:1500,margin:'0 auto',padding:isMobile?'0 12px':'0 20px',display:'flex',alignItems:'center',overflowX:'auto' }}>
             <button onClick={()=>applyCategory('')}
               style={{ color:'white',background:searchQuery===''?'rgba(255,255,255,.2)':'transparent',border:'none',padding:'12px 18px',cursor:'pointer',fontSize:13,fontWeight:700,whiteSpace:'nowrap',borderBottom:searchQuery===''?'3px solid white':'3px solid transparent',display:'flex',alignItems:'center',gap:6,fontFamily:'inherit' }}>
               <Package size={14}/> All Products
@@ -479,7 +495,7 @@ const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCu
                 {cat}
               </button>
             ))}
-            <div style={{ marginLeft:'auto',display:'flex',gap:6,padding:'6px 0',flexShrink:0 }}>
+            <div style={{ marginLeft:isMobile?0:'auto',display:'flex',gap:6,padding:'6px 0',flexShrink:0 }}>
               <button onClick={()=>setChatOpen(true)}
                 style={{ display:'flex',alignItems:'center',gap:6,color:'#064e3b',background:'white',border:'none',borderRadius:20,padding:'8px 16px',cursor:'pointer',fontSize:13,fontWeight:800,transition:'all .2s',fontFamily:'inherit' }}
                 onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-1px)';e.currentTarget.style.boxShadow='0 6px 16px rgba(0,0,0,.15)'}}
@@ -496,7 +512,7 @@ const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCu
       </header>
 
       {/* ══ MAIN ════════════════════════════════════════════════════════════ */}
-      <div style={{ maxWidth:1500,margin:'0 auto',padding:'0 16px' }}>
+      <div style={{ maxWidth:1500,margin:'0 auto',padding:isMobile?'0 12px':'0 16px' }}>
 
         {error && (
           <div style={{ marginTop:16,background:'#fef2f2',border:'1px solid #fca5a5',borderRadius:12,padding:'12px 16px' }}>
@@ -505,16 +521,16 @@ const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCu
         )}
 
         {/* BANNER CAROUSEL */}
-        <div style={{ position:'relative',height:260,overflow:'hidden',marginTop:20,marginBottom:24,borderRadius:24,boxShadow:'0 12px 40px rgba(13,148,136,.15)' }}>
+        <div style={{ position:'relative',height:isMobile?200:(isTablet?230:260),overflow:'hidden',marginTop:20,marginBottom:24,borderRadius:isMobile?16:24,boxShadow:'0 12px 40px rgba(13,148,136,.15)' }}>
           <div style={{ position:'absolute',inset:0,display:'flex',transition:'transform .6s cubic-bezier(.45,0,.55,1)',transform:`translateX(-${currentBanner*100}%)` }}>
             {banners.map((b,idx)=>(
               <div key={idx} style={{ minWidth:'100%',height:'100%',background:b.bg,position:'relative',overflow:'hidden' }}>
                 <div style={{ position:'absolute',top:-50,right:-50,width:240,height:240,borderRadius:'50%',background:'rgba(255,255,255,.15)' }}/>
-                <div style={{ position:'absolute',inset:0,display:'flex',flexDirection:'column',justifyContent:'center',padding:'36px 48px' }}>
+                <div style={{ position:'absolute',inset:0,display:'flex',flexDirection:'column',justifyContent:'center',padding:isMobile?'18px':'36px 48px' }}>
                   <div style={{ fontSize:10,fontWeight:800,letterSpacing:2,textTransform:'uppercase',marginBottom:10,background:'rgba(255,255,255,.5)',display:'inline-block',padding:'4px 12px',borderRadius:20,width:'fit-content',color:b.tc }}>Limited offer</div>
-                  <h2 style={{ fontSize:36,fontWeight:900,margin:'0 0 6px',letterSpacing:-1,color:b.tc }}>{b.title}</h2>
-                  <p style={{ fontSize:16,fontWeight:700,margin:'0 0 4px',color:b.tc,opacity:.85 }}>{b.subtitle}</p>
-                  <p style={{ fontSize:13,margin:'0 0 20px',color:b.tc,opacity:.7 }}>{b.desc}</p>
+                  <h2 style={{ fontSize:isMobile?24:36,fontWeight:900,margin:'0 0 6px',letterSpacing:-1,color:b.tc }}>{b.title}</h2>
+                  <p style={{ fontSize:isMobile?13:16,fontWeight:700,margin:'0 0 4px',color:b.tc,opacity:.85 }}>{b.subtitle}</p>
+                  <p style={{ fontSize:isMobile?12:13,margin:'0 0 20px',color:b.tc,opacity:.7 }}>{b.desc}</p>
                   <button onClick={()=>{setSearchQuery('');setIsSemanticMode(false);setSemanticResults([])}}
                     style={{ background:b.bb,color:b.bc,border:'none',padding:'12px 26px',borderRadius:40,fontSize:14,fontWeight:800,cursor:'pointer',display:'flex',alignItems:'center',gap:7,width:'fit-content',fontFamily:'inherit' }}
                     onMouseEnter={e=>e.currentTarget.style.transform='scale(1.05)'}
@@ -527,7 +543,7 @@ const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCu
           </div>
           {[{side:'left',icon:<ChevronLeft size={18} color="#065f46"/>,onClick:()=>setCurrentBanner(p=>(p-1+3)%3)},
             {side:'right',icon:<ChevronRight size={18} color="#065f46"/>,onClick:()=>setCurrentBanner(p=>(p+1)%3)}].map(btn=>(
-            <button key={btn.side} onClick={btn.onClick} style={{ position:'absolute',[btn.side]:16,top:'50%',transform:'translateY(-50%)',background:'rgba(255,255,255,.88)',border:'none',borderRadius:'50%',width:38,height:38,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer' }}
+            <button key={btn.side} onClick={btn.onClick} style={{ position:'absolute',[btn.side]:isMobile?8:16,top:'50%',transform:'translateY(-50%)',background:'rgba(255,255,255,.88)',border:'none',borderRadius:'50%',width:isMobile?34:38,height:isMobile?34:38,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer' }}
               onMouseEnter={e=>{e.currentTarget.style.background='white';e.currentTarget.style.transform='translateY(-50%) scale(1.1)'}}
               onMouseLeave={e=>{e.currentTarget.style.background='rgba(255,255,255,.88)';e.currentTarget.style.transform='translateY(-50%)'}}>
               {btn.icon}
@@ -539,7 +555,7 @@ const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCu
         </div>
 
         {/* CATEGORY CARDS */}
-        <div style={{ display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:16,marginBottom:24 }}>
+        <div style={{ display:'grid',gridTemplateColumns:isMobile?'1fr':(isTablet?'repeat(2,1fr)':'repeat(4,1fr)'),gap:16,marginBottom:24 }}>
           {[
             {title:'Trending Electronics',subs:['Smartphones','Laptops','Tablets','Accessories'],cat:'Electronics',icon:<Zap size={16}/>,bg:'#ccfbf1',accent:'#0d9488'},
             {title:'Audio & Wearables',subs:['Headphones','Watches','Earbuds','Speakers'],cat:'Audio',icon:<Star size={16}/>,bg:'#f0e9ff',accent:'#8b5cf6'},
@@ -571,14 +587,14 @@ const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCu
         </div>
 
         {/* FILTER BAR */}
-        <div style={{ background:'white',borderRadius:16,padding:'12px 20px',marginBottom:20,display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:12,border:'1px solid #ccfbf1',boxShadow:'0 2px 10px rgba(13,148,136,.06)' }}>
+        <div style={{ background:'white',borderRadius:16,padding:isMobile?'12px':'12px 20px',marginBottom:20,display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:12,border:'1px solid #ccfbf1',boxShadow:'0 2px 10px rgba(13,148,136,.06)' }}>
           <div style={{ display:'flex',alignItems:'center',gap:12 }}>
             <span style={{ fontSize:13,fontWeight:700,color:'#64748b',display:'flex',alignItems:'center',gap:6 }}><Filter size={14} color="#2dd4bf"/>Sort:</span>
             <select style={{ fontSize:13,border:'1.5px solid #99f6e4',borderRadius:20,padding:'6px 14px',background:'#f0fdfa',color:'#064e3b',fontWeight:700,outline:'none',cursor:'pointer',fontFamily:'inherit' }}>
               <option>Featured</option><option>Price: Low to High</option><option>Price: High to Low</option><option>Top Rated</option>
             </select>
           </div>
-          <div style={{ display:'flex',alignItems:'center',gap:10 }}>
+          <div style={{ display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',justifyContent:isMobile?'space-between':'flex-start',width:isMobile?'100%':'auto' }}>
             {isSemanticMode && (
               <>
                 <span style={{ background:'#f0fdfa',color:'#0d9488',fontSize:12,fontWeight:700,padding:'6px 12px',borderRadius:20,border:'1px solid #99f6e4',display:'flex',alignItems:'center',gap:5 }}>
@@ -588,7 +604,7 @@ const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCu
               </>
             )}
             <span style={{ fontSize:13,color:'#94a3b8' }}><strong style={{ color:'#064e3b' }}>{displayedProducts.length}</strong> products</span>
-            <div style={{ display:'flex',background:'#f0fdfa',borderRadius:10,padding:3,gap:3,border:'1px solid #99f6e4' }}>
+            <div style={{ display:'flex',background:'#f0fdfa',borderRadius:10,padding:3,gap:3,border:'1px solid #99f6e4',marginLeft:isMobile?'auto':0 }}>
               {[{m:'grid',icon:<Grid size={14}/>},{m:'list',icon:<List size={14}/>}].map(v=>(
                 <button key={v.m} onClick={()=>setViewMode(v.m)} style={{ padding:'6px 10px',borderRadius:8,border:'none',background:viewMode===v.m?'white':'transparent',color:viewMode===v.m?'#0d9488':'#94a3b8',cursor:'pointer',display:'flex',alignItems:'center',transition:'all .2s',boxShadow:viewMode===v.m?'0 2px 6px rgba(13,148,136,.12)':'none' }}>{v.icon}</button>
               ))}
@@ -599,7 +615,7 @@ const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCu
         {/* PRODUCTS */}
         <div style={{ paddingBottom:60 }}>
           {searchLoading && isSemanticMode ? (
-            <div style={{ display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:16 }}>
+            <div style={{ display:'grid',gridTemplateColumns:`repeat(auto-fill,minmax(${isMobile ? 150 : 200}px,1fr))`,gap:16 }}>
               {[...Array(10)].map((_,i)=>(
                 <div key={i} style={{ background:'white',borderRadius:20,overflow:'hidden',border:'1px solid #ccfbf1' }}>
                   <div style={{ aspectRatio:'1/1',background:'linear-gradient(90deg,#ccfbf1 25%,#f0fdfa 50%,#ccfbf1 75%)',backgroundSize:'200% 100%',animation:'shimmerBg 1.5s infinite' }}/>
@@ -618,7 +634,7 @@ const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCu
               <button onClick={()=>{setSearchQuery('');setIsSemanticMode(false);setSemanticResults([])}} style={{ background:'linear-gradient(135deg,#2dd4bf,#0d9488)',color:'white',border:'none',padding:'12px 28px',borderRadius:40,fontSize:14,fontWeight:800,cursor:'pointer',fontFamily:'inherit' }}>View All Products</button>
             </div>
           ) : viewMode==='grid' ? (
-            <div style={{ display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:16 }}>
+            <div style={{ display:'grid',gridTemplateColumns:`repeat(auto-fill,minmax(${isMobile ? 150 : 200}px,1fr))`,gap:16 }}>
               {displayedProducts.map((product,index)=>(
                 <div key={getProductId(product)||index} className="card-in" style={{ animationDelay:`${Math.min(index*.04,.4)}s` }}>
                   <ProductCard product={product} onAddToCart={addToCart} setError={setError} onViewDetails={setDetailProduct}/>
@@ -629,18 +645,18 @@ const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCu
             <div style={{ display:'flex',flexDirection:'column',gap:12 }}>
               {displayedProducts.map((product,index)=>(
                 <div key={getProductId(product)||index} className="card-in"
-                  style={{ animationDelay:`${Math.min(index*.03,.3)}s`,background:'white',borderRadius:16,border:'1px solid #ccfbf1',padding:16,display:'flex',gap:16,alignItems:'center',transition:'all .2s' }}
+                  style={{ animationDelay:`${Math.min(index*.03,.3)}s`,background:'white',borderRadius:16,border:'1px solid #ccfbf1',padding:16,display:'flex',gap:16,alignItems:isMobile?'stretch':'center',transition:'all .2s',flexDirection:isMobile?'column':'row' }}
                   onMouseEnter={e=>{e.currentTarget.style.boxShadow='0 8px 24px rgba(13,148,136,.12)';e.currentTarget.style.borderColor='#5eead4'}}
                   onMouseLeave={e=>{e.currentTarget.style.boxShadow='none';e.currentTarget.style.borderColor='#ccfbf1'}}>
-                  <img src={product.imageUrl||'https://via.placeholder.com/100/ccfbf1/0d9488?text=P'} alt={product.name} style={{ width:88,height:88,objectFit:'contain',borderRadius:12,background:'#f0fdfa',flexShrink:0 }} onError={e=>{e.currentTarget.src='https://via.placeholder.com/100/ccfbf1/0d9488?text=P'}}/>
+                  <img src={product.imageUrl||'https://via.placeholder.com/100/ccfbf1/0d9488?text=P'} alt={product.name} style={{ width:88,height:88,objectFit:'contain',borderRadius:12,background:'#f0fdfa',flexShrink:0,alignSelf:isMobile?'center':'auto' }} onError={e=>{e.currentTarget.src='https://via.placeholder.com/100/ccfbf1/0d9488?text=P'}}/>
                   <div style={{ flex:1 }}>
                     <p style={{ fontSize:11,color:'#2dd4bf',fontWeight:800,margin:'0 0 4px' }}>{getCategoryName(product)}</p>
                     <h3 style={{ fontSize:15,fontWeight:700,color:'#064e3b',margin:'0 0 6px' }}>{product.name}</h3>
                     {getRating(product)&&<div style={{ display:'flex',gap:2 }}>{[...Array(5)].map((_,i)=><Star key={i} size={12} style={{ color:i<Math.floor(getRating(product))?'#f59e0b':'#e2e8f0',fill:i<Math.floor(getRating(product))?'#f59e0b':'#e2e8f0' }}/>)}</div>}
                   </div>
-                  <div style={{ display:'flex',flexDirection:'column',alignItems:'flex-end',gap:10,flexShrink:0 }}>
+                  <div style={{ display:'flex',flexDirection:'column',alignItems:isMobile?'stretch':'flex-end',gap:10,flexShrink:0,width:isMobile?'100%':'auto' }}>
                     <div style={{ fontSize:22,fontWeight:900,color:'#0d9488' }}>₹{getPrice(product).toLocaleString()}</div>
-                    <div style={{ display:'flex',gap:8 }}>
+                    <div style={{ display:'flex',gap:8,flexWrap:isMobile?'wrap':'nowrap' }}>
                       <button onClick={()=>setDetailProduct(product)} style={{ padding:'8px 14px',background:'#f0fdfa',color:'#0d9488',border:'1.5px solid #99f6e4',borderRadius:10,fontSize:12,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',gap:5,fontFamily:'inherit' }}><Eye size={13}/> Details</button>
                       <button onClick={()=>addToCart(product,setError)} disabled={product.stockQuantity===0} style={{ padding:'8px 14px',background:'linear-gradient(135deg,#2dd4bf,#0d9488)',color:'white',border:'none',borderRadius:10,fontSize:12,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',gap:5,opacity:product.stockQuantity===0?.4:1,fontFamily:'inherit' }}><ShoppingCart size={13}/> Add</button>
                     </div>
@@ -676,10 +692,10 @@ const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCu
       {/* FLOATING CHAT BUTTON */}
       {!chatOpen && (
         <button onClick={()=>setChatOpen(true)}
-          style={{ position:'fixed',bottom:28,right:28,width:62,height:62,background:'linear-gradient(135deg,#2dd4bf,#0d9488)',borderRadius:20,border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',zIndex:40,boxShadow:'0 8px 28px rgba(13,148,136,.5)',transition:'all .3s cubic-bezier(.34,1.56,.64,1)',animation:'pulseRing 2.5s infinite' }}
+          style={{ position:'fixed',bottom:isMobile?16:28,right:isMobile?16:28,width:isMobile?54:62,height:isMobile?54:62,background:'linear-gradient(135deg,#2dd4bf,#0d9488)',borderRadius:isMobile?16:20,border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',zIndex:40,boxShadow:'0 8px 28px rgba(13,148,136,.5)',transition:'all .3s cubic-bezier(.34,1.56,.64,1)',animation:'pulseRing 2.5s infinite' }}
           onMouseEnter={e=>{e.currentTarget.style.transform='scale(1.15) rotate(-5deg)';e.currentTarget.style.boxShadow='0 14px 36px rgba(13,148,136,.65)'}}
           onMouseLeave={e=>{e.currentTarget.style.transform='scale(1)';e.currentTarget.style.boxShadow='0 8px 28px rgba(13,148,136,.5)'}}>
-          <Bot size={26} color="white"/>
+          <Bot size={isMobile?22:26} color="white"/>
           {chatMessages.filter(m=>m.role==='user').length > 0 && (
             <span style={{ position:'absolute',top:-6,right:-6,background:'#ff6b6b',color:'white',fontSize:10,fontWeight:800,borderRadius:'50%',width:20,height:20,display:'flex',alignItems:'center',justifyContent:'center',border:'2px solid white',animation:'bounceIn .4s ease' }}>
               {Math.min(chatMessages.filter(m=>m.role==='user').length, 9)}

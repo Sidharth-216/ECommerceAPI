@@ -7,6 +7,7 @@ namespace ECommerceAPI.Infrastructure.Repositories.Interfaces
     public interface IProductMongoRepository
     {
         Task<IEnumerable<ProductMongo>> GetAllAsync();
+        Task<(IReadOnlyList<ProductMongo> Items, long TotalCount)> GetPageAsync(int page, int pageSize);
         Task<ProductMongo> GetByIdAsync(string id);
 
         Task<IEnumerable<ProductMongo>> SearchAsync(

@@ -45,6 +45,29 @@ export const useProducts = () => {
     }
   };
 
+  const loadProductsPage = async (page = 1, pageSize = 24) => {
+    try {
+      const response = await productsAPI.getPaged(page, pageSize);
+      const payload = response?.data || {};
+      const rawProducts = Array.isArray(payload.items) ? payload.items : [];
+      const normalizedProducts = rawProducts.map(normalizeProduct);
+
+      setProducts(normalizedProducts);
+
+      return {
+        items: normalizedProducts,
+        page: payload.page || page,
+        pageSize: payload.pageSize || pageSize,
+        totalCount: payload.totalCount || normalizedProducts.length,
+        totalPages: payload.totalPages || 1
+      };
+    } catch (err) {
+      console.error('❌ Error loading paged products:', err);
+      setProducts([]);
+      throw new Error(err.response?.data?.message || err.message || 'Failed to load paged products');
+    }
+  };
+
   const searchProducts = async (query) => {
   try {
     console.log('🔍 Searching products:', query);
@@ -96,6 +119,7 @@ export const useProducts = () => {
     products,
     setProducts,
     loadProducts,
+    loadProductsPage,
     searchProducts,
     getProductById
   };

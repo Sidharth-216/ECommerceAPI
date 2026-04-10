@@ -10,6 +10,7 @@
 
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System;
 using System.Threading.Tasks;
 using ECommerceAPI.Application.Interfaces;
@@ -33,6 +34,7 @@ namespace ECommerceAPI.API.Controllers
         /// <summary>GET /api/mongo/products — all active products</summary>
         [HttpGet]
         [AllowAnonymous]
+        [ResponseCache(Duration = 60, Location = ResponseCacheLocation.Any)]
         public async Task<IActionResult> GetAll()
         {
             try
@@ -43,6 +45,26 @@ namespace ECommerceAPI.API.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "Failed to retrieve products", error = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// GET /api/mongo/products/paged?page=1&pageSize=24
+        /// Paginated active products for faster storefront rendering.
+        /// </summary>
+        [HttpGet("paged")]
+        [AllowAnonymous]
+        [ResponseCache(Duration = 30, Location = ResponseCacheLocation.Any, VaryByQueryKeys = new[] { "page", "pageSize" })]
+        public async Task<IActionResult> GetPaged([FromQuery] int page = 1, [FromQuery] int pageSize = 24)
+        {
+            try
+            {
+                var paged = await _service.GetPageAsync(page, pageSize);
+                return Ok(paged);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Failed to retrieve paged products", error = ex.Message });
             }
         }
 
@@ -71,6 +93,8 @@ namespace ECommerceAPI.API.Controllers
         /// </summary>
         [HttpGet("search")]
         [AllowAnonymous]
+        [EnableRateLimiting("SearchPolicy")]
+        [ResponseCache(Duration = 20, Location = ResponseCacheLocation.Any, VaryByQueryKeys = new[] { "query", "categoryId", "minPrice", "maxPrice", "brand" })]
         public async Task<IActionResult> Search([FromQuery] ProductSearchDto dto)
         {
             try
@@ -87,6 +111,8 @@ namespace ECommerceAPI.API.Controllers
         /// <summary>GET /api/mongo/products/suggest?q=...</summary>
         [HttpGet("suggest")]
         [AllowAnonymous]
+        [EnableRateLimiting("SearchPolicy")]
+        [ResponseCache(Duration = 20, Location = ResponseCacheLocation.Any, VaryByQueryKeys = new[] { "q" })]
         public async Task<IActionResult> Suggest([FromQuery] string q)
         {
             try

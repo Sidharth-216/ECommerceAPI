@@ -64,6 +64,11 @@ namespace ECommerceAPI.Infrastructure.Repositories.Implementations
         {
             try
             {
+                var isActiveIndex = Builders<ProductMongo>.IndexKeys
+                    .Ascending(p => p.IsActive)
+                    .Descending(p => p.CreatedAt);
+                _products.Indexes.CreateOne(new CreateIndexModel<ProductMongo>(isActiveIndex));
+
                 // Index for SQL ID lookup during migration
                 var sqlIdIndex = Builders<ProductMongo>.IndexKeys
                     .Ascending(p => p.SqlId);
@@ -90,15 +95,27 @@ namespace ECommerceAPI.Infrastructure.Repositories.Implementations
             }
         }
 
+        private static FilterDefinition<ProductMongo> ActiveProductsFilter()
+        {
+            var builder = Builders<ProductMongo>.Filter;
+            return builder.Or(
+                builder.Eq("IsActive", true),
+                builder.Eq("IsActive", "true"),
+                builder.Eq("IsActive", BsonNull.Value),
+                builder.Exists("IsActive", false)
+            );
+        }
+
         public async Task<IEnumerable<ProductMongo>> GetAllAsync()
         {
             try
             {
                 Console.WriteLine("📦 [ProductMongoRepository] GetAllAsync - Fetching all products");
-                
-                // ✅ FIXED: Simple filter - just get all products, don't filter by IsActive
-                // This avoids the BsonString vs BsonBoolean casting error
-                var products = await _products.Find(_ => true).ToListAsync();
+
+                var products = await _products
+                    .Find(ActiveProductsFilter())
+                    .SortByDescending(p => p.CreatedAt)
+                    .ToListAsync();
                 
                 Console.WriteLine($"✅ Retrieved {products.Count} products from MongoDB");
                 
@@ -110,6 +127,24 @@ namespace ECommerceAPI.Infrastructure.Repositories.Implementations
                 Console.WriteLine($"Stack trace: {ex.StackTrace}");
                 throw;
             }
+        }
+
+        public async Task<(IReadOnlyList<ProductMongo> Items, long TotalCount)> GetPageAsync(int page, int pageSize)
+        {
+            var safePage = page < 1 ? 1 : page;
+            var safePageSize = pageSize < 1 ? 24 : Math.Min(pageSize, 100);
+            var skip = (safePage - 1) * safePageSize;
+            var filter = ActiveProductsFilter();
+
+            var totalCount = await _products.CountDocumentsAsync(filter);
+            var items = await _products
+                .Find(filter)
+                .SortByDescending(p => p.CreatedAt)
+                .Skip(skip)
+                .Limit(safePageSize)
+                .ToListAsync();
+
+            return (items, totalCount);
         }
 
         public async Task<ProductMongo> GetByIdAsync(string id)
@@ -173,7 +208,7 @@ namespace ECommerceAPI.Infrastructure.Repositories.Implementations
             try
             {
                 var filterBuilder = Builders<ProductMongo>.Filter;
-                var filter = filterBuilder.Empty;
+                var filter = ActiveProductsFilter();
 
                 if (!string.IsNullOrEmpty(query))
                 {
@@ -322,9 +357,11 @@ namespace ECommerceAPI.Infrastructure.Repositories.Implementations
                     filterBuilder.Regex(p => p.Brand, new BsonRegularExpression(query, "i")),
                     filterBuilder.Regex("category.name", new BsonRegularExpression(query, "i"))
                 );
+
+                var filter = filterBuilder.And(ActiveProductsFilter(), searchFilter);
                 
                 var results = await _products
-                    .Find(searchFilter)
+                    .Find(filter)
                     .Limit(8)
                     .ToListAsync();
                 

@@ -53,6 +53,24 @@ namespace ECommerceAPI.Application.Services
             return all.Where(p => p.IsActive != false);
         }
 
+        public async Task<PagedProductsResponseDto> GetPageAsync(int page, int pageSize)
+        {
+            var safePage = page < 1 ? 1 : page;
+            var safePageSize = pageSize < 1 ? 24 : Math.Min(pageSize, 100);
+
+            var (items, totalCount) = await _repo.GetPageAsync(safePage, safePageSize);
+            var totalPages = (int)Math.Ceiling(totalCount / (double)safePageSize);
+
+            return new PagedProductsResponseDto
+            {
+                Items = items,
+                Page = safePage,
+                PageSize = safePageSize,
+                TotalCount = totalCount,
+                TotalPages = totalPages
+            };
+        }
+
         public Task<ProductMongo> GetByIdAsync(string id)
         {
             _logger.LogInformation("🔍 [ProductMongoService] GetByIdAsync: {Id}", id);

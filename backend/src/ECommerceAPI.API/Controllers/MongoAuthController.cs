@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.Tasks;
 using ECommerceAPI.Application.DTOs.Auth;
 using ECommerceAPI.Application.Services;
@@ -37,6 +38,7 @@ namespace ECommerceAPI.API.Controllers
         }
 
         [HttpPost("login")]
+        [EnableRateLimiting("AuthOtpPolicy")]
         public async Task<ActionResult<AuthResponseDto>> Login([FromBody] LoginDto loginDto)
         {
             var response = await _mongoAuthService.LoginAsync(loginDto);
@@ -44,6 +46,7 @@ namespace ECommerceAPI.API.Controllers
         }
 
         [HttpPost("request-otp")]
+        [EnableRateLimiting("AuthOtpPolicy")]
         public async Task<ActionResult<OtpResponseDto>> RequestOtp([FromBody] RequestOtpDto requestDto)
         {
             var response = await _mongoAuthService.RequestOtpAsync(requestDto);
@@ -51,6 +54,7 @@ namespace ECommerceAPI.API.Controllers
         }
 
         [HttpPost("verify-otp")]
+        [EnableRateLimiting("AuthOtpPolicy")]
         public async Task<ActionResult<AuthResponseDto>> VerifyOtp([FromBody] VerifyOtpDto verifyDto)
         {
             var response = await _mongoAuthService.VerifyOtpAndLoginAsync(verifyDto);
@@ -58,6 +62,7 @@ namespace ECommerceAPI.API.Controllers
         }
 
         [HttpPost("request-email-otp")]
+        [EnableRateLimiting("AuthOtpPolicy")]
         public async Task<ActionResult<OtpResponseDto>> RequestEmailOtp([FromBody] RequestEmailOtpDto requestDto)
         {
             var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
@@ -66,6 +71,7 @@ namespace ECommerceAPI.API.Controllers
         }
 
         [HttpPost("verify-email-otp")]
+        [EnableRateLimiting("AuthOtpPolicy")]
         public async Task<ActionResult<AuthResponseDto>> VerifyEmailOtp([FromBody] VerifyEmailOtpDto verifyDto)
         {
             var response = await _mongoAuthService.VerifyEmailOtpAndLoginAsync(verifyDto);

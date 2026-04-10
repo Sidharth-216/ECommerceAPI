@@ -1,11 +1,15 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'https://ecommerceapi-er8d.onrender.com/api';
+const rawApiBaseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5033/api';
+const API_BASE_URL = rawApiBaseUrl.endsWith('/api')
+  ? rawApiBaseUrl
+  : `${rawApiBaseUrl.replace(/\/$/, '')}/api`;
 //https://ecommerceapi-er8d.onrender.com/api 
 //http://localhost:5033/api
 
 const api = axios.create({
   baseURL: API_BASE_URL,
+  timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json'
@@ -242,6 +246,12 @@ export const productsAPI = {
     return api.get('/mongo/products');
   },
 
+  getPaged: (page = 1, pageSize = 24) => {
+    const safePage = Number.isFinite(page) ? Math.max(1, page) : 1;
+    const safePageSize = Number.isFinite(pageSize) ? Math.min(Math.max(1, pageSize), 100) : 24;
+    return api.get('/mongo/products/paged', { params: { page: safePage, pageSize: safePageSize } });
+  },
+
   search: (query, topK = 8) => {
     if (!query?.trim()) return Promise.resolve({ data: { results: [] } });
     return api.get('/mongo/search', { params: { query: query.trim(), topK } });
@@ -454,7 +464,7 @@ export const adminAPI = {
 
   getProducts: () => {
     console.log('📦 Admin API - Get All Products');
-    return api.get('/mongo/products');
+    return api.get('/mongo/products/paged', { params: { page: 1, pageSize: 100 } });
   },
 
   addProduct: (productData) => {
