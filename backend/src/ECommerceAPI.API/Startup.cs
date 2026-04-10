@@ -12,6 +12,7 @@ using System.Security.Claims;
 using MongoDB.Driver;
 using System;
 using System.IO.Compression;
+using System.Linq;
 using System.Threading.RateLimiting;
 
 using ECommerceAPI.Application.Helpers;
@@ -91,9 +92,20 @@ namespace ECommerceAPI.API
             {
                 options.AddPolicy("AllowFrontend", builder =>
                 {
-                    var allowedOrigins = Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>();
+                    var configOrigins = Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
+                    var envOriginsRaw = Environment.GetEnvironmentVariable("CORS_ALLOWED_ORIGINS");
+                    var envOrigins = string.IsNullOrWhiteSpace(envOriginsRaw)
+                        ? Array.Empty<string>()
+                        : envOriginsRaw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
-                    if (allowedOrigins != null && allowedOrigins.Length > 0)
+                    var allowedOrigins = configOrigins
+                        .Concat(envOrigins)
+                        .Where(o => !string.IsNullOrWhiteSpace(o))
+                        .Where(o => !o.Contains("your-frontend-domain.com", StringComparison.OrdinalIgnoreCase))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToArray();
+
+                    if (allowedOrigins.Length > 0)
                     {
                         builder
                             .WithOrigins(allowedOrigins)
