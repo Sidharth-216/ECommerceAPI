@@ -86,11 +86,17 @@ api.interceptors.response.use(
     }
 
     if (error.response?.status === 401) {
-      console.error('Unauthorized — clearing tokens');
-      sessionStorage.removeItem('token');
-      sessionStorage.removeItem('user');
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+      const requestUrl = String(config?.url || '');
+      // Only hard-clear on explicit auth validation failure.
+      if (requestUrl.includes('/mongo/auth/validate')) {
+        console.error('Unauthorized validation — clearing tokens');
+        sessionStorage.removeItem('token');
+        sessionStorage.removeItem('user');
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      } else {
+        console.warn('401 received for request, preserving session to avoid false logout:', requestUrl);
+      }
     }
     return Promise.reject(error);
   }

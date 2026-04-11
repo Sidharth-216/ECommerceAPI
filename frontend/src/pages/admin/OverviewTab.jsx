@@ -63,6 +63,10 @@ const OverviewTab = () => {
         ? allProductsRaw
         : (allProductsRaw?.items || allProductsRaw?.data || []);
 
+      const allProductsTotalCount = Number.isFinite(allProductsRaw?.totalCount)
+        ? allProductsRaw.totalCount
+        : allProducts.length;
+
       console.log('📊 Dashboard API Responses:', {
         ordersCount: orders.length,
         usersCount: users.length,
@@ -79,7 +83,7 @@ const OverviewTab = () => {
 
       const totalOrders = orders.length;
       const totalCustomers = users.length;
-      const totalProducts = allProducts.length;
+      const totalProducts = allProductsTotalCount;
 
       console.log('📊 Calculated Totals:', {
         totalRevenue,

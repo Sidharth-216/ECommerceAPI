@@ -19,6 +19,7 @@ import {
 const OrdersTab = () => {
   const [allOrders, setAllOrders] = useState([]);
   const [filteredOrders, setFilteredOrders] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [sortBy, setSortBy] = useState('date-desc');
@@ -30,6 +31,7 @@ const OrdersTab = () => {
     startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     endDate: new Date().toISOString().split('T')[0]
   });
+  const pageSize = 10;
 
   // Fetch orders on mount
   useEffect(() => {
@@ -96,6 +98,7 @@ const OrdersTab = () => {
       
       setAllOrders(normalizedOrders);
       setFilteredOrders(normalizedOrders);
+      setCurrentPage(1);
     } catch (err) {
       console.error('Error fetching orders:', err);
       setError('Failed to load orders');
@@ -152,6 +155,14 @@ const OrdersTab = () => {
 
     setFilteredOrders(filtered);
   }, [allOrders, searchQuery, statusFilter, sortBy, dateRange]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter, sortBy, dateRange.startDate, dateRange.endDate]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedOrders = filteredOrders.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   // Update order status
   const updateOrderStatus = async (orderId, newStatus) => {
@@ -413,7 +424,7 @@ const OrdersTab = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredOrders.map((order, idx) => (
+                {paginatedOrders.map((order, idx) => (
                   <tr key={order.id} className={`border-b border-slate-100 transition-all hover:bg-teal-50 ${
                     idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'
                   }`}>
@@ -506,12 +517,32 @@ const OrdersTab = () => {
       </div>
 
       {/* PAGINATION INFO */}
-      <div className="flex items-center justify-between text-sm">
+      <div className="flex items-center justify-between text-sm flex-wrap gap-3">
         <div className="text-slate-600">
-          Showing <span className="font-bold text-slate-900">{filteredOrders.length}</span> of{' '}
+          Showing <span className="font-bold text-slate-900">{paginatedOrders.length > 0 ? ((safePage - 1) * pageSize) + 1 : 0}-{Math.min(safePage * pageSize, filteredOrders.length)}</span> of{' '}
+          <span className="font-bold text-slate-900">{filteredOrders.length}</span> filtered /{' '}
           <span className="font-bold text-slate-900">{allOrders.length}</span> orders
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          {filteredOrders.length > pageSize && (
+            <>
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={safePage === 1}
+                className="px-3 py-1.5 rounded-lg border border-slate-300 text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Prev
+              </button>
+              <span className="px-2 py-1 text-slate-700 font-semibold">Page {safePage}/{totalPages}</span>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={safePage === totalPages}
+                className="px-3 py-1.5 rounded-lg border border-slate-300 text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </>
+          )}
           <span className="px-3 py-1.5 bg-teal-50 text-teal-700 rounded-lg font-semibold">
             Total Revenue: ₹{allOrders.reduce((sum, o) => sum + o.totalAmount, 0).toLocaleString()}
           </span>

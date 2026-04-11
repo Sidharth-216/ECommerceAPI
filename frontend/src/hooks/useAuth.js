@@ -92,11 +92,15 @@ const resolveTabSession = () => {
 };
 
 const callValidate = async (token) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 3500);
   try {
     const res = await fetch(`${API_BASE_URL}/mongo/auth/validate`, {
       method: 'GET',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      signal: controller.signal,
     });
+    clearTimeout(timeoutId);
     if (!res.ok) {
       return {
         ok: false,
@@ -112,6 +116,7 @@ const callValidate = async (token) => {
       return { ok: true, bootId: null, hardFail: false };
     }
   } catch (err) {
+    clearTimeout(timeoutId);
     console.warn('⚠️ validate unreachable:', err.message);
     // Network/cold-start issue: do not force logout on refresh.
     return { ok: false, bootId: null, hardFail: false };
@@ -149,31 +154,37 @@ export const useAuth = () => {
         if (source === 'local') {
           writeTabSession(token, rehydratedUser, getBootIdSync());
         }
+        setIsInitializing(false);
 
-        const { ok, bootId: currentBootId, hardFail } = await callValidate(token);
-        if (!ok && hardFail) {
-          clearAuthSession();
-          sessionStorage.setItem('currentPage', 'home');
-          localStorage.setItem('currentPage',   'home');
-          return;
-        }
-
-        if (currentBootId) {
-          const storedBootId =
-            sessionStorage.getItem('serverBootId') ||
-            localStorage.getItem('serverBootId');
-          if (storedBootId && storedBootId !== currentBootId) {
-            console.warn('⚠️ Server restarted — clearing session');
+        // Validate in background; do not block initial page render.
+        (async () => {
+          const { ok, bootId: currentBootId, hardFail } = await callValidate(token);
+          if (!ok && hardFail) {
             clearAuthSession();
             sessionStorage.setItem('currentPage', 'home');
             localStorage.setItem('currentPage',   'home');
+            setUser(null);
             return;
           }
-          if (!storedBootId) {
-            sessionStorage.setItem('serverBootId', currentBootId);
-            localStorage.setItem('serverBootId',   currentBootId);
+
+          if (currentBootId) {
+            const storedBootId =
+              sessionStorage.getItem('serverBootId') ||
+              localStorage.getItem('serverBootId');
+            if (storedBootId && storedBootId !== currentBootId) {
+              console.warn('⚠️ Server restarted — clearing session');
+              clearAuthSession();
+              sessionStorage.setItem('currentPage', 'home');
+              localStorage.setItem('currentPage',   'home');
+              setUser(null);
+              return;
+            }
+            if (!storedBootId) {
+              sessionStorage.setItem('serverBootId', currentBootId);
+              localStorage.setItem('serverBootId',   currentBootId);
+            }
           }
-        }
+        })();
 
         console.log(`✅ Session restored (${source}) for: ${rehydratedUser.email}`);
       } catch (err) {

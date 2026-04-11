@@ -298,6 +298,7 @@ const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCu
   const [detailProduct,       setDetailProduct]       = useState(null);
   const [viewMode,            setViewMode]            = useState('grid');
   const [viewportWidth,       setViewportWidth]       = useState(typeof window !== 'undefined' ? window.innerWidth : 1280);
+  const [currentProductPage,  setCurrentProductPage]  = useState(1);
   const debounceTimer = useRef(null);
   const isMobile = viewportWidth < 768;
   const isTablet = viewportWidth >= 768 && viewportWidth < 1024;
@@ -360,9 +361,20 @@ const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCu
   };
 
   const displayedProducts = isSemanticMode ? semanticResults : (products || []);
+  const productsPerPage = isMobile ? 8 : (isTablet ? 12 : 16);
+  const totalProductPages = Math.max(1, Math.ceil(displayedProducts.length / productsPerPage));
+  const currentPageSafe = Math.min(currentProductPage, totalProductPages);
+  const paginatedProducts = displayedProducts.slice(
+    (currentPageSafe - 1) * productsPerPage,
+    currentPageSafe * productsPerPage
+  );
   const uniqueCategories  = Array.from(
     new Set((products || []).map(p => getCategoryName(p)).filter(Boolean))
   ).slice(0, 20);
+
+  useEffect(() => {
+    setCurrentProductPage(1);
+  }, [searchQuery, isSemanticMode, products?.length, semanticResults?.length]);
 
   const banners = [
     { title:'Summer Sale 2026', subtitle:'Up to 50% OFF on Electronics', desc:'Free shipping on orders above ₹999', bg:'linear-gradient(135deg,#fca5a5 0%,#f87171 50%,#ef4444 100%)', tc:'#a0328e', bb:'#d61e64', bc:'white' },
@@ -615,7 +627,12 @@ const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCu
                 <button onClick={()=>{setSearchQuery('');setIsSemanticMode(false);setSemanticResults([])}} style={{ background:'none',border:'none',color:'#94a3b8',fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit' }}>✕ Clear</button>
               </>
             )}
-            <span style={{ fontSize:13,color:'#94a3b8' }}><strong style={{ color:'#064e3b' }}>{displayedProducts.length}</strong> products</span>
+            <span style={{ fontSize:13,color:'#94a3b8' }}>
+              <strong style={{ color:'#064e3b' }}>{displayedProducts.length}</strong> products
+              {displayedProducts.length > 0 && (
+                <> • showing {((currentPageSafe - 1) * productsPerPage) + 1}-{Math.min(currentPageSafe * productsPerPage, displayedProducts.length)}</>
+              )}
+            </span>
             <div style={{ display:'flex',background:'#f0fdfa',borderRadius:10,padding:3,gap:3,border:'1px solid #99f6e4',marginLeft:isMobile?'auto':0 }}>
               {[{m:'grid',icon:<Grid size={14}/>},{m:'list',icon:<List size={14}/>}].map(v=>(
                 <button key={v.m} onClick={()=>setViewMode(v.m)} style={{ padding:'6px 10px',borderRadius:8,border:'none',background:viewMode===v.m?'white':'transparent',color:viewMode===v.m?'#0d9488':'#94a3b8',cursor:'pointer',display:'flex',alignItems:'center',transition:'all .2s',boxShadow:viewMode===v.m?'0 2px 6px rgba(13,148,136,.12)':'none' }}>{v.icon}</button>
@@ -647,7 +664,7 @@ const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCu
             </div>
           ) : viewMode==='grid' ? (
             <div style={{ display:'grid',gridTemplateColumns:`repeat(auto-fill,minmax(${isMobile ? 150 : 200}px,1fr))`,gap:16 }}>
-              {displayedProducts.map((product,index)=>(
+              {paginatedProducts.map((product,index)=>(
                 <div key={getProductId(product)||index} className="card-in" style={{ animationDelay:`${Math.min(index*.04,.4)}s` }}>
                   <ProductCard product={product} onAddToCart={addToCart} setError={setError} onViewDetails={setDetailProduct}/>
                 </div>
@@ -655,7 +672,7 @@ const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCu
             </div>
           ) : (
             <div style={{ display:'flex',flexDirection:'column',gap:12 }}>
-              {displayedProducts.map((product,index)=>(
+              {paginatedProducts.map((product,index)=>(
                 <div key={getProductId(product)||index} className="card-in"
                   style={{ animationDelay:`${Math.min(index*.03,.3)}s`,background:'white',borderRadius:16,border:'1px solid #ccfbf1',padding:16,display:'flex',gap:16,alignItems:isMobile?'stretch':'center',transition:'all .2s',flexDirection:isMobile?'column':'row' }}
                   onMouseEnter={e=>{e.currentTarget.style.boxShadow='0 8px 24px rgba(13,148,136,.12)';e.currentTarget.style.borderColor='#5eead4'}}
@@ -675,6 +692,36 @@ const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCu
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {displayedProducts.length > productsPerPage && (
+            <div style={{ marginTop:20,display:'flex',alignItems:'center',justifyContent:'center',gap:10,flexWrap:'wrap' }}>
+              <button
+                onClick={() => setCurrentProductPage(p => Math.max(1, p - 1))}
+                disabled={currentPageSafe === 1}
+                style={{
+                  border:'1.5px solid #99f6e4', background:'white', color:'#0d9488', borderRadius:12,
+                  padding:'8px 12px', cursor: currentPageSafe === 1 ? 'not-allowed' : 'pointer',
+                  opacity: currentPageSafe === 1 ? 0.5 : 1, fontWeight:700, fontFamily:'inherit'
+                }}
+              >
+                Prev
+              </button>
+              <span style={{ fontSize:13, color:'#64748b', fontWeight:700 }}>
+                Page {currentPageSafe} of {totalProductPages}
+              </span>
+              <button
+                onClick={() => setCurrentProductPage(p => Math.min(totalProductPages, p + 1))}
+                disabled={currentPageSafe === totalProductPages}
+                style={{
+                  border:'1.5px solid #99f6e4', background:'white', color:'#0d9488', borderRadius:12,
+                  padding:'8px 12px', cursor: currentPageSafe === totalProductPages ? 'not-allowed' : 'pointer',
+                  opacity: currentPageSafe === totalProductPages ? 0.5 : 1, fontWeight:700, fontFamily:'inherit'
+                }}
+              >
+                Next
+              </button>
             </div>
           )}
         </div>

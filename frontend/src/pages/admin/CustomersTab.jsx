@@ -8,6 +8,8 @@ const CustomersTab = ({ error, setError, loading, setLoading }) => {
   const [filteredCustomers, setFilteredCustomers] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
 
   const fetchCustomers = useCallback(async () => {
     setRefreshing(true);
@@ -42,6 +44,7 @@ const CustomersTab = ({ error, setError, loading, setLoading }) => {
       
       setCustomers(customersList);
       setFilteredCustomers(customersList);
+      setCurrentPage(1);
     } catch (err) {
       console.error('Customers fetch error:', err);
       setError(err.response?.data?.message || err.message || 'Failed to fetch customers');
@@ -76,6 +79,14 @@ const CustomersTab = ({ error, setError, loading, setLoading }) => {
   useEffect(() => {
     filterCustomers();
   }, [filterCustomers]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredCustomers.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedCustomers = filteredCustomers.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   const deleteCustomer = async (customerId, customerName) => {
     if (!window.confirm(`Are you sure you want to delete ${customerName}? This action cannot be undone.`)) {
@@ -249,7 +260,7 @@ Status: ${customer.isActive ? 'Active' : 'Inactive'}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {filteredCustomers.map((customer) => (
+                {paginatedCustomers.map((customer) => (
                   <tr key={customer._id || customer.id} className="hover:bg-blue-50 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
@@ -339,6 +350,31 @@ Status: ${customer.isActive ? 'Active' : 'Inactive'}
           </div>
         )}
       </div>
+
+      {filteredCustomers.length > pageSize && (
+        <div className="bg-white rounded-xl border border-gray-200 px-4 py-3 flex items-center justify-between">
+          <p className="text-sm text-gray-600">
+            Showing {(safePage - 1) * pageSize + 1}-{Math.min(safePage * pageSize, filteredCustomers.length)} of {filteredCustomers.length}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={safePage === 1}
+              className="px-3 py-1.5 rounded-lg border border-gray-300 text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Prev
+            </button>
+            <span className="text-sm font-semibold text-gray-700">Page {safePage} / {totalPages}</span>
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={safePage === totalPages}
+              className="px-3 py-1.5 rounded-lg border border-gray-300 text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Footer Info */}
       <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
