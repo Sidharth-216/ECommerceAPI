@@ -299,6 +299,10 @@ const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCu
   const [viewMode,            setViewMode]            = useState('grid');
   const [viewportWidth,       setViewportWidth]       = useState(typeof window !== 'undefined' ? window.innerWidth : 1280);
   const [currentProductPage,  setCurrentProductPage]  = useState(1);
+  const [serverPagedProducts, setServerPagedProducts] = useState([]);
+  const [serverTotalProducts, setServerTotalProducts] = useState(0);
+  const [serverTotalPages,    setServerTotalPages]    = useState(1);
+  const [serverPageLoading,   setServerPageLoading]   = useState(false);
   const debounceTimer = useRef(null);
   const isMobile = viewportWidth < 768;
   const isTablet = viewportWidth >= 768 && viewportWidth < 1024;
@@ -362,12 +366,18 @@ const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCu
 
   const displayedProducts = isSemanticMode ? semanticResults : (products || []);
   const productsPerPage = isMobile ? 8 : (isTablet ? 12 : 16);
-  const totalProductPages = Math.max(1, Math.ceil(displayedProducts.length / productsPerPage));
+  const totalProductPages = isSemanticMode
+    ? Math.max(1, Math.ceil(displayedProducts.length / productsPerPage))
+    : Math.max(1, serverTotalPages || Math.ceil((serverTotalProducts || displayedProducts.length) / productsPerPage));
   const currentPageSafe = Math.min(currentProductPage, totalProductPages);
-  const paginatedProducts = displayedProducts.slice(
-    (currentPageSafe - 1) * productsPerPage,
-    currentPageSafe * productsPerPage
-  );
+  const paginatedProducts = isSemanticMode
+    ? displayedProducts.slice((currentPageSafe - 1) * productsPerPage, currentPageSafe * productsPerPage)
+    : (serverPagedProducts.length > 0
+      ? serverPagedProducts
+      : displayedProducts.slice((currentPageSafe - 1) * productsPerPage, currentPageSafe * productsPerPage));
+  const totalProductCount = isSemanticMode
+    ? displayedProducts.length
+    : (serverTotalProducts || displayedProducts.length);
   const uniqueCategories  = Array.from(
     new Set((products || []).map(p => getCategoryName(p)).filter(Boolean))
   ).slice(0, 20);
@@ -375,6 +385,40 @@ const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCu
   useEffect(() => {
     setCurrentProductPage(1);
   }, [searchQuery, isSemanticMode, products?.length, semanticResults?.length]);
+
+  useEffect(() => {
+    if (isSemanticMode) return;
+
+    const fetchPage = async () => {
+      setServerPageLoading(true);
+      try {
+        const res = await productsAPI.getPaged(currentPageSafe, productsPerPage);
+        const payload = res?.data || {};
+        const items = Array.isArray(payload)
+          ? payload
+          : (Array.isArray(payload.items) ? payload.items : []);
+        const totalCount = Number.isFinite(payload.totalCount)
+          ? payload.totalCount
+          : (products?.length || items.length);
+        const totalPages = Number.isFinite(payload.totalPages)
+          ? payload.totalPages
+          : Math.max(1, Math.ceil(totalCount / productsPerPage));
+
+        setServerPagedProducts(items);
+        setServerTotalProducts(totalCount);
+        setServerTotalPages(totalPages);
+      } catch {
+        // Fallback to already-loaded products on API page fetch failure.
+        setServerPagedProducts([]);
+        setServerTotalProducts(products?.length || 0);
+        setServerTotalPages(Math.max(1, Math.ceil((products?.length || 0) / productsPerPage)));
+      } finally {
+        setServerPageLoading(false);
+      }
+    };
+
+    fetchPage();
+  }, [isSemanticMode, currentPageSafe, productsPerPage, products?.length]);
 
   const banners = [
     { title:'Summer Sale 2026', subtitle:'Up to 50% OFF on Electronics', desc:'Free shipping on orders above ₹999', bg:'linear-gradient(135deg,#fca5a5 0%,#f87171 50%,#ef4444 100%)', tc:'#a0328e', bb:'#d61e64', bc:'white' },
@@ -628,9 +672,9 @@ const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCu
               </>
             )}
             <span style={{ fontSize:13,color:'#94a3b8' }}>
-              <strong style={{ color:'#064e3b' }}>{displayedProducts.length}</strong> products
-              {displayedProducts.length > 0 && (
-                <> • showing {((currentPageSafe - 1) * productsPerPage) + 1}-{Math.min(currentPageSafe * productsPerPage, displayedProducts.length)}</>
+              <strong style={{ color:'#064e3b' }}>{totalProductCount}</strong> products
+              {totalProductCount > 0 && (
+                <> • showing {((currentPageSafe - 1) * productsPerPage) + 1}-{Math.min(currentPageSafe * productsPerPage, totalProductCount)}</>
               )}
             </span>
             <div style={{ display:'flex',background:'#f0fdfa',borderRadius:10,padding:3,gap:3,border:'1px solid #99f6e4',marginLeft:isMobile?'auto':0 }}>
@@ -655,7 +699,19 @@ const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCu
                 </div>
               ))}
             </div>
-          ) : displayedProducts.length===0 ? (
+          ) : (!isSemanticMode && serverPageLoading) ? (
+            <div style={{ display:'grid',gridTemplateColumns:`repeat(auto-fill,minmax(${isMobile ? 150 : 200}px,1fr))`,gap:16 }}>
+              {[...Array(8)].map((_,i)=>(
+                <div key={i} style={{ background:'white',borderRadius:20,overflow:'hidden',border:'1px solid #ccfbf1' }}>
+                  <div style={{ aspectRatio:'1/1',background:'linear-gradient(90deg,#ccfbf1 25%,#f0fdfa 50%,#ccfbf1 75%)',backgroundSize:'200% 100%',animation:'shimmerBg 1.5s infinite' }}/>
+                  <div style={{ padding:14 }}>
+                    <div style={{ height:12,background:'#ccfbf1',borderRadius:6,marginBottom:8 }}/>
+                    <div style={{ height:12,background:'#ccfbf1',borderRadius:6,width:'65%' }}/>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : totalProductCount===0 ? (
             <div style={{ background:'white',padding:'60px 20px',textAlign:'center',borderRadius:24,border:'1px solid #ccfbf1' }}>
               <div style={{ width:80,height:80,background:'#f0fdfa',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 16px' }}><Search size={32} color="#99f6e4"/></div>
               <h3 style={{ fontSize:20,fontWeight:800,color:'#064e3b',marginBottom:8 }}>No products found</h3>
@@ -695,7 +751,7 @@ const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCu
             </div>
           )}
 
-          {displayedProducts.length > productsPerPage && (
+          {totalProductCount > productsPerPage && (
             <div style={{ marginTop:20,display:'flex',alignItems:'center',justifyContent:'center',gap:10,flexWrap:'wrap' }}>
               <button
                 onClick={() => setCurrentProductPage(p => Math.max(1, p - 1))}
