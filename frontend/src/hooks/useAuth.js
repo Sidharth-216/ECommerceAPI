@@ -133,6 +133,23 @@ export const useAuth = () => {
         if (!resolved) return;
         const { token, userData, source } = resolved;
 
+        const tokenUserId = extractUserIdFromToken(token);
+        const finalUserId = tokenUserId || userData.userId || userData.id;
+        if (!finalUserId) {
+          clearAuthSession();
+          sessionStorage.setItem('currentPage', 'home');
+          localStorage.setItem('currentPage',   'home');
+          return;
+        }
+
+        const rehydratedUser = { ...userData, id: finalUserId, userId: finalUserId };
+
+        // Optimistic restore: keeps user on current page and avoids refresh bounce.
+        setUser(rehydratedUser);
+        if (source === 'local') {
+          writeTabSession(token, rehydratedUser, getBootIdSync());
+        }
+
         const { ok, bootId: currentBootId, hardFail } = await callValidate(token);
         if (!ok && hardFail) {
           clearAuthSession();
@@ -158,20 +175,6 @@ export const useAuth = () => {
           }
         }
 
-        const tokenUserId = extractUserIdFromToken(token);
-        const finalUserId = tokenUserId || userData.userId || userData.id;
-        if (!finalUserId) {
-          clearAuthSession();
-          sessionStorage.setItem('currentPage', 'home');
-          localStorage.setItem('currentPage',   'home');
-          return;
-        }
-
-        const rehydratedUser = { ...userData, id: finalUserId, userId: finalUserId };
-        if (source === 'local') {
-          writeTabSession(token, rehydratedUser, getBootIdSync());
-        }
-        setUser(rehydratedUser);
         console.log(`✅ Session restored (${source}) for: ${rehydratedUser.email}`);
       } catch (err) {
         console.error('❌ Session restore error:', err);

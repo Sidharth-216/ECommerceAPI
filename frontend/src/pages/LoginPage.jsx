@@ -10,6 +10,7 @@ import { formatTime } from '../utils/helpers';
 const LoginPage = ({ 
   setCurrentPage, 
   setUser, 
+  handleLogin: authHandleLogin,
   setError, 
   error, 
   loading, 
@@ -42,6 +43,16 @@ const LoginPage = ({
   }, [otpTimer, otpSent, emailOtpSent]);
 
   const handleLogin = async () => {
+    if (typeof authHandleLogin === 'function') {
+      try {
+        const role = await authHandleLogin(loginData, loginRole, setError, setLoading);
+        setCurrentPage(role === 'Admin' ? 'admin' : 'products');
+      } catch {
+        // error state already set by auth hook
+      }
+      return;
+    }
+
     setError(''); setLoading(true);
     try {
       if (!loginData.email?.trim() || !loginData.password) throw new Error('All fields are required');
@@ -56,6 +67,8 @@ const LoginPage = ({
       // ✅ localStorage — persists on refresh
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(userData));
+      sessionStorage.setItem('token', data.token);
+      sessionStorage.setItem('user', JSON.stringify(userData));
 
       setUser(userData);
       setCurrentPage(userRole === 'Admin' ? 'admin' : 'products');
@@ -78,13 +91,17 @@ const LoginPage = ({
     try {
       const resp = await mongoAuthAPI.verifyOtp(mobileNumber, otpValue);
       const data = resp.data;
+      const userId = data.mongoUserId || data.userId || data.id || getUserIdFromToken();
+      const normalized = { ...data, id: userId, userId };
 
       // ✅ localStorage — persists on refresh
       localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data));
+      localStorage.setItem('user', JSON.stringify(normalized));
+      sessionStorage.setItem('token', data.token);
+      sessionStorage.setItem('user', JSON.stringify(normalized));
 
-      setUser(data);
-      setCurrentPage(data.role === 'Admin' ? 'admin' : 'products');
+      setUser(normalized);
+      setCurrentPage(normalized.role === 'Admin' ? 'admin' : 'products');
     } catch (err) { setError(err.message); } finally { setLoading(false); }
   };
 
@@ -104,13 +121,17 @@ const LoginPage = ({
     try {
       const resp = await mongoAuthAPI.verifyEmailOtp(emailForOtp, otpValue);
       const data = resp.data;
+      const userId = data.mongoUserId || data.userId || data.id || getUserIdFromToken();
+      const normalized = { ...data, id: userId, userId };
 
       // ✅ localStorage — persists on refresh
       localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data));
+      localStorage.setItem('user', JSON.stringify(normalized));
+      sessionStorage.setItem('token', data.token);
+      sessionStorage.setItem('user', JSON.stringify(normalized));
 
-      setUser(data);
-      setCurrentPage(data.role === 'Admin' ? 'admin' : 'products');
+      setUser(normalized);
+      setCurrentPage(normalized.role === 'Admin' ? 'admin' : 'products');
     } catch (err) { setError(err.message); } finally { setLoading(false); }
   };
 

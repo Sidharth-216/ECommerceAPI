@@ -37,11 +37,31 @@ const OverviewTab = () => {
       // Extract data from successful responses
       const dashboardData = dashboardRes.status === 'fulfilled' ? dashboardRes.value.data : {};
       const revenue = revenueRes.status === 'fulfilled' ? revenueRes.value.data : {};
-      const products = topProductsRes.status === 'fulfilled' ? topProductsRes.value.data : [];
-      const orders = ordersRes.status === 'fulfilled' ? ordersRes.value.data : [];
-      const categories = categoryRes.status === 'fulfilled' ? categoryRes.value.data : [];
-      const users = usersRes.status === 'fulfilled' ? usersRes.value.data : [];
-      const allProducts = productsRes.status === 'fulfilled' ? productsRes.value.data : [];
+      const productsRaw = topProductsRes.status === 'fulfilled' ? topProductsRes.value.data : [];
+      const ordersRaw = ordersRes.status === 'fulfilled' ? ordersRes.value.data : [];
+      const categoriesRaw = categoryRes.status === 'fulfilled' ? categoryRes.value.data : [];
+      const usersRaw = usersRes.status === 'fulfilled' ? usersRes.value.data : [];
+      const allProductsRaw = productsRes.status === 'fulfilled' ? productsRes.value.data : [];
+
+      const products = Array.isArray(productsRaw)
+        ? productsRaw
+        : (productsRaw?.items || productsRaw?.data || []);
+
+      const orders = Array.isArray(ordersRaw)
+        ? ordersRaw
+        : (ordersRaw?.items || ordersRaw?.orders || []);
+
+      const categories = Array.isArray(categoriesRaw)
+        ? categoriesRaw
+        : (categoriesRaw?.items || categoriesRaw?.data || []);
+
+      const users = Array.isArray(usersRaw)
+        ? usersRaw
+        : (usersRaw?.items || usersRaw?.users || []);
+
+      const allProducts = Array.isArray(allProductsRaw)
+        ? allProductsRaw
+        : (allProductsRaw?.items || allProductsRaw?.data || []);
 
       console.log('📊 Dashboard API Responses:', {
         ordersCount: orders.length,

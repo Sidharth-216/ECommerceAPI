@@ -73,12 +73,20 @@ const App = () => {
 
     (async () => {
       try {
-        await Promise.all([
-          productsHook.loadProducts().catch(e => console.warn('⚠️ products:', e)),
-          cartHook.loadCart().catch(e =>         console.warn('⚠️ cart:', e)),
-          auth.loadProfile().catch(e =>          console.warn('⚠️ profile:', e)),
-          auth.loadOrders().catch(e =>           console.warn('⚠️ orders:', e))
-        ]);
+        const tasks = [];
+
+        // Fast path for admin dashboard: admin tabs fetch their own datasets.
+        if (auth.user?.role === 'Admin') {
+          tasks.push(auth.loadOrders().catch(e => console.warn('⚠️ admin orders:', e)));
+        } else {
+          // Customer bootstrap: fetch smaller initial product set + account data.
+          tasks.push(productsHook.loadProductsPage(1, 24).catch(e => console.warn('⚠️ products page1:', e)));
+          tasks.push(cartHook.loadCart().catch(e => console.warn('⚠️ cart:', e)));
+          tasks.push(auth.loadProfile().catch(e => console.warn('⚠️ profile:', e)));
+          tasks.push(auth.loadOrders().catch(e => console.warn('⚠️ orders:', e)));
+        }
+
+        await Promise.all(tasks);
       } catch (e) { console.error('❌ loadUserData:', e); }
     })();
   }, [auth.user?.id, auth.user?.userId, productsHook, cartHook, auth]);
@@ -96,6 +104,8 @@ const App = () => {
     setProducts:        productsHook.setProducts,
     orders:             auth.orders,
     setOrders:          auth.setOrders,
+    handleLogin:        auth.handleLogin,
+    handleRegister:     auth.handleRegister,
     handleLogout:       auth.handleLogout,
     addToCart:          cartHook.addToCart,
     updateCartQuantity: cartHook.updateCartQuantity,

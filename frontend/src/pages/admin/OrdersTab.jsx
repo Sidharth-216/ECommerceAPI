@@ -41,7 +41,10 @@ const OrdersTab = () => {
       setLoading(true);
       setError('');
       const response = await adminAPI.getOrders();
-      const orders = response.data || [];
+      const payload = response?.data || [];
+      const orders = Array.isArray(payload)
+        ? payload
+        : (payload?.items || payload?.orders || payload?.data || []);
       
       console.log('📦 Fetched orders:', orders);
       // 🔍 Log first order raw so we can see the exact shape

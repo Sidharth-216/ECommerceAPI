@@ -30,7 +30,10 @@ const CustomersTab = ({ error, setError, loading, setLoading }) => {
         }
       }
       
-      const data = response?.data || [];
+      const payload = response?.data || [];
+      const data = Array.isArray(payload)
+        ? payload
+        : (payload?.items || payload?.users || payload?.data || []);
       
       // Filter only customers (not admins)
       const customersList = data.filter(user => 
