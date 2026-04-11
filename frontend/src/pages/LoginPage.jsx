@@ -351,24 +351,6 @@ const LoginPage = ({
               )}
             </div>
 
-            {/* Demo Credentials */}
-            <div className="mt-10 p-4 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
-              <div className="flex flex-col gap-2">
-                <button
-                  onClick={() => { setLoginMethod('email'); setLoginRole('Admin'); setLoginData({email:'admin@ecommerce.com', password:'admin123'}); }}
-                  className="text-[10px] text-left uppercase font-bold text-gray-400 hover:text-indigo-600"
-                >
-                  Quick Admin Access: admin@ecommerce.com
-                </button>
-                <button
-                  onClick={() => { setLoginMethod('email'); setLoginRole('Customer'); setLoginData({email:'customer@test.com', password:'password123'}); }}
-                  className="text-[10px] text-left uppercase font-bold text-gray-400 hover:text-indigo-600"
-                >
-                  Quick Customer Access: customer@test.com
-                </button>
-              </div>
-            </div>
-
             <div className="mt-8 text-center">
               <p className="text-gray-500 font-medium">New Shopper? 
                 <button onClick={() => setCurrentPage('register')} className="ml-2 text-indigo-600 font-black hover:underline">
