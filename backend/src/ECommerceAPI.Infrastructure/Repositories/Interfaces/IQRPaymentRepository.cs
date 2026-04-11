@@ -23,7 +23,7 @@ namespace ECommerceAPI.Infrastructure.Repositories.Interfaces
 
         /// <summary>
         /// Get all sessions awaiting admin confirmation
-        /// (status == PaymentReceived or AwaitingPayment and not yet expired)
+        /// (status == PaymentReceived)
         /// </summary>
         Task<IEnumerable<MongoQRPayment>> GetPendingConfirmationsAsync();
 

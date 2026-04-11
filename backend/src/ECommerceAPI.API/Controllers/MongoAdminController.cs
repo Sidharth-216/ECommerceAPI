@@ -70,6 +70,30 @@ namespace ECommerceAPI.API.Controllers
             }
         }
 
+        [HttpDelete("users/{mongoId}")]
+        public async Task<IActionResult> DeleteUser(string mongoId)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(mongoId))
+                    return BadRequest(new { message = "User ID is required" });
+
+                var deleted = await _mongoAdminService.DeleteUserAsync(mongoId);
+                if (!deleted)
+                    return NotFound(new { message = "User not found" });
+
+                return Ok(new { message = "Customer deleted successfully", userId = mongoId });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "An error occurred while deleting user", error = ex.Message });
+            }
+        }
+
         // ===================== ORDER MANAGEMENT =====================
 
         [HttpGet("orders")]

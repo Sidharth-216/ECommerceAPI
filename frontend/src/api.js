@@ -482,6 +482,11 @@ export const adminAPI = {
     return api.get(`/mongo/admin/users/${userId}`);
   },
 
+  deleteUser: (userId) => {
+    if (!userId) return Promise.reject(new Error('User ID is required'));
+    return api.delete(`/mongo/admin/users/${userId}`);
+  },
+
   getOrders: () => {
     console.log('📦 Admin API - Get All Orders');
     return api.get('/mongo/admin/orders');
@@ -509,6 +514,30 @@ export const adminAPI = {
   getProducts: () => {
     console.log('📦 Admin API - Get All Products');
     return api.get('/mongo/products/paged', { params: { page: 1, pageSize: 100 } });
+  },
+
+  getProductsPaged: (page = 1, pageSize = 100) => {
+    const safePage = Number.isFinite(page) ? Math.max(1, page) : 1;
+    const safePageSize = Number.isFinite(pageSize) ? Math.min(Math.max(1, pageSize), 100) : 100;
+    return api.get('/mongo/products/paged', { params: { page: safePage, pageSize: safePageSize } });
+  },
+
+  getAllProducts: async () => {
+    const pageSize = 100;
+    const first = await api.get('/mongo/products/paged', { params: { page: 1, pageSize } });
+    const firstData = first?.data || {};
+    const all = Array.isArray(firstData.items) ? [...firstData.items] : [];
+    const totalPages = Number.isFinite(firstData.totalPages) ? firstData.totalPages : 1;
+
+    if (totalPages > 1) {
+      for (let page = 2; page <= totalPages; page += 1) {
+        const res = await api.get('/mongo/products/paged', { params: { page, pageSize } });
+        const items = Array.isArray(res?.data?.items) ? res.data.items : [];
+        all.push(...items);
+      }
+    }
+
+    return { data: all };
   },
 
   addProduct: (productData) => {

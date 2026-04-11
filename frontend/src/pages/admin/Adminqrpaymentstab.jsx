@@ -44,6 +44,7 @@ const AdminQRPaymentsTab = () => {
 
   // ── Confirm ────────────────────────────────────────────────────────────
   const handleConfirm = async (paymentId, note) => {
+    if (processing) return;
     setProcessing(paymentId);
     try {
       await qrPaymentAPI.adminConfirm(paymentId, note);
@@ -61,6 +62,7 @@ const AdminQRPaymentsTab = () => {
 
   // ── Reject ─────────────────────────────────────────────────────────────
   const handleReject = async (paymentId, note) => {
+    if (processing) return;
     setProcessing(paymentId);
     try {
       await qrPaymentAPI.adminReject(paymentId, note);
@@ -100,9 +102,7 @@ const AdminQRPaymentsTab = () => {
 
   const cfg = (status) => statusConfig[status] || statusConfig.Expired;
 
-  const pending = payments.filter(p =>
-    p.status === 'AwaitingPayment' || p.status === 'PaymentReceived'
-  );
+  const pending = payments.filter(p => p.status === 'PaymentReceived');
 
   // ────────────────────────────────────────────────────────────────────────
   return (
@@ -252,7 +252,7 @@ const AdminQRPaymentsTab = () => {
                 {payments.map((p, idx) => {
                   const { color, icon: Icon, label } = cfg(p.status);
                   const isExpanded = expanded === p.paymentId;
-                  const canAct = p.status === 'AwaitingPayment' || p.status === 'PaymentReceived';
+                  const canAct = p.status === 'PaymentReceived';
                   const isProcessing = processing === p.paymentId;
 
                   return (

@@ -204,25 +204,6 @@ namespace ECommerceAPI.Application.Services
                 var orderDto = MapMongoToDto(mongoOrder);
                 Console.WriteLine($"✅ Order creation completed successfully!");
 
-                // 📧 Send confirmation email (awaited — errors surface in terminal, never block order)
-                Console.WriteLine($"📧 Sending order confirmation email to: {user.Email}");
-                try
-                {
-                    var emailSent = await _orderEmailService.SendOrderConfirmationAsync(
-                        user.Email,
-                        user.FullName ?? "Valued Customer",
-                        orderDto);
-
-                    Console.WriteLine(emailSent
-                        ? $"✅ Confirmation email sent to {user.Email}"
-                        : $"⚠️ Confirmation email returned false for {user.Email}");
-                }
-                catch (Exception emailEx)
-                {
-                    Console.WriteLine($"⚠️ Confirmation email failed (order still created): {emailEx.Message}");
-                    Console.WriteLine($"   Stack: {emailEx.StackTrace}");
-                }
-
                 return orderDto;
             }
             catch (Exception ex)

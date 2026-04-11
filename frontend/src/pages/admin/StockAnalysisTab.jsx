@@ -53,6 +53,7 @@ const groupByCategory = (products) => {
 
 const StockAnalysisTab = () => {
     const [stockAnalysis, setStockAnalysis] = useState([]);
+    const [analysisSummary, setAnalysisSummary] = useState(null);
     const [lowStockProducts, setLowStockProducts] = useState([]);
     const [stockByCategory, setStockByCategory] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -68,37 +69,27 @@ const StockAnalysisTab = () => {
 
         try {
             console.log('🔄 Calling adminAPI.getStockAnalysis()...');
-            const response = await adminAPI.getStockAnalysis();
-            console.log('✅ Stock analysis response:', response.data);
+            const [analysisRes, allProductsRes] = await Promise.all([
+                adminAPI.getStockAnalysis(),
+                adminAPI.getAllProducts()
+            ]);
 
-            const data = response.data;
+            const data = analysisRes?.data || {};
+            const allProducts = Array.isArray(allProductsRes?.data) ? allProductsRes.data : [];
 
-            // Extract stock analysis (array of products with stock info)
-            const analysisArray = Array.isArray(data) 
-                ? data 
-                : data.lowStockItems || data.stockAnalysis || [];
+            console.log('✅ Stock analysis response:', data);
+            console.log('✅ Full inventory products:', allProducts.length);
 
-            console.log('📦 Stock analysis array:', analysisArray);
+            const lowStock = Array.isArray(data.lowStockItems)
+                ? data.lowStockItems
+                : [];
 
-            // Extract low stock items
-            const lowStock = Array.isArray(data.lowStockItems) 
-                ? data.lowStockItems 
-                : analysisArray.filter(item => {
-                    const qty = getNumber(item.quantity || item.currentStock || item.stockQuantity);
-                    const minStock = getNumber(item.minimumStock || item.reorderLevel, 10);
-                    return qty > 0 && qty <= minStock;
-                });
+            const categoryBreakdown = Array.isArray(data.stockByCategory)
+                ? data.stockByCategory
+                : groupByCategory(allProducts);
 
-            console.log('⚠️ Low stock items:', lowStock);
-
-            // Extract category breakdown
-            const categoryBreakdown = Array.isArray(data.stockByCategory) 
-                ? data.stockByCategory 
-                : groupByCategory(analysisArray);
-
-            console.log('📊 Stock by category:', categoryBreakdown);
-
-            setStockAnalysis(analysisArray);
+            setAnalysisSummary(data);
+            setStockAnalysis(allProducts);
             setLowStockProducts(lowStock);
             setStockByCategory(categoryBreakdown);
 
@@ -113,6 +104,7 @@ const StockAnalysisTab = () => {
             );
             
             // Set empty arrays to prevent crashes
+            setAnalysisSummary(null);
             setStockAnalysis([]);
             setLowStockProducts([]);
             setStockByCategory([]);
@@ -160,13 +152,13 @@ const StockAnalysisTab = () => {
         });
 
     // Calculate totals
-    const totalValue = stockAnalysis.reduce((sum, item) => {
+    const totalValue = analysisSummary?.totalStockValue ?? stockAnalysis.reduce((sum, item) => {
         const price = getNumber(item.price);
         const qty = getNumber(item.quantity || item.stockQuantity);
         return sum + (price * qty);
     }, 0);
 
-    const outOfStockCount = stockAnalysis.filter(item => 
+    const outOfStockCount = analysisSummary?.outOfStockProducts ?? stockAnalysis.filter(item => 
         getNumber(item.quantity || item.stockQuantity) === 0
     ).length;
 
@@ -298,7 +290,7 @@ const StockAnalysisTab = () => {
                         <Package className="w-4 h-4" />
                         Total Products
                     </p>
-                    <p className="text-3xl font-bold text-gray-900">{stockAnalysis.length}</p>
+                    <p className="text-3xl font-bold text-gray-900">{analysisSummary?.totalProducts ?? stockAnalysis.length}</p>
                     <p className="text-xs text-gray-400 mt-2">In inventory</p>
                 </div>
 
@@ -307,7 +299,7 @@ const StockAnalysisTab = () => {
                         <AlertCircle className="w-4 h-4" />
                         Low Stock Items
                     </p>
-                    <p className="text-3xl font-bold text-orange-600">{lowStockProducts.length}</p>
+                    <p className="text-3xl font-bold text-orange-600">{analysisSummary?.lowStockProducts ?? lowStockProducts.length}</p>
                     <p className="text-xs text-orange-600 mt-2">Below threshold</p>
                 </div>
 

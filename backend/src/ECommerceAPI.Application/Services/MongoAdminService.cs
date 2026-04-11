@@ -23,19 +23,22 @@ namespace ECommerceAPI.Application.Services
         private readonly IMongoOrderRepository _orderRepository;
         private readonly IProductMongoRepository _productRepository;
         private readonly IAddressMongoRepository _addressRepository;
+        private readonly ICartMongoRepository _cartRepository;
         private readonly ILogger<MongoAdminService> _logger;
 
         public MongoAdminService(
             IMongoUserRepository userRepository,
             IMongoOrderRepository orderRepository,
             IProductMongoRepository productRepository,
-            IAddressMongoRepository addressRepository,              // ← ADD THIS
+            IAddressMongoRepository addressRepository,
+            ICartMongoRepository cartRepository,
             ILogger<MongoAdminService> logger)
         {
             _userRepository    = userRepository    ?? throw new ArgumentNullException(nameof(userRepository));
             _orderRepository   = orderRepository   ?? throw new ArgumentNullException(nameof(orderRepository));
             _productRepository = productRepository ?? throw new ArgumentNullException(nameof(productRepository));
-            _addressRepository = addressRepository ?? throw new ArgumentNullException(nameof(addressRepository)); // ← ADD
+            _addressRepository = addressRepository ?? throw new ArgumentNullException(nameof(addressRepository));
+            _cartRepository    = cartRepository    ?? throw new ArgumentNullException(nameof(cartRepository));
             _logger            = logger            ?? throw new ArgumentNullException(nameof(logger));
         }
 
@@ -107,6 +110,32 @@ namespace ECommerceAPI.Application.Services
                 _logger.LogError(ex, $"❌ Error fetching user {mongoId}");
                 throw;
             }
+        }
+
+        public async Task<bool> DeleteUserAsync(string mongoId)
+        {
+            if (string.IsNullOrWhiteSpace(mongoId))
+                return false;
+
+            var user = await _userRepository.GetByIdAsync(mongoId);
+            if (user == null)
+                return false;
+
+            if (string.Equals(user.Role, "Admin", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Admin users cannot be deleted from customer actions.");
+
+            var addresses = await _addressRepository.GetByUserIdAsync(mongoId);
+            foreach (var address in addresses)
+            {
+                if (!string.IsNullOrWhiteSpace(address.Id))
+                    await _addressRepository.DeleteAsync(address.Id);
+            }
+
+            await _cartRepository.DeleteByUserIdAsync(mongoId);
+            await _userRepository.DeleteAsync(mongoId);
+
+            _logger.LogInformation("🗑️ Deleted customer {UserId} and related cart/address data", mongoId);
+            return true;
         }
 
         #endregion

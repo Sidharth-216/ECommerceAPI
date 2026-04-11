@@ -5,6 +5,7 @@ import { adminAPI } from '../../api.js';
 const SalesReportTab = ({ error, setError }) => {
   const [loading, setLoading] = useState(false);
   const [reportData, setReportData] = useState(null);
+  const [topProducts, setTopProducts] = useState([]);
   
   // Initialize dateRange with proper default values
   const getDefaultDateRange = () => {
@@ -25,13 +26,20 @@ const SalesReportTab = ({ error, setError }) => {
     setError('');
 
     try {
-      const response = await adminAPI.getSalesReport(dateRange.startDate, dateRange.endDate);
-      const data = response?.data || null;
+      const [reportRes, productSalesRes] = await Promise.all([
+        adminAPI.getSalesReport(dateRange.startDate, dateRange.endDate),
+        adminAPI.getSalesByProduct(dateRange.startDate, dateRange.endDate)
+      ]);
+
+      const data = reportRes?.data || null;
+      const productSales = Array.isArray(productSalesRes?.data) ? productSalesRes.data : [];
       setReportData(data);
+      setTopProducts(productSales.slice(0, 10));
     } catch (err) {
       console.error('Sales report error:', err);
       setError(err.response?.data?.message || err.message || 'Failed to fetch sales report');
       setReportData(null);
+      setTopProducts([]);
     } finally {
       setLoading(false);
     }
@@ -55,12 +63,15 @@ const SalesReportTab = ({ error, setError }) => {
 Sales Report (${dateRange.startDate} to ${dateRange.endDate})
 
 Summary:
-Total Revenue,₹${reportData.totalRevenue?.toLocaleString() || 0}
+Total Sales,₹${reportData.totalSales?.toLocaleString() || 0}
 Total Orders,${reportData.totalOrders || 0}
 Average Order Value,₹${reportData.averageOrderValue?.toLocaleString() || 0}
 
+Daily Sales:
+${(reportData.dailySalesList || []).map(day => `${new Date(day.date).toLocaleDateString('en-IN')},₹${(day.sales || 0).toLocaleString()},${day.orders || 0} orders`).join('\n')}
+
 Top Products:
-${(reportData.topProducts || []).map(p => `${p.name},₹${p.revenue},${p.unitsSold} units`).join('\n')}
+${topProducts.map(p => `${p.productName || 'Unknown Product'},₹${(p.revenue || 0).toLocaleString()},${p.quantitySold || 0} units`).join('\n')}
     `.trim();
 
     const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -169,9 +180,9 @@ ${(reportData.topProducts || []).map(p => `${p.name},₹${p.revenue},${p.unitsSo
                   <DollarSign className="w-6 h-6 text-green-600" />
                 </div>
               </div>
-              <p className="text-sm font-semibold text-gray-600 uppercase">Total Revenue</p>
+              <p className="text-sm font-semibold text-gray-600 uppercase">Total Sales</p>
               <p className="text-4xl font-bold text-green-600 mt-2">
-                ₹{(reportData.totalRevenue || 0).toLocaleString()}
+                ₹{(reportData.totalSales || 0).toLocaleString()}
               </p>
             </div>
 
@@ -207,7 +218,7 @@ ${(reportData.topProducts || []).map(p => `${p.name},₹${p.revenue},${p.unitsSo
               <p className="text-sm text-gray-600 mt-1">Best performers in selected period</p>
             </div>
 
-            {!reportData.topProducts || reportData.topProducts.length === 0 ? (
+            {topProducts.length === 0 ? (
               <div className="p-12 text-center">
                 <p className="text-gray-500">No product data available</p>
               </div>
@@ -224,7 +235,7 @@ ${(reportData.topProducts || []).map(p => `${p.name},₹${p.revenue},${p.unitsSo
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {reportData.topProducts.map((product, idx) => (
+                    {topProducts.map((product, idx) => (
                       <tr key={idx} className="hover:bg-blue-50 transition-colors">
                         <td className="px-6 py-4">
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-white ${
@@ -237,17 +248,17 @@ ${(reportData.topProducts || []).map(p => `${p.name},₹${p.revenue},${p.unitsSo
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <div className="font-semibold text-gray-900">{product.name}</div>
-                          <div className="text-xs text-gray-500">{product.brand || 'N/A'}</div>
+                          <div className="font-semibold text-gray-900">{product.productName || 'Unknown Product'}</div>
+                          <div className="text-xs text-gray-500">{product.category || 'N/A'}</div>
                         </td>
                         <td className="px-6 py-4 font-bold text-gray-900">
-                          {product.unitsSold || 0} units
+                          {product.quantitySold || 0} units
                         </td>
                         <td className="px-6 py-4 font-bold text-green-600">
                           ₹{(product.revenue || 0).toLocaleString()}
                         </td>
                         <td className="px-6 py-4 text-gray-600">
-                          ₹{(product.averagePrice || 0).toLocaleString()}
+                          ₹{(product.quantitySold > 0 ? product.revenue / product.quantitySold : 0).toLocaleString()}
                         </td>
                       </tr>
                     ))}
@@ -258,13 +269,13 @@ ${(reportData.topProducts || []).map(p => `${p.name},₹${p.revenue},${p.unitsSo
           </div>
 
           {/* Daily Sales Chart (Text-based) */}
-          {reportData.dailySales && reportData.dailySales.length > 0 && (
+          {reportData.dailySalesList && reportData.dailySalesList.length > 0 && (
             <div className="bg-white rounded-2xl shadow-md border border-gray-200 p-6">
               <h3 className="text-lg font-bold text-gray-900 mb-6">Daily Sales Trend</h3>
               <div className="space-y-3">
-                {reportData.dailySales.map((day, idx) => {
-                  const maxRevenue = Math.max(...reportData.dailySales.map(d => d.revenue));
-                  const percentage = (day.revenue / maxRevenue) * 100;
+                {reportData.dailySalesList.map((day, idx) => {
+                  const maxRevenue = Math.max(...reportData.dailySalesList.map(d => d.sales || 0));
+                  const percentage = maxRevenue > 0 ? ((day.sales || 0) / maxRevenue) * 100 : 0;
 
                   return (
                     <div key={idx}>
@@ -272,7 +283,7 @@ ${(reportData.topProducts || []).map(p => `${p.name},₹${p.revenue},${p.unitsSo
                         <span className="font-medium text-gray-700">
                           {new Date(day.date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
                         </span>
-                        <span className="font-bold text-blue-600">₹{day.revenue.toLocaleString()}</span>
+                        <span className="font-bold text-blue-600">₹{(day.sales || 0).toLocaleString()}</span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-3">
                         <div

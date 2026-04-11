@@ -25,6 +25,11 @@ namespace ECommerceAPI.Application.Interfaces
         Task<UserDto> GetUserByIdAsync(string mongoId);
 
         /// <summary>
+        /// Delete a customer by MongoDB ObjectId.
+        /// </summary>
+        Task<bool> DeleteUserAsync(string mongoId);
+
+        /// <summary>
         /// Get all orders from MongoDB
         /// </summary>
         Task<IEnumerable<OrderDto>> GetAllOrdersAsync();

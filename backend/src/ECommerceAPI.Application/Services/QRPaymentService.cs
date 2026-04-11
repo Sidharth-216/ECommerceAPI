@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
+using ECommerceAPI.Application.DTOs.Orders;
 using ECommerceAPI.Application.DTOs.QRPayment;
 using ECommerceAPI.Application.Interfaces;
 using ECommerceAPI.Domain.Entities.Mongo;
@@ -31,6 +32,7 @@ namespace ECommerceAPI.Application.Services
         private readonly IQRPaymentRepository  _qrRepo;
         private readonly IMongoOrderRepository _orderRepo;
         private readonly IMongoUserRepository  _userRepo;
+        private readonly IMongoOrderEmailService _orderEmailService;
         private readonly ILogger<QRPaymentService> _logger;
         private readonly string _upiId;
         private readonly string _upiPayeeName;
@@ -39,12 +41,14 @@ namespace ECommerceAPI.Application.Services
             IQRPaymentRepository  qrRepo,
             IMongoOrderRepository orderRepo,
             IMongoUserRepository  userRepo,
+            IMongoOrderEmailService orderEmailService,
             ILogger<QRPaymentService> logger,
             IConfiguration configuration)
         {
             _qrRepo    = qrRepo;
             _orderRepo = orderRepo;
             _userRepo  = userRepo;
+            _orderEmailService = orderEmailService;
             _logger    = logger;
             _upiId = configuration["Payment:UpiId"] ?? string.Empty;
             _upiPayeeName = configuration["Payment:UpiPayeeName"] ?? "ShopAI";
@@ -214,6 +218,41 @@ namespace ECommerceAPI.Application.Services
                 order.UpdatedAt = DateTime.UtcNow;
                 await _orderRepo.UpdateAsync(order);
                 _logger.LogInformation("📦 Order {OrderId} moved to Pending after payment confirmation", order.Id);
+
+                try
+                {
+                    var user = await _userRepo.GetByIdAsync(order.UserId);
+                    if (user != null && !string.IsNullOrWhiteSpace(user.Email))
+                    {
+                        var orderDto = new OrderDto
+                        {
+                            Id = order.Id,
+                            UserId = order.UserId,
+                            OrderNumber = order.OrderNumber,
+                            Status = order.Status,
+                            TotalAmount = order.TotalAmount,
+                            CreatedAt = order.CreatedAt,
+                            Items = (order.Items ?? new List<Domain.Entities.MongoDB.MongoOrderItem>())
+                                .Select(i => new OrderItemDto
+                                {
+                                    ProductId = i.ProductId,
+                                    ProductName = i.ProductName,
+                                    Quantity = i.Quantity,
+                                    Price = i.Price
+                                })
+                                .ToList()
+                        };
+
+                        await _orderEmailService.SendOrderConfirmationAsync(
+                            user.Email,
+                            user.FullName ?? "Valued Customer",
+                            orderDto);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "⚠️ Failed to send confirmation email for order {OrderId}", order.Id);
+                }
             }
 
             return true;

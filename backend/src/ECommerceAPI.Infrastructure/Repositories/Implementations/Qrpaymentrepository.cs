@@ -92,11 +92,10 @@ namespace ECommerceAPI.Infrastructure.Repositories.Implementations
 
         public async Task<IEnumerable<MongoQRPayment>> GetPendingConfirmationsAsync()
         {
-            // Payments the admin needs to act on:
-            //   status == PaymentReceived  (user said they paid)
-            //   status == AwaitingPayment  (QR shown, user hasn't confirmed yet)
-            var filter = Builders<MongoQRPayment>.Filter.In(p => p.Status,
-                new[] { QRPaymentStatus.PaymentReceived, QRPaymentStatus.AwaitingPayment });
+            // Admin should act only after user marks payment as received.
+            var filter = Builders<MongoQRPayment>.Filter.Eq(
+                p => p.Status,
+                QRPaymentStatus.PaymentReceived);
 
             return await _payments
                 .Find(filter)
