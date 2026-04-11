@@ -2,7 +2,7 @@
 
 A production-ready, three-tier e-commerce application combining a **.NET 8 REST API**, a **React 18 frontend**, and a **Python AI agent** with semantic product search and conversational shopping capabilities.
 
-Live URL: https://e-commerce-aqs6c9ext-sidharth-216s-projects.vercel.app/
+Live URL:https://e-commerce-api-omega-topaz.vercel.app/
 ---
 
 ## Table of Contents
