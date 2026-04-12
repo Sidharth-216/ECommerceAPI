@@ -240,6 +240,7 @@ namespace ECommerceAPI.API
             services.AddScoped<IMongoOrderRepository,     MongoOrderRepository>();
             services.AddScoped<IAddressMongoRepository,   AddressMongoRepository>();
             services.AddScoped<IQRPaymentRepository,      QRPaymentRepository>();
+            services.AddScoped<IBarcodeDataRepository,    BarcodeDataRepository>(); // ← BARCODE REPO
             // ── Services ──────────────────────────────────────────────────────
             services.AddScoped<MongoAuthService>();
             services.AddScoped<IMongoOtpService,          MongoOtpService>();
@@ -251,6 +252,7 @@ namespace ECommerceAPI.API
             services.AddScoped<IMongoAdminService,        MongoAdminService>();
             services.AddScoped<IMongoOrderEmailService,   MongoOrderEmailService>(); // ← ADDED
             services.AddScoped<IQRPaymentService,         QRPaymentService>();
+            services.AddScoped<IBarcodeService,           BarcodeService>(); // ← BARCODE SERVICE
             services.AddHttpClient<ISemanticSearchService, SemanticSearchService>(client => {
                 client.Timeout = TimeSpan.FromSeconds(30);
             });

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Search, Plus, Edit2, Trash2, RefreshCw, AlertCircle, X } from 'lucide-react';
+import { Package, Search, Plus, Edit2, Trash2, RefreshCw, AlertCircle, X, Barcode } from 'lucide-react';
 import { adminAPI } from '../../api.js';
+import BarcodeScanner from '../../components/BarcodeScanner';
+import ScannedItemsList from '../../components/ScannedItemsList';
 
 const safeStr = (v) => (v == null ? '' : String(v));
 
@@ -179,6 +181,9 @@ const ProductsTab = ({ products, loadProducts, error, setError, loading, setLoad
   const [showEditModal, setShowEditModal]       = useState(false);
   const [editingProduct, setEditingProduct]     = useState(null);
   const [localError, setLocalError]             = useState('');
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
+  const [scannedBarcodes, setScannedBarcodes]   = useState([]);
+  const [showScannedList, setShowScannedList]   = useState(false);
 
   const emptyForm = {
     name: '', brand: '', price: '', stockQuantity: '',
@@ -229,6 +234,30 @@ const ProductsTab = ({ products, loadProducts, error, setError, loading, setLoad
   const showErr  = (msg) => { setLocalError(msg); setError && setError(msg); };
   const clearErr = ()    => { setLocalError('');  setError && setError('');  };
   const resetForm = () => setFormData(emptyForm);
+
+  const handleBarcodeDetected = (barcode) => {
+    // Add barcode to list when scanner detects one
+    setScannedBarcodes(prev => {
+      if (!prev.includes(barcode)) {
+        return [...prev, barcode];
+      }
+      return prev;
+    });
+  };
+
+  const handleCloseBarcodeScanner = () => {
+    setShowBarcodeScanner(false);
+    // If barcodes were scanned, show the items list
+    if (scannedBarcodes.length > 0) {
+      setShowScannedList(true);
+    }
+  };
+
+  const handleProductsAdded = (count) => {
+    alert(`✅ Successfully added ${count} product(s) from barcode scan!`);
+    setScannedBarcodes([]);
+    loadProducts();
+  };
 
   const validateForm = () => {
     if (!formData.name?.trim())                                   throw new Error('Product name is required');
@@ -364,6 +393,13 @@ const ProductsTab = ({ products, loadProducts, error, setError, loading, setLoad
           >
             <Plus className="w-4 h-4" />
             Add Product
+          </button>
+          <button
+            onClick={() => { setScannedBarcodes([]); setShowBarcodeScanner(true); }}
+            className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl hover:shadow-lg transition-all font-semibold"
+          >
+            <Barcode className="w-4 h-4" />
+            Scan Barcode
           </button>
         </div>
       </div>
@@ -523,6 +559,26 @@ const ProductsTab = ({ products, loadProducts, error, setError, loading, setLoad
         loading={loading}
         localError={localError}
         clearError={clearErr}
+      />
+
+      {/* Barcode Scanner — for scanning product barcodes */}
+      <BarcodeScanner
+        show={showBarcodeScanner}
+        onClose={handleCloseBarcodeScanner}
+        onBarcodeDetected={handleBarcodeDetected}
+        isLoading={loading}
+        manualInput={true}
+      />
+
+      {/* Scanned Items List — for processing scanned products */}
+      <ScannedItemsList
+        show={showScannedList}
+        onClose={() => {
+          setShowScannedList(false);
+          setScannedBarcodes([]);
+        }}
+        scannedBarcodes={scannedBarcodes}
+        onAddProducts={handleProductsAdded}
       />
     </div>
   );

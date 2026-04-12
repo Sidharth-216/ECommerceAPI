@@ -64,6 +64,10 @@ namespace ECommerceAPI.Domain.Entities.Mongo
         [BsonIgnoreIfNull]
         public object Specifications { get; set; }
 
+        [BsonElement("barcode")]
+        [BsonIgnoreIfNull]
+        public string Barcode { get; set; }
+
         [BsonElement("createdAt")]
         [BsonDateTimeOptions(Kind = DateTimeKind.Utc)]
         public DateTime CreatedAt { get; set; }

@@ -585,6 +585,36 @@ export const adminAPI = {
   getDashboard: () => {
     console.log('🎯 Admin API - Get Dashboard');
     return api.get('/mongo/admin/dashboard');
+  },
+
+  // ══════════════ BARCODE SCANNING APIs ══════════════
+  lookupBarcode: (barcode) => {
+    if (!barcode) return Promise.reject(new Error('Barcode is required'));
+    console.log('🔍 Admin API - Lookup Barcode:', barcode);
+    return api.get('/mongo/barcodes/lookup', { params: { barcode } });
+  },
+
+  lookupMultipleBarcodes: (barcodes) => {
+    if (!barcodes || !barcodes.length) return Promise.reject(new Error('Barcodes array is required'));
+    console.log('🔍 Admin API - Batch Lookup Barcodes:', barcodes.length);
+    return api.post('/mongo/barcodes/lookup-batch', { barcodes });
+  },
+
+  createBarcode: (barcodeData) => {
+    if (!barcodeData || !barcodeData.barcode) return Promise.reject(new Error('Barcode data is required'));
+    console.log('➕ Admin API - Create Barcode:', barcodeData.barcode);
+    return api.post('/mongo/barcodes/create', barcodeData);
+  },
+
+  createBarcodesBatch: (barcodes) => {
+    if (!barcodes || !barcodes.length) return Promise.reject(new Error('Barcodes array is required'));
+    console.log('➕ Admin API - Batch Create Barcodes:', barcodes.length);
+    return api.post('/mongo/barcodes/create-batch', { barcodes });
+  },
+
+  syncBarcodesFromProducts: () => {
+    console.log('🔄 Admin API - Sync Barcodes from Products');
+    return api.post('/mongo/barcodes/sync-from-products', {});
   }
 };
 
