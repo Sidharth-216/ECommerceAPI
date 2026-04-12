@@ -5,6 +5,9 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using ECommerceAPI.Application.DTOs.Orders;
 using ECommerceAPI.Application.Interfaces;
+using ECommerceAPI.Domain.Entities.Mongo;
+using ECommerceAPI.Domain.Entities.MongoDB;
+using ECommerceAPI.Infrastructure.Repositories.Interfaces;
 
 namespace ECommerceAPI.Application.Services
 {
@@ -13,7 +16,9 @@ namespace ECommerceAPI.Application.Services
     /// </summary>
     public class InvoiceService : IInvoiceService
     {
-        private readonly IMongoOrderService _orderService;
+      private readonly IMongoOrderRepository _orderRepository;
+      private readonly IMongoUserRepository _userRepository;
+      private readonly IAddressMongoRepository _addressRepository;
         private readonly ILogger<InvoiceService> _logger;
 
         // Brand constants
@@ -24,10 +29,14 @@ namespace ECommerceAPI.Application.Services
         private const string DarkColor = "#134e4a";      // teal-900
 
         public InvoiceService(
-            IMongoOrderService orderService,
+          IMongoOrderRepository orderRepository,
+          IMongoUserRepository userRepository,
+          IAddressMongoRepository addressRepository,
             ILogger<InvoiceService> logger)
         {
-            _orderService = orderService;
+          _orderRepository = orderRepository;
+          _userRepository = userRepository;
+          _addressRepository = addressRepository;
             _logger = logger;
         }
 
@@ -182,20 +191,51 @@ namespace ECommerceAPI.Application.Services
         {
             try
             {
-            var allOrders = await _orderService.GetAllOrdersAsync();
-            var order = allOrders.FirstOrDefault(o => o.Id == orderId);
+            var order = await _orderRepository.GetByIdAsync(orderId);
                 if (order == null)
                 {
                     _logger.LogWarning("⚠️ [InvoiceService] Order not found: {OrderId}", orderId);
                     throw new KeyNotFoundException($"Order {orderId} not found");
                 }
 
+            var customer = await _userRepository.GetByIdAsync(order.UserId);
+            var address = await _addressRepository.GetByIdAsync(order.ShippingAddressId);
+
+            var orderDto = new OrderDto
+            {
+              Id = order.Id,
+              UserId = order.UserId,
+              OrderNumber = order.OrderNumber,
+              TotalAmount = order.TotalAmount,
+              Status = order.Status,
+              CreatedAt = order.CreatedAt,
+              Items = order.Items?.Select(item => new OrderItemDto
+              {
+                ProductId = item.ProductId,
+                ProductName = item.ProductName,
+                Quantity = item.Quantity,
+                Price = item.Price
+              }).ToList(),
+              CustomerName = customer?.FullName ?? "Valued Customer",
+              CustomerEmail = customer?.Email ?? "",
+              CustomerPhone = customer?.Mobile ?? "",
+              ShippingAddress = address == null ? null : new ShippingAddressDto
+              {
+                AddressLine1 = address.AddressLine1,
+                AddressLine2 = address.AddressLine2,
+                City = address.City,
+                State = address.State,
+                PostalCode = address.PostalCode,
+                Country = address.Country
+              }
+            };
+
                 // Generate invoice with order data
                 var html = await GenerateInvoiceHtmlAsync(
-                    order,
-                    order.CustomerName ?? "Valued Customer",
-                    order.CustomerEmail ?? "",
-                    order.CustomerPhone ?? "");
+              orderDto,
+              orderDto.CustomerName,
+              orderDto.CustomerEmail,
+              orderDto.CustomerPhone);
 
                 return html;
             }

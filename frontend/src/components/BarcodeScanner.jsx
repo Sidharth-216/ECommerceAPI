@@ -22,6 +22,7 @@ const BarcodeScanner = ({
   const qrScannerRef = useRef(null);
   const cameraRef = useRef(null);
   const Html5QrcodeRef = useRef(null);
+  const scannedBarcodesRef = useRef(new Set());
 
   // Load Html5QrCode library dynamically
   useEffect(() => {
@@ -29,7 +30,13 @@ const BarcodeScanner = ({
 
     const loadQrCodeLibrary = async () => {
       try {
-        const Html5Qrcode = (await import('html5-qrcode')).Html5Qrcode;
+        const qrModule = await import('html5-qrcode');
+        const Html5Qrcode = qrModule.Html5Qrcode || qrModule.default?.Html5Qrcode || qrModule.default;
+
+        if (!Html5Qrcode) {
+          throw new Error('Html5Qrcode class is not available');
+        }
+
         Html5QrcodeRef.current = Html5Qrcode;
         
         // Get available cameras
@@ -53,29 +60,38 @@ const BarcodeScanner = ({
 
     const startScanning = async () => {
       try {
-        const scanner = new Html5QrcodeRef.current.Html5QrcodeScanner('qr-reader', {
-          fps: 10,
-          qrbox: { width: 250, height: 250 },
-          aspectRatio: 1.77777777,
-          rememberLastUsedCamera: true,
-          showTorchButtonIfSupported: true,
-          useBarCodeDetectorIfSupported: true
-        });
+        setIsCameraReady(false);
 
+        if (qrScannerRef.current) {
+          try {
+            await qrScannerRef.current.stop();
+          } catch (stopErr) {
+            console.warn('Error stopping previous scanner:', stopErr);
+          }
+
+          try {
+            await qrScannerRef.current.clear();
+          } catch (clearErr) {
+            console.warn('Error clearing previous scanner:', clearErr);
+          }
+
+          qrScannerRef.current = null;
+        }
+
+        const scanner = new Html5QrcodeRef.current('qr-reader');
         qrScannerRef.current = scanner;
 
         const onScanSuccess = (decodedText) => {
           const cleanBarcode = decodedText.trim();
-          
-          // Avoid duplicate scans (same barcode within 1 second)
-          if (scanned.some(s => s.barcode === cleanBarcode)) {
+
+          if (scannedBarcodesRef.current.has(cleanBarcode)) {
             return;
           }
 
+          scannedBarcodesRef.current.add(cleanBarcode);
           setScanned(prev => [...prev, { barcode: cleanBarcode, id: Date.now() }]);
           onBarcodeDetected(cleanBarcode);
 
-          // Audio feedback
           playBeep();
         };
 
@@ -83,7 +99,20 @@ const BarcodeScanner = ({
           // Silently fail - not every frame will have a barcode
         };
 
-        scanner.render(onScanSuccess, onScanFailure);
+        await scanner.start(
+          deviceId,
+          {
+            fps: 10,
+            qrbox: { width: 250, height: 250 },
+            aspectRatio: 1.77777777,
+            rememberLastUsedCamera: true,
+            showTorchButtonIfSupported: true,
+            useBarCodeDetectorIfSupported: true
+          },
+          onScanSuccess,
+          onScanFailure
+        );
+
         setIsCameraReady(true);
       } catch (err) {
         setError(`Failed to start camera: ${err.message}`);
@@ -95,12 +124,20 @@ const BarcodeScanner = ({
 
     return () => {
       if (qrScannerRef.current) {
-        qrScannerRef.current.clear().catch(err => {
-          console.warn('Error clearing scanner:', err);
-        });
+        qrScannerRef.current.stop()
+          .catch(err => {
+            console.warn('Error stopping scanner:', err);
+          })
+          .finally(() => {
+            qrScannerRef.current.clear().catch(err => {
+              console.warn('Error clearing scanner:', err);
+            }).finally(() => {
+              qrScannerRef.current = null;
+            });
+          });
       }
     };
-  }, [show, deviceId, onBarcodeDetected, scanned]);
+  }, [show, deviceId, onBarcodeDetected]);
 
   const playBeep = () => {
     // Simple beep audio feedback
@@ -129,11 +166,12 @@ const BarcodeScanner = ({
 
     const cleanBarcode = manualBarcode.trim();
 
-    if (scanned.some(s => s.barcode === cleanBarcode)) {
+    if (scannedBarcodesRef.current.has(cleanBarcode)) {
       setError('This barcode has already been scanned');
       return;
     }
 
+    scannedBarcodesRef.current.add(cleanBarcode);
     setScanned(prev => [...prev, { barcode: cleanBarcode, id: Date.now() }]);
     onBarcodeDetected(cleanBarcode);
     setManualBarcode('');
@@ -141,19 +179,35 @@ const BarcodeScanner = ({
   };
 
   const handleRemoveScanned = (id) => {
-    setScanned(prev => prev.filter(s => s.id !== id));
+    setScanned(prev => {
+      const removed = prev.find(item => item.id === id);
+      if (removed) {
+        scannedBarcodesRef.current.delete(removed.barcode);
+      }
+
+      return prev.filter(s => s.id !== id);
+    });
   };
 
   const handleClose = () => {
     if (qrScannerRef.current) {
-      qrScannerRef.current.clear().catch(err => {
-        console.warn('Error clearing scanner:', err);
-      });
+      qrScannerRef.current.stop()
+        .catch(err => {
+          console.warn('Error stopping scanner:', err);
+        })
+        .finally(() => {
+          qrScannerRef.current.clear().catch(err => {
+            console.warn('Error clearing scanner:', err);
+          }).finally(() => {
+            qrScannerRef.current = null;
+          });
+        });
     }
     setScanned([]);
     setManualBarcode('');
     setError('');
     setIsCameraReady(false);
+    scannedBarcodesRef.current.clear();
     onClose();
   };
 
