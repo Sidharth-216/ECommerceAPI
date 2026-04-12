@@ -14,12 +14,25 @@ import OrdersPage     from './pages/OrdersPage';
 import ProfilePage    from './pages/ProfilePage';
 import AdminDashboard from './pages/admin/AdminDashboard';
 
+const SELECTED_PRODUCT_STORAGE_KEY = 'shopai_selected_product_v1';
+
+const readStoredSelectedProduct = () => {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    const raw = sessionStorage.getItem(SELECTED_PRODUCT_STORAGE_KEY) || localStorage.getItem(SELECTED_PRODUCT_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
 const App = () => {
   const [currentPage,  setCurrentPage]  = useState('home');
   const [searchQuery,  setSearchQuery]  = useState('');
   const [error,        setError]        = useState('');
   const [loading,      setLoading]      = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [selectedProduct, setSelectedProduct] = useState(() => readStoredSelectedProduct());
 
   const auth         = useAuth();
   const cartHook     = useCart(auth.user);
@@ -39,6 +52,8 @@ const App = () => {
       localStorage.getItem('currentPage')   ||
       'home';
 
+    const savedSelectedProduct = readStoredSelectedProduct();
+
     if (!auth.user) {
       const publicPages = ['home', 'login', 'register'];
       setCurrentPage(publicPages.includes(saved) ? saved : 'home');
@@ -50,7 +65,12 @@ const App = () => {
       setCurrentPage(adminPages.includes(saved) ? saved : 'admin');
     } else {
       // Customer — block admin page
-      setCurrentPage(saved === 'admin' ? 'products' : saved);
+      const nextPage = saved === 'admin' ? 'products' : saved;
+      setCurrentPage(nextPage);
+
+      if (nextPage === 'product-detail' && savedSelectedProduct) {
+        setSelectedProduct(savedSelectedProduct);
+      }
     }
   }, [auth.isInitializing, auth.user, auth.user?.id, auth.user?.role]);
 
@@ -60,6 +80,19 @@ const App = () => {
     sessionStorage.setItem('currentPage', currentPage);
     localStorage.setItem('currentPage',   currentPage);
   }, [currentPage, auth.isInitializing]);
+
+  useEffect(() => {
+    if (auth.isInitializing) return;
+
+    if (currentPage === 'product-detail' && selectedProduct) {
+      sessionStorage.setItem(SELECTED_PRODUCT_STORAGE_KEY, JSON.stringify(selectedProduct));
+      localStorage.setItem(SELECTED_PRODUCT_STORAGE_KEY, JSON.stringify(selectedProduct));
+      return;
+    }
+
+    sessionStorage.removeItem(SELECTED_PRODUCT_STORAGE_KEY);
+    localStorage.removeItem(SELECTED_PRODUCT_STORAGE_KEY);
+  }, [currentPage, selectedProduct, auth.isInitializing]);
 
   // ── Load data when user becomes available ───────────────────────────────
   useEffect(() => {
