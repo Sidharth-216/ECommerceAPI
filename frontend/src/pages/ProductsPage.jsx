@@ -60,6 +60,7 @@ const GLOBAL_CSS = `
 `;
 
 // ─── PRODUCT DETAIL MODAL ─────────────────────────────────────────────────────
+// eslint-disable-next-line no-unused-vars
 const ProductDetailModal = ({ product, onClose, onAddToCart, setError }) => {
   const [qty, setQty] = useState(1);
   const [tab, setTab] = useState('overview');
@@ -224,7 +225,7 @@ const ProductDetailModal = ({ product, onClose, onAddToCart, setError }) => {
 };
 
 // ─── PRODUCT CARD ─────────────────────────────────────────────────────────────
-const ProductCard = ({ product, onAddToCart, setError, onViewDetails }) => {
+const ProductCard = ({ product, onAddToCart, setError, onOpenProduct }) => {
   const [hov, setHov] = useState(false);
   const [added, setAdded] = useState(false);
   const price  = getPrice(product);
@@ -237,7 +238,7 @@ const ProductCard = ({ product, onAddToCart, setError, onViewDetails }) => {
   };
 
   return (
-    <div onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
+    <div onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)} onClick={() => onOpenProduct(product)}
       style={{ background:'white',borderRadius:20,overflow:'hidden',border:`1.5px solid ${hov?'#5eead4':'#ccfbf1'}`,transition:'all .3s cubic-bezier(.34,1.56,.64,1)',transform:hov?'translateY(-6px) scale(1.02)':'none',boxShadow:hov?'0 20px 50px rgba(13,148,136,.15)':'0 2px 10px rgba(13,148,136,.06)',display:'flex',flexDirection:'column' }}>
       <div style={{ position:'relative',aspectRatio:'1/1',background:'linear-gradient(135deg,#f0fdfa,#ccfbf1)',overflow:'hidden' }}>
         <img src={product.imageUrl||'https://via.placeholder.com/300/ccfbf1/0d9488?text=Product'} alt={product.name}
@@ -267,13 +268,13 @@ const ProductCard = ({ product, onAddToCart, setError, onViewDetails }) => {
           <div style={{ fontSize:11,color:'#cbd5e1',textDecoration:'line-through' }}>₹{(price*1.2).toLocaleString(undefined,{maximumFractionDigits:0})}</div>
         </div>
         <div style={{ marginTop:'auto',paddingTop:8,display:'flex',flexDirection:'column',gap:7 }}>
-          <button onClick={()=>onViewDetails(product)}
+          <button onClick={(e)=>{e.stopPropagation();onOpenProduct(product);}}
             style={{ width:'100%',padding:'9px 0',fontSize:12,fontWeight:700,background:'#f0fdfa',color:'#0d9488',border:'1.5px solid #99f6e4',borderRadius:12,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:5,transition:'all .2s',fontFamily:'inherit' }}
             onMouseEnter={e=>{e.currentTarget.style.background='#ccfbf1';e.currentTarget.style.borderColor='#2dd4bf'}}
             onMouseLeave={e=>{e.currentTarget.style.background='#f0fdfa';e.currentTarget.style.borderColor='#99f6e4'}}>
             <Eye size={13}/> View Details
           </button>
-          <button onClick={handleAdd} disabled={product.stockQuantity===0}
+          <button onClick={(e)=>{e.stopPropagation();handleAdd();}} disabled={product.stockQuantity===0}
             style={{ width:'100%',padding:'9px 0',fontSize:12,fontWeight:700,background:added?'linear-gradient(135deg,#34d399,#10b981)':product.stockQuantity===0?'#f1f5f9':'linear-gradient(135deg,#2dd4bf,#0d9488)',color:product.stockQuantity===0?'#94a3b8':'white',border:'none',borderRadius:12,cursor:product.stockQuantity===0?'not-allowed':'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:5,transition:'all .25s cubic-bezier(.34,1.56,.64,1)',transform:added?'scale(.96)':'scale(1)',boxShadow:added?'0 4px 14px rgba(52,211,153,.45)':product.stockQuantity===0?'none':'0 4px 14px rgba(13,148,136,.3)',fontFamily:'inherit' }}>
             {added?<><CheckCircle size={13}/>Added!</>:product.stockQuantity===0?'Out of Stock':<><ShoppingCart size={13}/>Add to Cart</>}
           </button>
@@ -284,7 +285,7 @@ const ProductCard = ({ product, onAddToCart, setError, onViewDetails }) => {
 };
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
-const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCurrentPage, handleLogout, addToCart, error, setError }) => {
+const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCurrentPage, handleLogout, addToCart, error, setError, openProductDetail }) => {
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [chatOpen,            setChatOpen]            = useState(false);
@@ -295,7 +296,6 @@ const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCu
   const [showSuggestions,     setShowSuggestions]     = useState(false);
   const [isSemanticMode,      setIsSemanticMode]      = useState(false);
   const [currentBanner,       setCurrentBanner]       = useState(0);
-  const [detailProduct,       setDetailProduct]       = useState(null);
   const [viewMode,            setViewMode]            = useState('grid');
   const [viewportWidth,       setViewportWidth]       = useState(typeof window !== 'undefined' ? window.innerWidth : 1280);
   const [currentProductPage,  setCurrentProductPage]  = useState(1);
@@ -381,6 +381,53 @@ const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCu
   const uniqueCategories  = Array.from(
     new Set((products || []).map(p => getCategoryName(p)).filter(Boolean))
   ).slice(0, 20);
+  const catalogSections = [
+    {
+      title: 'Trending Electronics',
+      icon: <Zap size={16}/>,
+      bg: '#ccfbf1',
+      accent: '#0d9488',
+      products: (products || [])
+        .filter((p) => {
+          const c = getCategoryName(p).toLowerCase();
+          return c.includes('electronic') || c.includes('mobile') || c.includes('phone') || c.includes('laptop') || c.includes('tablet');
+        })
+        .slice(0, 4)
+    },
+    {
+      title: 'Audio & Wearables',
+      icon: <Star size={16}/>,
+      bg: '#f0e9ff',
+      accent: '#8b5cf6',
+      products: (products || [])
+        .filter((p) => {
+          const c = getCategoryName(p).toLowerCase();
+          return c.includes('audio') || c.includes('headphone') || c.includes('earbud') || c.includes('speaker') || c.includes('wearable') || c.includes('watch');
+        })
+        .slice(0, 4)
+    },
+    {
+      title: 'Home Appliances',
+      icon: <Package size={16}/>,
+      bg: '#fef9ee',
+      accent: '#f59e0b',
+      products: (products || [])
+        .filter((p) => {
+          const c = getCategoryName(p).toLowerCase();
+          return c.includes('appliance') || c.includes('home') || c.includes('kitchen') || c.includes('vacuum') || c.includes('washer') || c.includes('purifier') || c.includes('microwave');
+        })
+        .slice(0, 4)
+    },
+    {
+      title: 'Deals Under ₹999',
+      icon: <Tag size={16}/>,
+      bg: '#ecfdf5',
+      accent: '#10b981',
+      products: (products || [])
+        .filter((p) => getPrice(p) <= 999)
+        .slice(0, 4)
+    }
+  ];
 
   useEffect(() => {
     setCurrentProductPage(1);
@@ -624,12 +671,7 @@ const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCu
 
         {/* CATEGORY CARDS */}
         <div style={{ display:'grid',gridTemplateColumns:isMobile?'1fr':(isTablet?'repeat(2,1fr)':'repeat(4,1fr)'),gap:16,marginBottom:24 }}>
-          {[
-            {title:'Trending Electronics',subs:['Smartphones','Laptops','Tablets','Accessories'],cat:'Electronics',icon:<Zap size={16}/>,bg:'#ccfbf1',accent:'#0d9488'},
-            {title:'Audio & Wearables',subs:['Headphones','Watches','Earbuds','Speakers'],cat:'Audio',icon:<Star size={16}/>,bg:'#f0e9ff',accent:'#8b5cf6'},
-            {title:'Home Appliances',subs:['Purifiers','Vacuums','Microwaves','Washers'],cat:'Appliances',icon:<Package size={16}/>,bg:'#fef9ee',accent:'#f59e0b'},
-            {title:'Deals Under ₹999',subs:['Cables','Cases','Chargers','More'],cat:'',icon:<Tag size={16}/>,bg:'#ecfdf5',accent:'#10b981'},
-          ].map((c,i)=>(
+          {catalogSections.map((c,i)=>(
             <div key={i} style={{ background:'white',borderRadius:20,padding:18,border:'1px solid #ccfbf1',boxShadow:'0 4px 14px rgba(13,148,136,.06)',transition:'all .3s',position:'relative',overflow:'hidden',cursor:'pointer' }}
               onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-4px)';e.currentTarget.style.boxShadow='0 16px 40px rgba(13,148,136,.13)';e.currentTarget.style.borderColor='#5eead4'}}
               onMouseLeave={e=>{e.currentTarget.style.transform='none';e.currentTarget.style.boxShadow='0 4px 14px rgba(13,148,136,.06)';e.currentTarget.style.borderColor='#ccfbf1'}}>
@@ -639,14 +681,18 @@ const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCu
                 <h3 style={{ fontSize:13,fontWeight:800,color:'#064e3b',margin:0 }}>{c.title}</h3>
               </div>
               <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:14 }}>
-                {c.subs.map(sub=>(
-                  <div key={sub}>
-                    <div style={{ aspectRatio:'1/1',background:c.bg,borderRadius:10,marginBottom:4,opacity:.85 }}/>
-                    <p style={{ fontSize:11,color:'#64748b',margin:0,fontWeight:600 }}>{sub}</p>
-                  </div>
-                ))}
+                {c.products.length > 0 ? c.products.map((p, idx)=>(
+                  <button key={getProductId(p) || idx} onClick={() => openProductDetail(p)} style={{ border:'none',padding:0,background:'transparent',cursor:'pointer',textAlign:'left' }}>
+                    <div style={{ aspectRatio:'1/1',background:c.bg,borderRadius:10,marginBottom:4,opacity:.95,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden' }}>
+                      <img src={p.imageUrl||'https://via.placeholder.com/100/ccfbf1/0d9488?text=P'} alt={p.name} style={{ width:'80%',height:'80%',objectFit:'contain' }} onError={e=>{e.currentTarget.src='https://via.placeholder.com/100/ccfbf1/0d9488?text=P'}}/>
+                    </div>
+                    <p style={{ fontSize:11,color:'#64748b',margin:0,fontWeight:600,display:'-webkit-box',WebkitLineClamp:1,WebkitBoxOrient:'vertical',overflow:'hidden' }}>{p.name}</p>
+                  </button>
+                )) : (
+                  <div style={{ gridColumn:'1 / -1',fontSize:12,color:'#94a3b8',fontWeight:600,padding:'8px 4px' }}>No products found in this section yet.</div>
+                )}
               </div>
-              <button onClick={()=>applyCategory(c.cat)} style={{ background:'none',border:'none',color:c.accent,fontSize:12,fontWeight:800,cursor:'pointer',padding:0,display:'flex',alignItems:'center',gap:4,fontFamily:'inherit',transition:'gap .2s' }}
+              <button onClick={() => setCurrentPage('products')} style={{ background:'none',border:'none',color:c.accent,fontSize:12,fontWeight:800,cursor:'pointer',padding:0,display:'flex',alignItems:'center',gap:4,fontFamily:'inherit',transition:'gap .2s' }}
                 onMouseEnter={e=>e.currentTarget.style.gap='8px'} onMouseLeave={e=>e.currentTarget.style.gap='4px'}>
                 Explore all <ArrowRight size={12}/>
               </button>
@@ -722,7 +768,7 @@ const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCu
             <div style={{ display:'grid',gridTemplateColumns:`repeat(auto-fill,minmax(${isMobile ? 150 : 200}px,1fr))`,gap:16 }}>
               {paginatedProducts.map((product,index)=>(
                 <div key={getProductId(product)||index} className="card-in" style={{ animationDelay:`${Math.min(index*.04,.4)}s` }}>
-                  <ProductCard product={product} onAddToCart={addToCart} setError={setError} onViewDetails={setDetailProduct}/>
+                  <ProductCard product={product} onAddToCart={addToCart} setError={setError} onOpenProduct={openProductDetail}/>
                 </div>
               ))}
             </div>
@@ -742,7 +788,7 @@ const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCu
                   <div style={{ display:'flex',flexDirection:'column',alignItems:isMobile?'stretch':'flex-end',gap:10,flexShrink:0,width:isMobile?'100%':'auto' }}>
                     <div style={{ fontSize:22,fontWeight:900,color:'#0d9488' }}>₹{getPrice(product).toLocaleString()}</div>
                     <div style={{ display:'flex',gap:8,flexWrap:isMobile?'wrap':'nowrap' }}>
-                      <button onClick={()=>setDetailProduct(product)} style={{ padding:'8px 14px',background:'#f0fdfa',color:'#0d9488',border:'1.5px solid #99f6e4',borderRadius:10,fontSize:12,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',gap:5,fontFamily:'inherit' }}><Eye size={13}/> Details</button>
+                      <button onClick={()=>openProductDetail(product)} style={{ padding:'8px 14px',background:'#f0fdfa',color:'#0d9488',border:'1.5px solid #99f6e4',borderRadius:10,fontSize:12,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',gap:5,fontFamily:'inherit' }}><Eye size={13}/> Details</button>
                       <button onClick={()=>addToCart(product,setError)} disabled={product.stockQuantity===0} style={{ padding:'8px 14px',background:'linear-gradient(135deg,#2dd4bf,#0d9488)',color:'white',border:'none',borderRadius:10,fontSize:12,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',gap:5,opacity:product.stockQuantity===0?.4:1,fontFamily:'inherit' }}><ShoppingCart size={13}/> Add</button>
                     </div>
                   </div>
@@ -782,11 +828,6 @@ const ProductsPage = ({ user, products, cart, searchQuery, setSearchQuery, setCu
           )}
         </div>
       </div>
-
-      {/* PRODUCT DETAIL MODAL */}
-      {detailProduct && (
-        <ProductDetailModal product={detailProduct} onClose={()=>setDetailProduct(null)} onAddToCart={addToCart} setError={setError}/>
-      )}
 
       {/* ── FULL-PAGE CHAT ──────────────────────────────────────────────────
           chatMessages state lives here in ProductsPage and is passed down.

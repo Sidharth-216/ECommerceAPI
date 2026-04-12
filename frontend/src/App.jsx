@@ -7,6 +7,7 @@ import HomePage       from './pages/HomePage';
 import LoginPage      from './pages/LoginPage';
 import RegisterPage   from './pages/RegisterPage';
 import ProductsPage   from './pages/ProductsPage';
+import ProductDetailPage from './pages/ProductDetailPage';
 import CartPage       from './pages/CartPage';
 import CheckoutPage   from './pages/CheckoutPage';
 import OrdersPage     from './pages/OrdersPage';
@@ -18,6 +19,7 @@ const App = () => {
   const [searchQuery,  setSearchQuery]  = useState('');
   const [error,        setError]        = useState('');
   const [loading,      setLoading]      = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
 
   const auth         = useAuth();
   const cartHook     = useCart(auth.user);
@@ -115,7 +117,13 @@ const App = () => {
     setProfileData:     auth.setProfileData,
     loadProducts:       productsHook.loadProducts,
     loadOrders:         auth.loadOrders,
-    loadProfile:        auth.loadProfile
+    loadProfile:        auth.loadProfile,
+    selectedProduct,
+    setSelectedProduct,
+    openProductDetail:  (product) => {
+      setSelectedProduct(product || null);
+      setCurrentPage('product-detail');
+    }
   };
 
   // Spinner while session check runs
@@ -142,6 +150,10 @@ const App = () => {
 
   switch (currentPage) {
     case 'products': return <ProductsPage  {...pageProps} />;
+    case 'product-detail':
+      return selectedProduct
+        ? <ProductDetailPage {...pageProps} />
+        : <ProductsPage {...pageProps} />;
     case 'cart':     return <CartPage      {...pageProps} />;
     case 'checkout': return <CheckoutPage  {...pageProps} />;
     case 'orders':   return <OrdersPage    {...pageProps} />;
