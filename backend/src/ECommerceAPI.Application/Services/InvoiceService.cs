@@ -8,6 +8,9 @@ using ECommerceAPI.Application.Interfaces;
 using ECommerceAPI.Domain.Entities.Mongo;
 using ECommerceAPI.Domain.Entities.MongoDB;
 using ECommerceAPI.Infrastructure.Repositories.Interfaces;
+using QuestPDF.Fluent;
+using QuestPDF.Helpers;
+using QuestPDF.Infrastructure;
 
 namespace ECommerceAPI.Application.Services
 {
@@ -38,6 +41,8 @@ namespace ECommerceAPI.Application.Services
           _userRepository = userRepository;
           _addressRepository = addressRepository;
             _logger = logger;
+
+            QuestPDF.Settings.License = LicenseType.Community;
         }
 
         public async Task<string> GenerateInvoiceHtmlAsync(
@@ -191,7 +196,7 @@ namespace ECommerceAPI.Application.Services
         {
             try
             {
-            var order = await _orderRepository.GetByIdAsync(orderId);
+          var order = await _orderRepository.GetByIdAsync(orderId);
                 if (order == null)
                 {
                     _logger.LogWarning("⚠️ [InvoiceService] Order not found: {OrderId}", orderId);
@@ -245,6 +250,187 @@ namespace ECommerceAPI.Application.Services
                 throw;
             }
         }
+
+            public async Task<byte[]> GetInvoiceAsPdfAsync(string orderId)
+            {
+              var order = await _orderRepository.GetByIdAsync(orderId);
+              if (order == null)
+              {
+                _logger.LogWarning("⚠️ [InvoiceService] Order not found: {OrderId}", orderId);
+                throw new KeyNotFoundException($"Order {orderId} not found");
+              }
+
+              var customer = await _userRepository.GetByIdAsync(order.UserId);
+              var address = await _addressRepository.GetByIdAsync(order.ShippingAddressId);
+
+              var orderDto = BuildInvoiceOrderDto(order, customer, address);
+              return await GenerateInvoicePdfAsync(
+                orderDto,
+                orderDto.CustomerName,
+                orderDto.CustomerEmail,
+                orderDto.CustomerPhone);
+            }
+
+            public async Task<byte[]> GenerateInvoicePdfAsync(
+              OrderDto order,
+              string customerName,
+              string customerEmail,
+              string customerPhone)
+            {
+              try
+              {
+                _logger.LogInformation("📄 [InvoiceService] Generating PDF invoice for order {OrderNumber}", order.OrderNumber);
+
+                var document = Document.Create(container =>
+                {
+                  container.Page(page =>
+                  {
+                    page.Size(PageSizes.A4);
+                    page.Margin(28);
+                    page.DefaultTextStyle(x => x.FontSize(10));
+
+                    page.Header().Row(row =>
+                    {
+                      row.RelativeItem().Column(column =>
+                      {
+                        column.Item().Text(BrandName).FontSize(22).Bold().FontColor(PrimaryColor);
+                        column.Item().Text("Professional E-Commerce Solutions").FontSize(10).FontColor(Colors.Grey.Darken1);
+                      });
+
+                      row.ConstantItem(170).AlignRight().Column(column =>
+                      {
+                        column.Item().Text("INVOICE").FontSize(18).Bold().FontColor(DarkColor);
+                        column.Item().Text(order.OrderNumber).FontSize(12).FontColor(PrimaryColor).Bold();
+                        column.Item().Text(order.CreatedAt.ToString("dd MMM yyyy")).FontSize(10).FontColor(Colors.Grey.Darken1);
+                      });
+                    });
+
+                    page.Content().PaddingTop(20).Column(column =>
+                    {
+                      column.Spacing(14);
+
+                      column.Item().Border(1).BorderColor(Colors.Grey.Lighten2).Padding(12).Column(box =>
+                      {
+                        box.Item().Text("BILL TO").FontSize(9).Bold().FontColor(Colors.Grey.Darken1);
+                        box.Item().Text(customerName).FontSize(12).Bold();
+                        box.Item().Text(customerEmail).FontSize(10).FontColor(Colors.Grey.Darken1);
+                        box.Item().Text(customerPhone).FontSize(10).FontColor(Colors.Grey.Darken1);
+                      });
+
+                      column.Item().Border(1).BorderColor(Colors.Grey.Lighten2).Padding(12).Column(box =>
+                      {
+                        box.Item().Text("SHIPPING ADDRESS").FontSize(9).Bold().FontColor(Colors.Grey.Darken1);
+                        box.Item().Text(order.ShippingAddress?.AddressLine1 ?? "Address not provided").FontSize(10);
+
+                        if (!string.IsNullOrWhiteSpace(order.ShippingAddress?.AddressLine2))
+                          box.Item().Text(order.ShippingAddress.AddressLine2).FontSize(10);
+
+                        box.Item().Text($"{order.ShippingAddress?.City}, {order.ShippingAddress?.State} {order.ShippingAddress?.PostalCode}").FontSize(10);
+                        box.Item().Text(order.ShippingAddress?.Country ?? string.Empty).FontSize(10);
+                      });
+
+                      column.Item().Table(table =>
+                      {
+                        table.ColumnsDefinition(columns =>
+                        {
+                          columns.RelativeColumn(3);
+                          columns.RelativeColumn(1);
+                          columns.RelativeColumn(1);
+                          columns.RelativeColumn(1);
+                        });
+
+                        table.Header(header =>
+                        {
+                          header.Cell().Element(CellHeaderStyle).Text("PRODUCT");
+                          header.Cell().Element(CellHeaderStyle).AlignCenter().Text("QTY");
+                          header.Cell().Element(CellHeaderStyle).AlignRight().Text("UNIT PRICE");
+                          header.Cell().Element(CellHeaderStyle).AlignRight().Text("TOTAL");
+                        });
+
+                        foreach (var item in order.Items ?? new List<OrderItemDto>())
+                        {
+                          table.Cell().Element(CellBodyStyle).Text(item.ProductName);
+                          table.Cell().Element(CellBodyStyle).AlignCenter().Text(item.Quantity.ToString());
+                          table.Cell().Element(CellBodyStyle).AlignRight().Text($"₹{item.Price:N2}");
+                          table.Cell().Element(CellBodyStyle).AlignRight().Text($"₹{(item.Price * item.Quantity):N2}");
+                        }
+                      });
+
+                      var subtotal = order.Items?.Sum(i => i.Price * i.Quantity) ?? 0;
+                      var tax = subtotal * 0.05m;
+                      var shipping = subtotal > 500 ? 0 : 50;
+                      var total = subtotal + tax + shipping;
+
+                      column.Item().AlignRight().Border(1).BorderColor(Colors.Grey.Lighten2).Padding(12).Column(box =>
+                      {
+                        box.Item().Row(r => { r.RelativeItem().Text("Subtotal"); r.ConstantItem(120).AlignRight().Text($"₹{subtotal:N2}"); });
+                        box.Item().Row(r => { r.RelativeItem().Text("Tax (5%)"); r.ConstantItem(120).AlignRight().Text($"₹{tax:N2}"); });
+                        box.Item().Row(r => { r.RelativeItem().Text("Shipping"); r.ConstantItem(120).AlignRight().Text($"₹{shipping:N2}"); });
+                        box.Item().LineHorizontal(1).LineColor(Colors.Grey.Lighten2);
+                        box.Item().Row(r =>
+                        {
+                          r.RelativeItem().Text("TOTAL").Bold();
+                          r.ConstantItem(120).AlignRight().Text($"₹{total:N2}").Bold().FontColor(PrimaryColor);
+                        });
+                      });
+                    });
+
+                    page.Footer().AlignCenter().Text($"Thank you for shopping with {BrandName}.").FontSize(9).FontColor(Colors.Grey.Darken1);
+                  });
+                });
+
+                using var stream = new System.IO.MemoryStream();
+                document.GeneratePdf(stream);
+                return stream.ToArray();
+              }
+              catch (Exception ex)
+              {
+                _logger.LogError(ex, "❌ [InvoiceService] Error generating PDF invoice for order {OrderNumber}", order.OrderNumber);
+                throw;
+              }
+            }
+
+            private OrderDto BuildInvoiceOrderDto(MongoOrder order, MongoUser customer, AddressMongo address)
+            {
+              return new OrderDto
+              {
+                Id = order.Id,
+                UserId = order.UserId,
+                OrderNumber = order.OrderNumber,
+                TotalAmount = order.TotalAmount,
+                Status = order.Status,
+                CreatedAt = order.CreatedAt,
+                Items = order.Items?.Select(item => new OrderItemDto
+                {
+                  ProductId = item.ProductId,
+                  ProductName = item.ProductName,
+                  Quantity = item.Quantity,
+                  Price = item.Price
+                }).ToList(),
+                CustomerName = customer?.FullName ?? "Valued Customer",
+                CustomerEmail = customer?.Email ?? string.Empty,
+                CustomerPhone = customer?.Mobile ?? string.Empty,
+                ShippingAddress = address == null ? null : new ShippingAddressDto
+                {
+                  AddressLine1 = address.AddressLine1,
+                  AddressLine2 = address.AddressLine2,
+                  City = address.City,
+                  State = address.State,
+                  PostalCode = address.PostalCode,
+                  Country = address.Country
+                }
+              };
+            }
+
+            private static IContainer CellHeaderStyle(IContainer container)
+            {
+              return container.BorderBottom(1).BorderColor(Colors.Grey.Darken2).PaddingVertical(6).Background(Colors.Grey.Lighten3);
+            }
+
+            private static IContainer CellBodyStyle(IContainer container)
+            {
+              return container.BorderBottom(1).BorderColor(Colors.Grey.Lighten2).PaddingVertical(6);
+            }
 
         /// <summary>
         /// Build HTML for items table rows

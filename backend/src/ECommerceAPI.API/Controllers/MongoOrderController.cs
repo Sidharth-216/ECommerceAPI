@@ -271,7 +271,7 @@ namespace ECommerceAPI.API.Controllers
     /// <summary>
     /// Download invoice for a delivered order
     /// GET /api/mongo/order/{orderId}/invoice
-    /// Returns HTML invoice as file download
+    /// Returns PDF invoice as file download
     /// </summary>
     [HttpGet("{orderId}/invoice")]
     public async Task<ActionResult> DownloadInvoice(string orderId)
@@ -304,24 +304,18 @@ namespace ECommerceAPI.API.Controllers
                 });
             }
 
-            // Inject and use InvoiceService to generate HTML
+            // Inject and use InvoiceService to generate PDF
             var invoiceService = HttpContext.RequestServices.GetService(typeof(IInvoiceService)) as IInvoiceService;
             if (invoiceService == null)
             {
                 return StatusCode(500, new { message = "Invoice service not available" });
             }
 
-            // Generate invoice HTML directly using the OrderDto we already fetched
-            var invoiceHtml = await invoiceService.GenerateInvoiceHtmlAsync(
-                order,
-                order.CustomerName ?? "Valued Customer",
-                order.CustomerEmail ?? "customer@email.com",
-                order.CustomerPhone ?? "");
+            var invoicePdf = await invoiceService.GetInvoiceAsPdfAsync(orderId);
 
-            // Return as downloadable HTML file
-            var fileName = $"Invoice-{order.OrderNumber}.html";
-            var bytes = System.Text.Encoding.UTF8.GetBytes(invoiceHtml);
-            return File(bytes, "text/html", fileName);
+            // Return as downloadable PDF file
+            var fileName = $"Invoice-{order.OrderNumber}.pdf";
+            return File(invoicePdf, "application/pdf", fileName);
         }
         catch (KeyNotFoundException ex)
         {

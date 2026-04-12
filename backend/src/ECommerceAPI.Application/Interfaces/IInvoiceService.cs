@@ -14,8 +14,18 @@ namespace ECommerceAPI.Application.Interfaces
         Task<string> GenerateInvoiceHtmlAsync(OrderDto order, string customerName, string customerEmail, string customerPhone);
 
         /// <summary>
+        /// Generate a PDF invoice for an order
+        /// </summary>
+        Task<byte[]> GenerateInvoicePdfAsync(OrderDto order, string customerName, string customerEmail, string customerPhone);
+
+        /// <summary>
         /// Get invoice as HTML string (for download or email attachment)
         /// </summary>
         Task<string> GetInvoiceAsHtmlAsync(string orderId);
+
+        /// <summary>
+        /// Get invoice as PDF bytes for download or email attachment
+        /// </summary>
+        Task<byte[]> GetInvoiceAsPdfAsync(string orderId);
     }
 }

@@ -936,7 +936,7 @@ namespace ECommerceAPI.Application.Services
         /// Send detailed invoice email when order is delivered
         /// </summary>
         public async Task<bool> SendInvoiceAsync(
-            string toEmail, string customerName, OrderDto order, string invoiceHtml)
+          string toEmail, string customerName, OrderDto order, string invoiceHtml, byte[] invoicePdfBytes)
         {
             try
             {
@@ -1025,7 +1025,18 @@ namespace ECommerceAPI.Application.Services
 </body>
 </html>";
 
-                var sent = await SendEmailAsync(toEmail, subject, body);
+                var attachments = invoicePdfBytes != null && invoicePdfBytes.Length > 0
+                  ? new[]
+                  {
+                    new
+                    {
+                      name = $"Invoice-{order.OrderNumber}.pdf",
+                      content = Convert.ToBase64String(invoicePdfBytes)
+                    }
+                  }
+                  : null;
+
+                var sent = await SendEmailAsync(toEmail, subject, body, attachments);
                 if (sent)
                     _logger.LogInformation("✅ Invoice email sent to {Email}", toEmail);
                 else
@@ -1048,7 +1059,7 @@ namespace ECommerceAPI.Application.Services
         //   - No domain required — sends to any email on free tier
         // ─────────────────────────────────────────────────────────────────────────
 
-        private async Task<bool> SendEmailAsync(string toEmail, string subject, string htmlBody)
+        private async Task<bool> SendEmailAsync(string toEmail, string subject, string htmlBody, object[] attachments = null)
         {
             try
             {
@@ -1068,7 +1079,8 @@ namespace ECommerceAPI.Application.Services
                     sender      = new { name = fromName, email = fromEmail },
                     to          = new[] { new { email = toEmail } },
                     subject     = subject,
-                    htmlContent = htmlBody
+                  htmlContent = htmlBody,
+                  attachments = attachments
                 };
 
                 var client  = _httpClientFactory.CreateClient();

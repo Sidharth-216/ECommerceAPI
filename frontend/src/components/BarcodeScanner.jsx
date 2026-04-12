@@ -345,6 +345,7 @@ const BarcodeScanner = ({
             </button>
             <button
               disabled={scanned.length === 0 || isLoading}
+              onClick={handleClose}
               className="flex-1 px-6 py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
             >
               {isLoading && <Loader className="w-4 h-4 animate-spin" />}

@@ -30,6 +30,6 @@ namespace ECommerceAPI.Application.Interfaces
         /// <summary>
         /// Send a detailed invoice email when order is delivered
         /// </summary>
-        Task<bool> SendInvoiceAsync(string toEmail, string customerName, OrderDto order, string invoiceHtml);
+        Task<bool> SendInvoiceAsync(string toEmail, string customerName, OrderDto order, string invoiceHtml, byte[] invoicePdfBytes);
     }
 }

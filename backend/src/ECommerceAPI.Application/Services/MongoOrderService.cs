@@ -205,6 +205,32 @@ namespace ECommerceAPI.Application.Services
 
                 // 🔟 Build DTO
                 var orderDto = MapMongoToDto(mongoOrder);
+
+                // 1️⃣1️⃣ Send order confirmation email after the order is safely persisted
+                try
+                {
+                    if (!string.IsNullOrWhiteSpace(user.Email))
+                    {
+                        var confirmationSent = await _orderEmailService.SendOrderConfirmationAsync(
+                            user.Email,
+                            user.FullName ?? "Valued Customer",
+                            orderDto);
+
+                        if (confirmationSent)
+                        {
+                            Console.WriteLine($"📧 Confirmation email sent to {user.Email}");
+                        }
+                        else
+                        {
+                            Console.WriteLine($"⚠️ Confirmation email returned false for {user.Email}");
+                        }
+                    }
+                }
+                catch (Exception emailEx)
+                {
+                    Console.WriteLine($"⚠️ Confirmation email failed (order still created): {emailEx.Message}");
+                }
+
                 Console.WriteLine($"✅ Order creation completed successfully!");
 
                 return orderDto;
@@ -458,12 +484,19 @@ namespace ECommerceAPI.Application.Services
                                     orderUser.FullName ?? "Valued Customer",
                                     orderUser.Email,
                                     orderUser.Mobile ?? "");
+
+                                var invoicePdf = await _invoiceService.GenerateInvoicePdfAsync(
+                                    updatedDto,
+                                    orderUser.FullName ?? "Valued Customer",
+                                    orderUser.Email,
+                                    orderUser.Mobile ?? "");
                                 
                                 var invoiceSent = await _orderEmailService.SendInvoiceAsync(
                                     orderUser.Email,
                                     orderUser.FullName ?? "Valued Customer",
                                     updatedDto,
-                                    invoiceHtml);
+                                    invoiceHtml,
+                                    invoicePdf);
                                 
                                 _logger.LogInformation(invoiceSent
                                     ? $"✅ Invoice email sent to {orderUser.Email}"

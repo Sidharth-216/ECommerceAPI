@@ -49,11 +49,12 @@ const OrdersPage = ({ user, orders = [], setOrders, setCurrentPage }) => {
             setLoading(true);
             setError('');
             
-            // Fetch the invoice HTML from the API
+            // Fetch the invoice PDF from the API
             const response = await fetch(`/api/mongo/order/${orderId}/invoice`, {
                 method: 'GET',
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'Accept': 'application/pdf'
                 }
             });
 
@@ -69,7 +70,7 @@ const OrdersPage = ({ user, orders = [], setOrders, setCurrentPage }) => {
             const url = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
-            link.download = `Invoice-${order.orderNumber}.html`;
+            link.download = `Invoice-${order.orderNumber}.pdf`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
