@@ -107,6 +107,18 @@ const ProductDetailPage = ({
   const [newRating, setNewRating] = useState(5);
   const [newComment, setNewComment] = useState('');
   const [reviews, setReviews] = useState(() => readProductReviews(productId));
+  const [viewportWidth, setViewportWidth] = useState(
+    typeof window !== 'undefined' ? window.innerWidth : 1280
+  );
+
+  const isMobile = viewportWidth < 640;
+  const isTablet = viewportWidth >= 640 && viewportWidth < 1024;
+
+  React.useEffect(() => {
+    const handleResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   if (!product) {
     return (
@@ -174,8 +186,8 @@ const ProductDetailPage = ({
 
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(180deg,#ecfeff 0%,#f8fafc 45%,#ffffff 100%)' }}>
-      <div style={{ maxWidth: 1280, margin: '0 auto', padding: '16px' }}>
-        <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+      <div style={{ maxWidth: 1280, margin: '0 auto', padding: isMobile ? '12px' : '16px' }}>
+        <div style={{ marginBottom: isMobile ? 12 : 16, display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: 12, flexWrap: 'wrap' }}>
           <button
             onClick={() => setCurrentPage('products')}
             style={{
@@ -183,7 +195,7 @@ const ProductDetailPage = ({
               color: '#0d9488',
               background: 'white',
               borderRadius: 999,
-              padding: '10px 14px',
+              padding: isMobile ? '9px 12px' : '10px 14px',
               fontWeight: 700,
               display: 'flex',
               alignItems: 'center',
@@ -194,7 +206,7 @@ const ProductDetailPage = ({
             <ArrowLeft size={16} /> Back To Products
           </button>
 
-          <div style={{ color: '#0f766e', fontSize: 13, fontWeight: 700 }}>
+          <div style={{ color: '#0f766e', fontSize: isMobile ? 12 : 13, fontWeight: 700, textAlign: isMobile ? 'right' : 'left' }}>
             {category}
           </div>
         </div>
@@ -202,44 +214,44 @@ const ProductDetailPage = ({
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'minmax(0, 1fr)',
-          gap: 18
+          gap: isMobile ? 14 : 18
         }}>
           <div className="product-detail-grid" style={{
             display: 'grid',
-            gridTemplateColumns: 'minmax(0, 420px) minmax(0, 1fr)',
-            gap: 18,
+            gridTemplateColumns: isTablet ? 'minmax(0, 360px) minmax(0, 1fr)' : 'minmax(0, 420px) minmax(0, 1fr)',
+            gap: isMobile ? 14 : 18,
             background: 'white',
             border: '1px solid #ccfbf1',
-            borderRadius: 20,
+            borderRadius: isMobile ? 16 : 20,
             overflow: 'hidden'
           }}>
-            <div style={{ padding: 18, background: 'linear-gradient(140deg,#f0fdfa,#ccfbf1)' }}>
-              <div style={{ borderRadius: 18, background: 'white', minHeight: 360, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ padding: isMobile ? 14 : 18, background: 'linear-gradient(140deg,#f0fdfa,#ccfbf1)' }}>
+              <div style={{ borderRadius: 18, background: 'white', minHeight: isMobile ? 240 : isTablet ? 300 : 360, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <img
                   src={product.imageUrl || 'https://via.placeholder.com/380/ccfbf1/0d9488?text=Product'}
                   alt={product.name}
-                  style={{ width: '88%', height: '88%', objectFit: 'contain' }}
+                  style={{ width: isMobile ? '84%' : '88%', height: isMobile ? '84%' : '88%', objectFit: 'contain' }}
                   onError={(e) => { e.currentTarget.src = 'https://via.placeholder.com/380/ccfbf1/0d9488?text=Product'; }}
                 />
               </div>
             </div>
 
-            <div style={{ padding: 20 }}>
-              <h1 style={{ margin: 0, fontSize: 30, color: '#064e3b', lineHeight: 1.2 }}>{product.name}</h1>
-              <p style={{ margin: '8px 0 0', color: '#64748b', fontWeight: 600 }}>{product.brand || 'ShopAI'}</p>
+            <div style={{ padding: isMobile ? 16 : 20 }}>
+              <h1 style={{ margin: 0, fontSize: isMobile ? 22 : isTablet ? 26 : 30, color: '#064e3b', lineHeight: 1.2 }}>{product.name}</h1>
+              <p style={{ margin: '8px 0 0', color: '#64748b', fontWeight: 600, fontSize: isMobile ? 13 : 14 }}>{product.brand || 'ShopAI'}</p>
 
               <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <RatingStars value={combinedRating ? Number(combinedRating.toFixed(1)) : 0} />
-                <span style={{ color: '#f59e0b', fontWeight: 800 }}>
+                <span style={{ color: '#f59e0b', fontWeight: 800, fontSize: isMobile ? 13 : 14 }}>
                   {combinedRating ? combinedRating.toFixed(1) : 'No rating yet'}
                 </span>
-                <span style={{ color: '#94a3b8', fontSize: 13 }}>
+                <span style={{ color: '#94a3b8', fontSize: isMobile ? 12 : 13 }}>
                   ({combinedReviewCount} reviews)
                 </span>
               </div>
 
               <div style={{ marginTop: 14, display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 34, fontWeight: 900, color: '#0d9488' }}>₹{basePrice.toLocaleString()}</span>
+                <span style={{ fontSize: isMobile ? 26 : isTablet ? 30 : 34, fontWeight: 900, color: '#0d9488' }}>₹{basePrice.toLocaleString()}</span>
                 <span style={{ color: '#94a3b8', textDecoration: 'line-through' }}>
                   ₹{Math.round(basePrice * 1.2).toLocaleString()}
                 </span>
@@ -248,7 +260,7 @@ const ProductDetailPage = ({
                 </span>
               </div>
 
-              <div style={{ marginTop: 16, color: '#475569', lineHeight: 1.7 }}>
+              <div style={{ marginTop: 16, color: '#475569', lineHeight: 1.7, fontSize: isMobile ? 13 : 14 }}>
                 {product.description || 'No detailed description available for this product yet.'}
               </div>
 
@@ -259,20 +271,20 @@ const ProductDetailPage = ({
                 border: '1px solid #ccfbf1',
                 background: '#f8fffe',
                 display: 'grid',
-                gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : 'repeat(2, minmax(0, 1fr))',
                 gap: 10
               }}>
-                <div style={{ fontSize: 13 }}><strong style={{ color: '#0f766e' }}>Category:</strong> {category}</div>
-                <div style={{ fontSize: 13 }}><strong style={{ color: '#0f766e' }}>Stock:</strong> {product.stockQuantity > 0 ? `${product.stockQuantity} available` : 'Out of stock'}</div>
-                <div style={{ fontSize: 13 }}><strong style={{ color: '#0f766e' }}>Delivery:</strong> Free above ₹499</div>
-                <div style={{ fontSize: 13 }}><strong style={{ color: '#0f766e' }}>Return:</strong> 7-day policy</div>
+                <div style={{ fontSize: isMobile ? 12 : 13 }}><strong style={{ color: '#0f766e' }}>Category:</strong> {category}</div>
+                <div style={{ fontSize: isMobile ? 12 : 13 }}><strong style={{ color: '#0f766e' }}>Stock:</strong> {product.stockQuantity > 0 ? `${product.stockQuantity} available` : 'Out of stock'}</div>
+                <div style={{ fontSize: isMobile ? 12 : 13 }}><strong style={{ color: '#0f766e' }}>Delivery:</strong> Free above ₹499</div>
+                <div style={{ fontSize: isMobile ? 12 : 13 }}><strong style={{ color: '#0f766e' }}>Return:</strong> 7-day policy</div>
               </div>
 
-              <div style={{ marginTop: 18, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ marginTop: 18, display: 'flex', gap: 10, alignItems: isMobile ? 'stretch' : 'center', flexWrap: 'wrap', flexDirection: isMobile ? 'column' : 'row' }}>
                 <div style={{ display: 'flex', alignItems: 'center', border: '1px solid #99f6e4', borderRadius: 999, overflow: 'hidden' }}>
-                  <button type="button" onClick={() => setQty((p) => Math.max(1, p - 1))} style={{ border: 'none', background: '#f0fdfa', padding: '10px 14px', cursor: 'pointer', fontWeight: 800 }}>-</button>
+                  <button type="button" onClick={() => setQty((p) => Math.max(1, p - 1))} style={{ border: 'none', background: '#f0fdfa', padding: isMobile ? '10px 14px' : '10px 14px', cursor: 'pointer', fontWeight: 800 }}>-</button>
                   <div style={{ minWidth: 42, textAlign: 'center', fontWeight: 800, color: '#064e3b' }}>{qty}</div>
-                  <button type="button" onClick={() => setQty((p) => p + 1)} style={{ border: 'none', background: '#f0fdfa', padding: '10px 14px', cursor: 'pointer', fontWeight: 800 }}>+</button>
+                  <button type="button" onClick={() => setQty((p) => p + 1)} style={{ border: 'none', background: '#f0fdfa', padding: isMobile ? '10px 14px' : '10px 14px', cursor: 'pointer', fontWeight: 800 }}>+</button>
                 </div>
 
                 <button
@@ -282,14 +294,16 @@ const ProductDetailPage = ({
                   style={{
                     border: 'none',
                     borderRadius: 999,
-                    padding: '12px 20px',
+                    padding: isMobile ? '12px 16px' : '12px 20px',
                     background: product.stockQuantity === 0 ? '#e2e8f0' : 'linear-gradient(135deg,#2dd4bf,#0d9488)',
                     color: product.stockQuantity === 0 ? '#64748b' : 'white',
                     fontWeight: 800,
                     display: 'flex',
                     alignItems: 'center',
                     gap: 8,
-                    cursor: product.stockQuantity === 0 ? 'not-allowed' : 'pointer'
+                    cursor: product.stockQuantity === 0 ? 'not-allowed' : 'pointer',
+                    width: isMobile ? '100%' : 'auto',
+                    justifyContent: 'center'
                   }}
                 >
                   <ShoppingCart size={16} />
@@ -302,12 +316,12 @@ const ProductDetailPage = ({
           <div style={{
             background: 'white',
             border: '1px solid #ccfbf1',
-            borderRadius: 20,
-            padding: 18
+            borderRadius: isMobile ? 16 : 20,
+            padding: isMobile ? 14 : 18
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
               <MessageSquare size={18} color="#0d9488" />
-              <h2 style={{ margin: 0, fontSize: 20, color: '#064e3b' }}>Ratings & Reviews</h2>
+              <h2 style={{ margin: 0, fontSize: isMobile ? 18 : 20, color: '#064e3b' }}>Ratings & Reviews</h2>
             </div>
 
             <form onSubmit={submitReview} style={{
@@ -317,7 +331,7 @@ const ProductDetailPage = ({
               padding: 14,
               marginBottom: 16
             }}>
-              <p style={{ margin: '0 0 8px', fontSize: 13, color: '#475569', fontWeight: 700 }}>
+              <p style={{ margin: '0 0 8px', fontSize: isMobile ? 12 : 13, color: '#475569', fontWeight: 700 }}>
                 Add your review
               </p>
               <RatingStars value={newRating} interactive onChange={setNewRating} />
@@ -349,7 +363,9 @@ const ProductDetailPage = ({
                   cursor: 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: 8
+                  gap: 8,
+                  width: isMobile ? '100%' : 'auto',
+                  justifyContent: 'center'
                 }}
               >
                 <CheckCircle size={16} /> Submit Review
@@ -379,9 +395,23 @@ const ProductDetailPage = ({
       </div>
 
       <style>{`
-        @media (max-width: 980px) {
+        @media (max-width: 1024px) {
           .product-detail-grid {
             grid-template-columns: minmax(0, 1fr);
+          }
+        }
+
+        @media (max-width: 640px) {
+          .product-detail-grid {
+            border-radius: 16px;
+          }
+
+          .product-detail-grid > div:first-child {
+            padding: 12px;
+          }
+
+          .product-detail-grid img {
+            max-height: 100%;
           }
         }
       `}</style>
