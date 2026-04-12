@@ -268,52 +268,124 @@ namespace ECommerceAPI.API.Controllers
             }
         }
 
-        /// <summary>
-        /// Get MongoDB User ID from JWT claims
-        /// Returns MongoDB ObjectId string (24 hex characters)
-        /// </summary>
-        private string GetMongoUserId()
+    /// <summary>
+    /// Download invoice for a delivered order
+    /// GET /api/mongo/order/{orderId}/invoice
+    /// Returns HTML invoice as file download
+    /// </summary>
+    [HttpGet("{orderId}/invoice")]
+    public async Task<ActionResult> DownloadInvoice(string orderId)
+    {
+        try
         {
-            // Try NameIdentifier claim (most common)
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
-            if (userIdClaim != null && !string.IsNullOrWhiteSpace(userIdClaim.Value))
+            if (!ObjectId.TryParse(orderId, out _))
             {
-                System.Console.WriteLine($"✅ Found User ID in NameIdentifier claim: {userIdClaim.Value}");
-                return userIdClaim.Value;
+                return BadRequest(new { message = $"Invalid MongoDB Order ID format: {orderId}" });
             }
 
-            // Try "sub" claim (JWT standard)
-            userIdClaim = User.FindFirst("sub");
-            if (userIdClaim != null && !string.IsNullOrWhiteSpace(userIdClaim.Value))
+            var mongoUserId = GetMongoUserId();
+            if (!ObjectId.TryParse(mongoUserId, out _))
             {
-                System.Console.WriteLine($"✅ Found User ID in 'sub' claim: {userIdClaim.Value}");
-                return userIdClaim.Value;
+                return BadRequest(new { message = $"Invalid MongoDB User ID format: {mongoUserId}" });
             }
 
-            // Try "userId" claim (custom)
-            userIdClaim = User.FindFirst("userId");
-            if (userIdClaim != null && !string.IsNullOrWhiteSpace(userIdClaim.Value))
+            // Get the order (this also verifies user ownership)
+            var order = await _mongoOrderService.GetOrderByMongoIdAsync(orderId, mongoUserId);
+            if (order == null)
             {
-                System.Console.WriteLine($"✅ Found User ID in 'userId' claim: {userIdClaim.Value}");
-                return userIdClaim.Value;
+                return NotFound(new { message = $"Order {orderId} not found" });
             }
 
-            // Try "nameid" claim (alternative)
-            userIdClaim = User.FindFirst("nameid");
-            if (userIdClaim != null && !string.IsNullOrWhiteSpace(userIdClaim.Value))
+            // Verify order is delivered (can download invoices only for delivered orders)
+            if (order.Status != "Delivered")
             {
-                System.Console.WriteLine($"✅ Found User ID in 'nameid' claim: {userIdClaim.Value}");
-                return userIdClaim.Value;
+                return BadRequest(new { 
+                    message = $"Invoice can only be downloaded for delivered orders. Current status: {order.Status}" 
+                });
             }
 
-            System.Console.WriteLine($"❌ User ID not found in any JWT claim!");
-            System.Console.WriteLine($"Available claims:");
-            foreach (var claim in User.Claims)
+            // Inject and use InvoiceService to generate HTML
+            var invoiceService = HttpContext.RequestServices.GetService(typeof(IInvoiceService)) as IInvoiceService;
+            if (invoiceService == null)
             {
-                System.Console.WriteLine($"   {claim.Type}: {claim.Value}");
+                return StatusCode(500, new { message = "Invoice service not available" });
             }
 
-            throw new UnauthorizedAccessException("User ID not found in token");
+            // Generate invoice HTML directly using the OrderDto we already fetched
+            var invoiceHtml = await invoiceService.GenerateInvoiceHtmlAsync(
+                order,
+                order.CustomerName ?? "Valued Customer",
+                order.CustomerEmail ?? "customer@email.com",
+                order.CustomerPhone ?? "");
+
+            // Return as downloadable HTML file
+            var fileName = $"Invoice-{order.OrderNumber}.html";
+            var bytes = System.Text.Encoding.UTF8.GetBytes(invoiceHtml);
+            return File(bytes, "text/html", fileName);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (System.UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (System.Exception ex)
+        {
+            return StatusCode(500, new { 
+                message = "An error occurred while generating the invoice",
+                error = ex.Message
+            });
         }
     }
+
+    /// <summary>
+    /// Get MongoDB User ID from JWT claims
+    /// Returns MongoDB ObjectId string (24 hex characters)
+    /// </summary>
+    private string GetMongoUserId()
+    {
+        // Try NameIdentifier claim (most common)
+        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+        if (userIdClaim != null && !string.IsNullOrWhiteSpace(userIdClaim.Value))
+        {
+            System.Console.WriteLine($"✅ Found User ID in NameIdentifier claim: {userIdClaim.Value}");
+            return userIdClaim.Value;
+        }
+
+        // Try "sub" claim (JWT standard)
+        userIdClaim = User.FindFirst("sub");
+        if (userIdClaim != null && !string.IsNullOrWhiteSpace(userIdClaim.Value))
+        {
+            System.Console.WriteLine($"✅ Found User ID in 'sub' claim: {userIdClaim.Value}");
+            return userIdClaim.Value;
+        }
+
+        // Try "userId" claim (custom)
+        userIdClaim = User.FindFirst("userId");
+        if (userIdClaim != null && !string.IsNullOrWhiteSpace(userIdClaim.Value))
+        {
+            System.Console.WriteLine($"✅ Found User ID in 'userId' claim: {userIdClaim.Value}");
+            return userIdClaim.Value;
+        }
+
+        // Try "nameid" claim (alternative)
+        userIdClaim = User.FindFirst("nameid");
+        if (userIdClaim != null && !string.IsNullOrWhiteSpace(userIdClaim.Value))
+        {
+            System.Console.WriteLine($"✅ Found User ID in 'nameid' claim: {userIdClaim.Value}");
+            return userIdClaim.Value;
+        }
+
+        System.Console.WriteLine($"❌ User ID not found in any JWT claim!");
+        System.Console.WriteLine($"Available claims:");
+        foreach (var claim in User.Claims)
+        {
+            System.Console.WriteLine($"   {claim.Type}: {claim.Value}");
+        }
+
+        throw new UnauthorizedAccessException("User ID not found in token");
+    }
+}
 }

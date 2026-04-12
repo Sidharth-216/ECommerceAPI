@@ -26,5 +26,10 @@ namespace ECommerceAPI.Application.Interfaces
         /// Send an order status update email (e.g. Shipped, Out for Delivery)
         /// </summary>
         Task<bool> SendOrderStatusUpdateAsync(string toEmail, string customerName, OrderDto order, string previousStatus);
+
+        /// <summary>
+        /// Send a detailed invoice email when order is delivered
+        /// </summary>
+        Task<bool> SendInvoiceAsync(string toEmail, string customerName, OrderDto order, string invoiceHtml);
     }
 }

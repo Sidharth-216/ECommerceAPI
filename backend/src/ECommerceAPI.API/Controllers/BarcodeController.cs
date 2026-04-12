@@ -215,9 +215,7 @@ namespace ECommerceAPI.API.Controllers
 
                 foreach (var product in productsWithBarcodes)
                 {
-                    var categoryStr = product.Category is null ? "" : 
-                                     product.Category is string catStr ? catStr :
-                                     product.Category is dynamic catObj ? (catObj.Name ?? "") : "";
+                    var categoryStr = product.Category?.Name ?? "";
 
                     var success = await _barcodeService.CreateBarcodeAsync(
                         product.Barcode,

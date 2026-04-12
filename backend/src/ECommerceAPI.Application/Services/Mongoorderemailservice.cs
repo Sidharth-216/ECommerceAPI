@@ -932,6 +932,114 @@ namespace ECommerceAPI.Application.Services
             }
         }
 
+        /// <summary>
+        /// Send detailed invoice email when order is delivered
+        /// </summary>
+        public async Task<bool> SendInvoiceAsync(
+            string toEmail, string customerName, OrderDto order, string invoiceHtml)
+        {
+            try
+            {
+                _logger.LogInformation(
+                    "📧 Sending invoice email to {Email} for order {OrderNumber}",
+                    toEmail, order.OrderNumber);
+
+                var subject = $"📄 Order Invoice — #{order.OrderNumber} | {BrandName}";
+
+                // Wrap invoice HTML in email template
+                var body = $@"<!DOCTYPE html>
+<html lang='en'>
+<head>
+  <meta charset='UTF-8'/>
+  <meta name='viewport' content='width=device-width,initial-scale=1.0'/>
+  <title>Invoice — {BrandName}</title>
+</head>
+<body style='margin:0;padding:0;background:#f9fafb;font-family:""Segoe UI"",Arial,sans-serif;'>
+
+<!-- Email Wrapper -->
+<table width='100%' cellpadding='0' cellspacing='0' style='background:#f9fafb;padding:20px 16px;'>
+<tr><td align='center'>
+<table width='600' cellpadding='0' cellspacing='0'
+       style='background:#ffffff;border-radius:12px;overflow:hidden;
+              box-shadow:0 4px 20px rgba(0,0,0,0.1);max-width:600px;width:100%;'>
+
+  <!-- Header -->
+  <tr>
+    <td style='background:linear-gradient(135deg,{AccentColor} 0%,#0891b2 100%);
+               padding:36px 32px;text-align:center;'>
+      <div style='font-size:36px;margin-bottom:8px;'>📄</div>
+      <h1 style='margin:0 0 4px;color:#fff;font-size:24px;font-weight:800;'>{BrandName}</h1>
+      <p style='margin:0;color:#ccfbf1;font-size:12px;letter-spacing:1px;
+                text-transform:uppercase;font-weight:600;'>Invoice Document</p>
+    </td>
+  </tr>
+
+  <!-- Invoice badge -->
+  <tr>
+    <td style='padding:0;text-align:center;background:#ffffff;'>
+      <div style='display:inline-block;margin-top:-20px;background:#fff;
+                  border-radius:50px;padding:8px 24px;
+                  box-shadow:0 4px 16px rgba(20,184,166,0.15);
+                  border:2px solid #ccfbf1;'>
+        <span style='color:{PrimaryColor};font-weight:800;font-size:13px;
+                     letter-spacing:0.5px;'>✅ ORDER DELIVERED</span>
+      </div>
+    </td>
+  </tr>
+
+  <!-- Greeting -->
+  <tr>
+    <td style='padding:24px 32px 0;'>
+      <h2 style='margin:0 0 8px;font-size:18px;color:#1f2937;font-weight:800;'>
+        Invoice for your order, {customerName.Split(' ')[0]}!</h2>
+      <p style='margin:0;color:#6b7280;font-size:14px;line-height:1.6;'>
+        Your order #{order.OrderNumber} has been delivered! Here's your complete invoice for your records.
+      </p>
+    </td>
+  </tr>
+
+  <!-- Invoice content (embedded invoice HTML) -->
+  <tr>
+    <td style='padding:24px 32px;'>
+      {invoiceHtml}
+    </td>
+  </tr>
+
+  <!-- Footer -->
+  <tr>
+    <td style='background:#f9fafb;padding:24px 32px;text-align:center;
+               border-top:1.5px solid #e5e7eb;'>
+      <p style='margin:0 0 8px;font-size:12px;color:#6b7280;'>
+        Thank you for shopping with <strong style='color:{PrimaryColor};'>{BrandName}</strong>!</p>
+      <p style='margin:0;font-size:11px;color:#9ca3af;'>
+        For support, contact <a href='mailto:{SupportEmail}'
+        style='color:{AccentColor};font-weight:700;text-decoration:none;'>{SupportEmail}</a>
+      </p>
+    </td>
+  </tr>
+
+</table>
+</td></tr>
+</table>
+
+</body>
+</html>";
+
+                var sent = await SendEmailAsync(toEmail, subject, body);
+                if (sent)
+                    _logger.LogInformation("✅ Invoice email sent to {Email}", toEmail);
+                else
+                    _logger.LogWarning("⚠️ Failed to send invoice email to {Email}", toEmail);
+
+                return sent;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ Error sending invoice email to {Email}", toEmail);
+                return false;
+            }
+        }
+
         // ─────────────────────────────────────────────────────────────────────────
         // BREVO HTTP API SENDER
         // Key difference from Resend:

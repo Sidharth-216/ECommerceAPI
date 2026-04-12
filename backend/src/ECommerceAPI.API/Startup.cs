@@ -253,6 +253,7 @@ namespace ECommerceAPI.API
             services.AddScoped<IMongoOrderEmailService,   MongoOrderEmailService>(); // ← ADDED
             services.AddScoped<IQRPaymentService,         QRPaymentService>();
             services.AddScoped<IBarcodeService,           BarcodeService>(); // ← BARCODE SERVICE
+            services.AddScoped<IInvoiceService,           InvoiceService>(); // ← INVOICE SERVICE
             services.AddHttpClient<ISemanticSearchService, SemanticSearchService>(client => {
                 client.Timeout = TimeSpan.FromSeconds(30);
             });

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Search, Plus, Edit2, Trash2, RefreshCw, AlertCircle, X, Barcode } from 'lucide-react';
+import { Package, Search, Plus, Edit2, Trash2, RefreshCw, AlertCircle, X, ScanLine } from 'lucide-react';
 import { adminAPI } from '../../api.js';
 import BarcodeScanner from '../../components/BarcodeScanner';
 import ScannedItemsList from '../../components/ScannedItemsList';
@@ -398,7 +398,7 @@ const ProductsTab = ({ products, loadProducts, error, setError, loading, setLoad
             onClick={() => { setScannedBarcodes([]); setShowBarcodeScanner(true); }}
             className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl hover:shadow-lg transition-all font-semibold"
           >
-            <Barcode className="w-4 h-4" />
+            <ScanLine className="w-4 h-4" />
             Scan Barcode
           </button>
         </div>

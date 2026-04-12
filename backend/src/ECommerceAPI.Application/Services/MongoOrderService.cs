@@ -22,7 +22,8 @@ namespace ECommerceAPI.Application.Services
         private readonly IProductMongoRepository  _mongoProductRepository;
         private readonly IMongoUserRepository     _mongoUserRepository;
         private readonly IAddressMongoRepository  _mongoAddressRepository;
-        private readonly IMongoOrderEmailService  _orderEmailService;   // ← ADDED
+        private readonly IMongoOrderEmailService  _orderEmailService;
+        private readonly IInvoiceService          _invoiceService;   // ← ADDED
         private readonly ILogger<MongoOrderService> _logger;
 
         public MongoOrderService(
@@ -31,7 +32,8 @@ namespace ECommerceAPI.Application.Services
             IProductMongoRepository  mongoProductRepository,
             IMongoUserRepository     mongoUserRepository,
             IAddressMongoRepository  mongoAddressRepository,
-            IMongoOrderEmailService  orderEmailService,                 // ← ADDED
+            IMongoOrderEmailService  orderEmailService,
+            IInvoiceService          invoiceService,                  // ← ADDED
             ILogger<MongoOrderService> logger)
         {
             _mongoOrderRepository   = mongoOrderRepository;
@@ -39,7 +41,8 @@ namespace ECommerceAPI.Application.Services
             _mongoProductRepository = mongoProductRepository;
             _mongoUserRepository    = mongoUserRepository;
             _mongoAddressRepository = mongoAddressRepository;
-            _orderEmailService      = orderEmailService;                // ← ADDED
+            _orderEmailService      = orderEmailService;
+            _invoiceService         = invoiceService;                 // ← ADDED
             _logger                 = logger;
         }
 
@@ -436,13 +439,43 @@ namespace ECommerceAPI.Application.Services
                 await _mongoOrderRepository.UpdateAsync(order);
                 _logger.LogInformation($"✅ Order {orderId} status updated to {newStatus}");
 
-                // 📧 Send status update email
+                // 📧 Send status update email and invoice (if delivered)
                 try
                 {
                     var orderUser = await _mongoUserRepository.GetByIdAsync(order.UserId);
                     if (orderUser != null && !string.IsNullOrWhiteSpace(orderUser.Email))
                     {
                         var updatedDto = MapMongoToDto(order);
+                        
+                        // 📋 Generate and send invoice if status is "Delivered"
+                        if (newStatus == "Delivered")
+                        {
+                            try
+                            {
+                                _logger.LogInformation($"📄 [MongoOrderService] Generating invoice for order {orderId}");
+                                var invoiceHtml = await _invoiceService.GenerateInvoiceHtmlAsync(
+                                    updatedDto,
+                                    orderUser.FullName ?? "Valued Customer",
+                                    orderUser.Email,
+                                    orderUser.Mobile ?? "");
+                                
+                                var invoiceSent = await _orderEmailService.SendInvoiceAsync(
+                                    orderUser.Email,
+                                    orderUser.FullName ?? "Valued Customer",
+                                    updatedDto,
+                                    invoiceHtml);
+                                
+                                _logger.LogInformation(invoiceSent
+                                    ? $"✅ Invoice email sent to {orderUser.Email}"
+                                    : $"⚠️ Invoice email returned false for {orderUser.Email}");
+                            }
+                            catch (Exception invoiceEx)
+                            {
+                                _logger.LogWarning($"⚠️ Invoice generation/email failed (non-critical): {invoiceEx.Message}");
+                            }
+                        }
+                        
+                        // Send status update email
                         var emailSent  = await _orderEmailService.SendOrderStatusUpdateAsync(
                             orderUser.Email,
                             orderUser.FullName ?? "Valued Customer",

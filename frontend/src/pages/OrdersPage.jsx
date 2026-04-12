@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { 
     Package, Clock, AlertCircle, 
   ChevronRight, ArrowLeft, ShoppingBag, Trash2, 
-    RefreshCcw 
+    RefreshCcw, FileText
 } from 'lucide-react';
 import { ordersAPI } from '../api';
 
@@ -38,6 +38,44 @@ const OrdersPage = ({ user, orders = [], setOrders, setCurrentPage }) => {
             if (selectedOrder) setSelectedOrder(null);
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to cancel order.');
+        } finally { setLoading(false); }
+    };
+
+    const handleDownloadInvoice = async (order) => {
+        const orderId = order._id || order.id || order.Id;
+        if (!orderId) return setError('Invalid order ID');
+
+        try {
+            setLoading(true);
+            setError('');
+            
+            // Fetch the invoice HTML from the API
+            const response = await fetch(`/api/mongo/order/${orderId}/invoice`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Failed to download invoice');
+            }
+
+            // Get the blob from response
+            const blob = await response.blob();
+            
+            // Create a download link and trigger it
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `Invoice-${order.orderNumber}.html`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        } catch (err) {
+            setError(err.message || 'Failed to download invoice');
         } finally { setLoading(false); }
     };
 
@@ -239,6 +277,15 @@ const OrdersPage = ({ user, orders = [], setOrders, setCurrentPage }) => {
                                             className="flex-1 py-4 bg-rose-50 text-rose-600 rounded-2xl font-black hover:bg-rose-100 transition-colors flex items-center justify-center gap-2"
                                         >
                                             <Trash2 size={18} /> Cancel Order
+                                        </button>
+                                    )}
+                                    {selectedOrder.status?.toLowerCase() === 'delivered' && (
+                                        <button
+                                            onClick={() => handleDownloadInvoice(selectedOrder)}
+                                            disabled={loading}
+                                            className="flex-1 py-4 bg-emerald-50 text-emerald-600 rounded-2xl font-black hover:bg-emerald-100 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                                        >
+                                            <FileText size={18} /> {loading ? 'Generating...' : 'Download Invoice'}
                                         </button>
                                     )}
                                     <button
