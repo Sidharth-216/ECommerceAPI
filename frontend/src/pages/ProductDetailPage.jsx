@@ -186,7 +186,7 @@ const ProductDetailPage = ({
 
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(180deg,#ecfeff 0%,#f8fafc 45%,#ffffff 100%)' }}>
-      <div style={{ maxWidth: 1280, margin: '0 auto', padding: isMobile ? '12px' : '16px' }}>
+      <div style={{ maxWidth: 1280, margin: '0 auto', padding: isMobile ? '12px' : '16px', width: '100%', boxSizing: 'border-box' }}>
         <div style={{ marginBottom: isMobile ? 12 : 16, display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: 12, flexWrap: 'wrap' }}>
           <button
             onClick={() => setCurrentPage('products')}
@@ -200,13 +200,15 @@ const ProductDetailPage = ({
               display: 'flex',
               alignItems: 'center',
               gap: 8,
-              cursor: 'pointer'
+              cursor: 'pointer',
+              width: isMobile ? '100%' : 'auto',
+              justifyContent: 'center'
             }}
           >
             <ArrowLeft size={16} /> Back To Products
           </button>
 
-          <div style={{ color: '#0f766e', fontSize: isMobile ? 12 : 13, fontWeight: 700, textAlign: isMobile ? 'right' : 'left' }}>
+          <div style={{ color: '#0f766e', fontSize: isMobile ? 12 : 13, fontWeight: 700, textAlign: isMobile ? 'left' : 'left', width: isMobile ? '100%' : 'auto' }}>
             {category}
           </div>
         </div>
@@ -218,7 +220,11 @@ const ProductDetailPage = ({
         }}>
           <div className="product-detail-grid" style={{
             display: 'grid',
-            gridTemplateColumns: isTablet ? 'minmax(0, 360px) minmax(0, 1fr)' : 'minmax(0, 420px) minmax(0, 1fr)',
+            gridTemplateColumns: isMobile
+              ? 'minmax(0, 1fr)'
+              : isTablet
+                ? 'minmax(0, 360px) minmax(0, 1fr)'
+                : 'minmax(0, 420px) minmax(0, 1fr)',
             gap: isMobile ? 14 : 18,
             background: 'white',
             border: '1px solid #ccfbf1',
@@ -226,18 +232,18 @@ const ProductDetailPage = ({
             overflow: 'hidden'
           }}>
             <div style={{ padding: isMobile ? 14 : 18, background: 'linear-gradient(140deg,#f0fdfa,#ccfbf1)' }}>
-              <div style={{ borderRadius: 18, background: 'white', minHeight: isMobile ? 240 : isTablet ? 300 : 360, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ borderRadius: 18, background: 'white', minHeight: isMobile ? 220 : isTablet ? 300 : 360, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <img
                   src={product.imageUrl || 'https://via.placeholder.com/380/ccfbf1/0d9488?text=Product'}
                   alt={product.name}
-                  style={{ width: isMobile ? '84%' : '88%', height: isMobile ? '84%' : '88%', objectFit: 'contain' }}
+                  style={{ width: isMobile ? '84%' : '88%', height: isMobile ? '84%' : '88%', maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
                   onError={(e) => { e.currentTarget.src = 'https://via.placeholder.com/380/ccfbf1/0d9488?text=Product'; }}
                 />
               </div>
             </div>
 
             <div style={{ padding: isMobile ? 16 : 20 }}>
-              <h1 style={{ margin: 0, fontSize: isMobile ? 22 : isTablet ? 26 : 30, color: '#064e3b', lineHeight: 1.2 }}>{product.name}</h1>
+              <h1 style={{ margin: 0, fontSize: isMobile ? 22 : isTablet ? 26 : 30, color: '#064e3b', lineHeight: 1.2, overflowWrap: 'anywhere' }}>{product.name}</h1>
               <p style={{ margin: '8px 0 0', color: '#64748b', fontWeight: 600, fontSize: isMobile ? 13 : 14 }}>{product.brand || 'ShopAI'}</p>
 
               <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -281,7 +287,7 @@ const ProductDetailPage = ({
               </div>
 
               <div style={{ marginTop: 18, display: 'flex', gap: 10, alignItems: isMobile ? 'stretch' : 'center', flexWrap: 'wrap', flexDirection: isMobile ? 'column' : 'row' }}>
-                <div style={{ display: 'flex', alignItems: 'center', border: '1px solid #99f6e4', borderRadius: 999, overflow: 'hidden' }}>
+                <div style={{ display: 'flex', alignItems: 'center', border: '1px solid #99f6e4', borderRadius: 999, overflow: 'hidden', width: isMobile ? '100%' : 'auto', justifyContent: isMobile ? 'space-between' : 'flex-start' }}>
                   <button type="button" onClick={() => setQty((p) => Math.max(1, p - 1))} style={{ border: 'none', background: '#f0fdfa', padding: isMobile ? '10px 14px' : '10px 14px', cursor: 'pointer', fontWeight: 800 }}>-</button>
                   <div style={{ minWidth: 42, textAlign: 'center', fontWeight: 800, color: '#064e3b' }}>{qty}</div>
                   <button type="button" onClick={() => setQty((p) => p + 1)} style={{ border: 'none', background: '#f0fdfa', padding: isMobile ? '10px 14px' : '10px 14px', cursor: 'pointer', fontWeight: 800 }}>+</button>
@@ -385,7 +391,7 @@ const ProductDetailPage = ({
                     <div style={{ marginTop: 6 }}>
                       <RatingStars value={rev.rating} />
                     </div>
-                    <p style={{ margin: '8px 0 0', color: '#475569', lineHeight: 1.5 }}>{rev.comment}</p>
+                    <p style={{ margin: '8px 0 0', color: '#475569', lineHeight: 1.5, overflowWrap: 'anywhere' }}>{rev.comment}</p>
                   </div>
                 ))}
               </div>
@@ -395,12 +401,6 @@ const ProductDetailPage = ({
       </div>
 
       <style>{`
-        @media (max-width: 1024px) {
-          .product-detail-grid {
-            grid-template-columns: minmax(0, 1fr);
-          }
-        }
-
         @media (max-width: 640px) {
           .product-detail-grid {
             border-radius: 16px;
