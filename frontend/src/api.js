@@ -368,6 +368,16 @@ export const ordersAPI = {
   cancel: (orderId) => {
     if (!orderId) return Promise.reject(new Error('Order ID is required'));
     return api.post(`/mongo/order/${orderId}/cancel`);
+  },
+
+  downloadInvoice: (orderId) => {
+    if (!orderId) return Promise.reject(new Error('Order ID is required'));
+    return api.get(`/mongo/order/${orderId}/invoice`, {
+      responseType: 'blob',
+      headers: {
+        Accept: 'application/pdf'
+      }
+    });
   }
 };
 

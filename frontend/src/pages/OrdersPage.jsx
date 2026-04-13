@@ -49,22 +49,17 @@ const OrdersPage = ({ user, orders = [], setOrders, setCurrentPage }) => {
             setLoading(true);
             setError('');
             
-            // Fetch the invoice PDF from the API
-            const response = await fetch(`/api/mongo/order/${orderId}/invoice`, {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                    'Accept': 'application/pdf'
-                }
-            });
+            const response = await ordersAPI.downloadInvoice(orderId);
+            const blob = response.data;
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || 'Failed to download invoice');
+            if (!(blob instanceof Blob) || blob.size === 0) {
+                throw new Error('Received an empty invoice file');
             }
 
-            // Get the blob from response
-            const blob = await response.blob();
+            const contentType = (blob.type || '').toLowerCase();
+            if (!contentType.includes('application/pdf')) {
+                throw new Error('Invoice response is not a valid PDF file');
+            }
             
             // Create a download link and trigger it
             const url = window.URL.createObjectURL(blob);

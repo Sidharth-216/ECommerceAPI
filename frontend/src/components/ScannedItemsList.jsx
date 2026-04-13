@@ -28,15 +28,19 @@ const ScannedItemsList = ({
 
       try {
         // Batch lookup for efficiency
-        const response = await adminAPI.post('/mongo/barcodes/lookup-batch', {
-          barcodes: scannedBarcodes
-        });
+        const response = await adminAPI.lookupMultipleBarcodes(scannedBarcodes);
 
         if (response.data?.results) {
+          const foundByBarcode = new Set(
+            response.data.results
+              .map(product => product.barcode)
+              .filter(Boolean)
+          );
+
           // Create items list with default quantity 1
-          const newItems = response.data.results.map(product => ({
-            id: product.id || Date.now(),
-            barcode: scannedBarcodes[0], // Note: should match barcode from request
+          const newItems = response.data.results.map((product, index) => ({
+            id: product.id || product._id || `${product.barcode || 'barcode'}-${index}-${Date.now()}`,
+            barcode: product.barcode || scannedBarcodes[index] || '',
             ...product,
             quantity: 1
           }));
@@ -45,8 +49,7 @@ const ScannedItemsList = ({
 
           // Track not found barcodes
           if (response.data.results.length < scannedBarcodes.length) {
-            const foundIds = response.data.results.map(r => r.id);
-            const unfound = scannedBarcodes.filter((barcode, idx) => !foundIds.includes(idx));
+            const unfound = scannedBarcodes.filter(barcode => !foundByBarcode.has(barcode));
             setNotFound(unfound);
           }
         }
@@ -105,7 +108,7 @@ const ScannedItemsList = ({
 
       for (const product of productsToAdd) {
         try {
-          await adminAPI.post('/mongo/products', product);
+          await adminAPI.addProduct(product);
           successCount++;
         } catch (err) {
           errors.push(`Failed to add ${product.name}: ${err.response?.data?.message || err.message}`);

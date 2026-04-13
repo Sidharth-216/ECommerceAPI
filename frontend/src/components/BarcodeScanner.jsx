@@ -24,6 +24,25 @@ const BarcodeScanner = ({
   const Html5QrcodeRef = useRef(null);
   const scannedBarcodesRef = useRef(new Set());
 
+  const stopAndClearScanner = async () => {
+    const scanner = qrScannerRef.current;
+    if (!scanner) return;
+
+    qrScannerRef.current = null;
+
+    try {
+      await scanner.stop();
+    } catch (stopErr) {
+      console.warn('Error stopping scanner:', stopErr);
+    }
+
+    try {
+      await scanner.clear();
+    } catch (clearErr) {
+      console.warn('Error clearing scanner:', clearErr);
+    }
+  };
+
   // Load Html5QrCode library dynamically
   useEffect(() => {
     if (!show) return;
@@ -63,19 +82,7 @@ const BarcodeScanner = ({
         setIsCameraReady(false);
 
         if (qrScannerRef.current) {
-          try {
-            await qrScannerRef.current.stop();
-          } catch (stopErr) {
-            console.warn('Error stopping previous scanner:', stopErr);
-          }
-
-          try {
-            await qrScannerRef.current.clear();
-          } catch (clearErr) {
-            console.warn('Error clearing previous scanner:', clearErr);
-          }
-
-          qrScannerRef.current = null;
+          await stopAndClearScanner();
         }
 
         const scanner = new Html5QrcodeRef.current('qr-reader');
@@ -123,19 +130,7 @@ const BarcodeScanner = ({
     startScanning();
 
     return () => {
-      if (qrScannerRef.current) {
-        qrScannerRef.current.stop()
-          .catch(err => {
-            console.warn('Error stopping scanner:', err);
-          })
-          .finally(() => {
-            qrScannerRef.current.clear().catch(err => {
-              console.warn('Error clearing scanner:', err);
-            }).finally(() => {
-              qrScannerRef.current = null;
-            });
-          });
-      }
+      stopAndClearScanner();
     };
   }, [show, deviceId, onBarcodeDetected]);
 
@@ -190,19 +185,7 @@ const BarcodeScanner = ({
   };
 
   const handleClose = () => {
-    if (qrScannerRef.current) {
-      qrScannerRef.current.stop()
-        .catch(err => {
-          console.warn('Error stopping scanner:', err);
-        })
-        .finally(() => {
-          qrScannerRef.current.clear().catch(err => {
-            console.warn('Error clearing scanner:', err);
-          }).finally(() => {
-            qrScannerRef.current = null;
-          });
-        });
-    }
+    stopAndClearScanner();
     setScanned([]);
     setManualBarcode('');
     setError('');

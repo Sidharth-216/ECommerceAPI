@@ -312,6 +312,11 @@ namespace ECommerceAPI.API.Controllers
             }
 
             var invoicePdf = await invoiceService.GetInvoiceAsPdfAsync(orderId);
+            if (invoicePdf == null || invoicePdf.Length < 4 ||
+                invoicePdf[0] != 0x25 || invoicePdf[1] != 0x50 || invoicePdf[2] != 0x44 || invoicePdf[3] != 0x46)
+            {
+                return StatusCode(500, new { message = "Generated invoice is not a valid PDF" });
+            }
 
             // Return as downloadable PDF file
             var fileName = $"Invoice-{order.OrderNumber}.pdf";
