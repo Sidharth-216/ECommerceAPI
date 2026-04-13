@@ -9,6 +9,7 @@ namespace ECommerceAPI.Infrastructure.Repositories.Interfaces
         Task<IEnumerable<ProductMongo>> GetAllAsync();
         Task<(IReadOnlyList<ProductMongo> Items, long TotalCount)> GetPageAsync(int page, int pageSize);
         Task<ProductMongo> GetByIdAsync(string id);
+        Task<ProductMongo> GetByBarcodeAsync(string barcode);
 
         Task<IEnumerable<ProductMongo>> SearchAsync(
             string query,

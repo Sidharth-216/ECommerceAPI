@@ -14,6 +14,7 @@ namespace ECommerceAPI.Application.Services
     public class BarcodeService : IBarcodeService
     {
         private readonly IBarcodeDataRepository _barcodeRepo;
+        private readonly IProductMongoRepository _productRepo;
         private readonly IMemoryCache _cache;
         private readonly ILogger<BarcodeService> _logger;
 
@@ -22,10 +23,12 @@ namespace ECommerceAPI.Application.Services
 
         public BarcodeService(
             IBarcodeDataRepository barcodeRepo,
+            IProductMongoRepository productRepo,
             IMemoryCache cache,
             ILogger<BarcodeService> logger)
         {
             _barcodeRepo = barcodeRepo;
+            _productRepo = productRepo;
             _cache = cache;
             _logger = logger;
         }
@@ -59,9 +62,29 @@ namespace ECommerceAPI.Application.Services
 
                 if (barcodeData == null)
                 {
+                    // Fallback: lookup product collection directly by product.barcode
+                    var product = await _productRepo.GetByBarcodeAsync(barcode);
+                    if (product != null)
+                    {
+                        var fallbackResult = new ProductSuggestionDto
+                        {
+                            Id = product.Id,
+                            Name = product.Name,
+                            Brand = product.Brand ?? string.Empty,
+                            Category = product.Category?.Name ?? string.Empty,
+                            Price = product.Price
+                        };
+
+                        _cache.Set(cacheKey, fallbackResult,
+                            new MemoryCacheEntryOptions().SetAbsoluteExpiration(TimeSpan.FromMinutes(CACHE_DURATION_MINUTES)));
+
+                        _logger.LogInformation("✅ [BarcodeService] Fallback hit from products collection for barcode: {Barcode}", barcode);
+                        return fallbackResult;
+                    }
+
                     _logger.LogWarning("⚠️ [BarcodeService] Barcode not found: {Barcode}", barcode);
                     // Cache negative result for 10 minutes to reduce repeated DB hits
-                    _cache.Set(cacheKey, (ProductSuggestionDto)null, 
+                    _cache.Set(cacheKey, (ProductSuggestionDto)null,
                         TimeSpan.FromMinutes(10));
                     return null;
                 }
@@ -132,6 +155,7 @@ namespace ECommerceAPI.Application.Services
                 try
                 {
                     var dbResults = await _barcodeRepo.GetByBarcodesAsync(barcodesNotInCache);
+                    var foundFromBarcodeCollection = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
                     foreach (var barcodeData in dbResults)
                     {
@@ -151,6 +175,35 @@ namespace ECommerceAPI.Application.Services
                         var cacheOptions = new MemoryCacheEntryOptions()
                             .SetAbsoluteExpiration(TimeSpan.FromMinutes(CACHE_DURATION_MINUTES));
                         _cache.Set(cacheKey, result, cacheOptions);
+
+                        foundFromBarcodeCollection.Add(barcodeData.Barcode);
+                    }
+
+                    // Fallback for still-missing barcodes: query products collection directly
+                    var missingInBarcodeCollection = barcodesNotInCache
+                        .Where(code => !foundFromBarcodeCollection.Contains(code))
+                        .ToList();
+
+                    foreach (var missingBarcode in missingInBarcodeCollection)
+                    {
+                        var product = await _productRepo.GetByBarcodeAsync(missingBarcode);
+                        if (product == null)
+                            continue;
+
+                        var fallbackResult = new ProductSuggestionDto
+                        {
+                            Id = product.Id,
+                            Name = product.Name,
+                            Brand = product.Brand ?? string.Empty,
+                            Category = product.Category?.Name ?? string.Empty,
+                            Price = product.Price
+                        };
+
+                        results.Add(fallbackResult);
+
+                        var cacheKey = CACHE_KEY_PREFIX + missingBarcode;
+                        _cache.Set(cacheKey, fallbackResult,
+                            new MemoryCacheEntryOptions().SetAbsoluteExpiration(TimeSpan.FromMinutes(CACHE_DURATION_MINUTES)));
                     }
                 }
                 catch (Exception ex)

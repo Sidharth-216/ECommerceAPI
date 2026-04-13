@@ -8,9 +8,11 @@ using ECommerceAPI.Application.Interfaces;
 using ECommerceAPI.Domain.Entities.Mongo;
 using ECommerceAPI.Domain.Entities.MongoDB;
 using ECommerceAPI.Infrastructure.Repositories.Interfaces;
-using QuestPDF.Fluent;
-using QuestPDF.Helpers;
-using QuestPDF.Infrastructure;
+using iText.IO.Font.Constants;
+using iText.Kernel.Font;
+using iText.Kernel.Pdf;
+using iText.Layout;
+using iText.Layout.Element;
 
 namespace ECommerceAPI.Application.Services
 {
@@ -41,8 +43,6 @@ namespace ECommerceAPI.Application.Services
           _userRepository = userRepository;
           _addressRepository = addressRepository;
             _logger = logger;
-
-            QuestPDF.Settings.License = LicenseType.Community;
         }
 
         public async Task<string> GenerateInvoiceHtmlAsync(
@@ -281,106 +281,61 @@ namespace ECommerceAPI.Application.Services
               {
                 _logger.LogInformation("📄 [InvoiceService] Generating PDF invoice for order {OrderNumber}", order.OrderNumber);
 
-                var document = Document.Create(container =>
-                {
-                  container.Page(page =>
-                  {
-                    page.Size(PageSizes.A4);
-                    page.Margin(28);
-                    page.DefaultTextStyle(x => x.FontSize(10));
-
-                    page.Header().Row(row =>
-                    {
-                      row.RelativeItem().Column(column =>
-                      {
-                        column.Item().Text(BrandName).FontSize(22).Bold().FontColor(Colors.Teal.Darken2);
-                        column.Item().Text("Professional E-Commerce Solutions").FontSize(10).FontColor(Colors.Grey.Darken1);
-                      });
-
-                      row.ConstantItem(170).AlignRight().Column(column =>
-                      {
-                        column.Item().Text("INVOICE").FontSize(18).Bold().FontColor(Colors.Teal.Darken3);
-                        column.Item().Text(order.OrderNumber).FontSize(12).FontColor(Colors.Teal.Darken2).Bold();
-                        column.Item().Text(order.CreatedAt.ToString("dd MMM yyyy")).FontSize(10).FontColor(Colors.Grey.Darken1);
-                      });
-                    });
-
-                    page.Content().PaddingTop(20).Column(column =>
-                    {
-                      column.Spacing(14);
-
-                      column.Item().Border(1).BorderColor(Colors.Grey.Lighten2).Padding(12).Column(box =>
-                      {
-                        box.Item().Text("BILL TO").FontSize(9).Bold().FontColor(Colors.Grey.Darken1);
-                        box.Item().Text(customerName).FontSize(12).Bold();
-                        box.Item().Text(customerEmail).FontSize(10).FontColor(Colors.Grey.Darken1);
-                        box.Item().Text(customerPhone).FontSize(10).FontColor(Colors.Grey.Darken1);
-                      });
-
-                      column.Item().Border(1).BorderColor(Colors.Grey.Lighten2).Padding(12).Column(box =>
-                      {
-                        box.Item().Text("SHIPPING ADDRESS").FontSize(9).Bold().FontColor(Colors.Grey.Darken1);
-                        box.Item().Text(order.ShippingAddress?.AddressLine1 ?? "Address not provided").FontSize(10);
-
-                        if (!string.IsNullOrWhiteSpace(order.ShippingAddress?.AddressLine2))
-                          box.Item().Text(order.ShippingAddress.AddressLine2).FontSize(10);
-
-                        box.Item().Text($"{order.ShippingAddress?.City}, {order.ShippingAddress?.State} {order.ShippingAddress?.PostalCode}").FontSize(10);
-                        box.Item().Text(order.ShippingAddress?.Country ?? string.Empty).FontSize(10);
-                      });
-
-                      column.Item().Table(table =>
-                      {
-                        table.ColumnsDefinition(columns =>
-                        {
-                          columns.RelativeColumn(3);
-                          columns.RelativeColumn(1);
-                          columns.RelativeColumn(1);
-                          columns.RelativeColumn(1);
-                        });
-
-                        table.Header(header =>
-                        {
-                          header.Cell().Element(CellHeaderStyle).Text("PRODUCT");
-                          header.Cell().Element(CellHeaderStyle).AlignCenter().Text("QTY");
-                          header.Cell().Element(CellHeaderStyle).AlignRight().Text("UNIT PRICE");
-                          header.Cell().Element(CellHeaderStyle).AlignRight().Text("TOTAL");
-                        });
-
-                        foreach (var item in order.Items ?? new List<OrderItemDto>())
-                        {
-                          table.Cell().Element(CellBodyStyle).Text(item.ProductName);
-                          table.Cell().Element(CellBodyStyle).AlignCenter().Text(item.Quantity.ToString());
-                          table.Cell().Element(CellBodyStyle).AlignRight().Text($"INR {item.Price:N2}");
-                          table.Cell().Element(CellBodyStyle).AlignRight().Text($"INR {(item.Price * item.Quantity):N2}");
-                        }
-                      });
-
-                      var subtotal = order.Items?.Sum(i => i.Price * i.Quantity) ?? 0;
-                      var tax = subtotal * 0.05m;
-                      var shipping = subtotal > 500 ? 0 : 50;
-                      var total = subtotal + tax + shipping;
-
-                      column.Item().AlignRight().Border(1).BorderColor(Colors.Grey.Lighten2).Padding(12).Column(box =>
-                      {
-                        box.Item().Row(r => { r.RelativeItem().Text("Subtotal"); r.ConstantItem(120).AlignRight().Text($"INR {subtotal:N2}"); });
-                        box.Item().Row(r => { r.RelativeItem().Text("Tax (5%)"); r.ConstantItem(120).AlignRight().Text($"INR {tax:N2}"); });
-                        box.Item().Row(r => { r.RelativeItem().Text("Shipping"); r.ConstantItem(120).AlignRight().Text($"INR {shipping:N2}"); });
-                        box.Item().LineHorizontal(1).LineColor(Colors.Grey.Lighten2);
-                        box.Item().Row(r =>
-                        {
-                          r.RelativeItem().Text("TOTAL").Bold();
-                          r.ConstantItem(120).AlignRight().Text($"INR {total:N2}").Bold().FontColor(Colors.Teal.Darken2);
-                        });
-                      });
-                    });
-
-                    page.Footer().AlignCenter().Text($"Thank you for shopping with {BrandName}.").FontSize(9).FontColor(Colors.Grey.Darken1);
-                  });
-                });
-
                 using var stream = new System.IO.MemoryStream();
-                document.GeneratePdf(stream);
+                using var writer = new PdfWriter(stream);
+                using var pdf = new PdfDocument(writer);
+                using var doc = new Document(pdf);
+
+                var normalFont = PdfFontFactory.CreateFont(StandardFonts.HELVETICA);
+                var boldFont = PdfFontFactory.CreateFont(StandardFonts.HELVETICA_BOLD);
+
+                doc.Add(new Paragraph(BrandName).SetFont(boldFont).SetFontSize(20));
+                doc.Add(new Paragraph("INVOICE").SetFont(boldFont).SetFontSize(16));
+                doc.Add(new Paragraph($"Order Number: {order.OrderNumber}").SetFont(normalFont));
+                doc.Add(new Paragraph($"Order Date: {order.CreatedAt:dd MMM yyyy}").SetFont(normalFont));
+                doc.Add(new Paragraph(" "));
+
+                doc.Add(new Paragraph("Bill To").SetFont(boldFont));
+                doc.Add(new Paragraph(customerName ?? "Valued Customer").SetFont(normalFont));
+                doc.Add(new Paragraph(customerEmail ?? string.Empty).SetFont(normalFont));
+                doc.Add(new Paragraph(customerPhone ?? string.Empty).SetFont(normalFont));
+                doc.Add(new Paragraph(" "));
+
+                doc.Add(new Paragraph("Shipping Address").SetFont(boldFont));
+                doc.Add(new Paragraph(order.ShippingAddress?.AddressLine1 ?? "Address not provided").SetFont(normalFont));
+                if (!string.IsNullOrWhiteSpace(order.ShippingAddress?.AddressLine2))
+                    doc.Add(new Paragraph(order.ShippingAddress.AddressLine2).SetFont(normalFont));
+                doc.Add(new Paragraph($"{order.ShippingAddress?.City}, {order.ShippingAddress?.State} {order.ShippingAddress?.PostalCode}").SetFont(normalFont));
+                doc.Add(new Paragraph(order.ShippingAddress?.Country ?? string.Empty).SetFont(normalFont));
+                doc.Add(new Paragraph(" "));
+
+                var table = new Table(new float[] { 4, 1, 2, 2 }).UseAllAvailableWidth();
+                table.AddHeaderCell(new Cell().Add(new Paragraph("Product").SetFont(boldFont)));
+                table.AddHeaderCell(new Cell().Add(new Paragraph("Qty").SetFont(boldFont)));
+                table.AddHeaderCell(new Cell().Add(new Paragraph("Unit Price").SetFont(boldFont)));
+                table.AddHeaderCell(new Cell().Add(new Paragraph("Total").SetFont(boldFont)));
+
+                foreach (var item in order.Items ?? new List<OrderItemDto>())
+                {
+                    table.AddCell(new Cell().Add(new Paragraph(item.ProductName ?? string.Empty).SetFont(normalFont)));
+                    table.AddCell(new Cell().Add(new Paragraph(item.Quantity.ToString()).SetFont(normalFont)));
+                    table.AddCell(new Cell().Add(new Paragraph($"INR {item.Price:N2}").SetFont(normalFont)));
+                    table.AddCell(new Cell().Add(new Paragraph($"INR {(item.Price * item.Quantity):N2}").SetFont(normalFont)));
+                }
+                doc.Add(table);
+
+                var subtotal = order.Items?.Sum(i => i.Price * i.Quantity) ?? 0;
+                var tax = subtotal * 0.05m;
+                var shipping = subtotal > 500 ? 0 : 50;
+                var total = subtotal + tax + shipping;
+
+                doc.Add(new Paragraph(" "));
+                doc.Add(new Paragraph($"Subtotal: INR {subtotal:N2}").SetFont(normalFont));
+                doc.Add(new Paragraph($"Tax (5%): INR {tax:N2}").SetFont(normalFont));
+                doc.Add(new Paragraph($"Shipping: INR {shipping:N2}").SetFont(normalFont));
+                doc.Add(new Paragraph($"Total: INR {total:N2}").SetFont(boldFont).SetFontSize(12));
+
+                doc.Close();
                 return stream.ToArray();
               }
               catch (Exception ex)
@@ -420,16 +375,6 @@ namespace ECommerceAPI.Application.Services
                   Country = address.Country
                 }
               };
-            }
-
-            private static IContainer CellHeaderStyle(IContainer container)
-            {
-              return container.BorderBottom(1).BorderColor(Colors.Grey.Darken2).PaddingVertical(6).Background(Colors.Grey.Lighten3);
-            }
-
-            private static IContainer CellBodyStyle(IContainer container)
-            {
-              return container.BorderBottom(1).BorderColor(Colors.Grey.Lighten2).PaddingVertical(6);
             }
 
         /// <summary>

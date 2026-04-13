@@ -175,6 +175,19 @@ namespace ECommerceAPI.Infrastructure.Repositories.Implementations
             }
         }
 
+        public async Task<ProductMongo> GetByBarcodeAsync(string barcode)
+        {
+            if (string.IsNullOrWhiteSpace(barcode))
+                return null;
+
+            var filterBuilder = Builders<ProductMongo>.Filter;
+            var filter = ActiveProductsFilter() & filterBuilder.Eq(p => p.Barcode, barcode);
+
+            return await _products
+                .Find(filter)
+                .FirstOrDefaultAsync();
+        }
+
         public async Task<ProductMongo> GetBySqlIdAsync(int sqlId)
         {
             Console.WriteLine($"🔍 [ProductMongoRepository] GetBySqlIdAsync - SQL ID: {sqlId}");
