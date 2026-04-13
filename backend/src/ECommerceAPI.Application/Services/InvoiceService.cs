@@ -261,7 +261,11 @@ namespace ECommerceAPI.Application.Services
               }
 
               var customer = await _userRepository.GetByIdAsync(order.UserId);
-              var address = await _addressRepository.GetByIdAsync(order.ShippingAddressId);
+              AddressMongo address = null;
+              if (!string.IsNullOrWhiteSpace(order.ShippingAddressId))
+              {
+                address = await _addressRepository.GetByIdAsync(order.ShippingAddressId);
+              }
 
               var orderDto = BuildInvoiceOrderDto(order, customer, address);
               return await GenerateInvoicePdfAsync(
@@ -279,6 +283,11 @@ namespace ECommerceAPI.Application.Services
             {
               try
               {
+                if (order == null)
+                {
+                  throw new ArgumentNullException(nameof(order));
+                }
+
                 _logger.LogInformation("📄 [InvoiceService] Generating PDF invoice for order {OrderNumber}", order.OrderNumber);
 
                 using var stream = new System.IO.MemoryStream();
@@ -291,7 +300,7 @@ namespace ECommerceAPI.Application.Services
 
                 doc.Add(new Paragraph(BrandName).SetFont(boldFont).SetFontSize(20));
                 doc.Add(new Paragraph("INVOICE").SetFont(boldFont).SetFontSize(16));
-                doc.Add(new Paragraph($"Order Number: {order.OrderNumber}").SetFont(normalFont));
+                doc.Add(new Paragraph($"Order Number: {order.OrderNumber ?? "N/A"}").SetFont(normalFont));
                 doc.Add(new Paragraph($"Order Date: {order.CreatedAt:dd MMM yyyy}").SetFont(normalFont));
                 doc.Add(new Paragraph(" "));
 
@@ -305,8 +314,27 @@ namespace ECommerceAPI.Application.Services
                 doc.Add(new Paragraph(order.ShippingAddress?.AddressLine1 ?? "Address not provided").SetFont(normalFont));
                 if (!string.IsNullOrWhiteSpace(order.ShippingAddress?.AddressLine2))
                     doc.Add(new Paragraph(order.ShippingAddress.AddressLine2).SetFont(normalFont));
-                doc.Add(new Paragraph($"{order.ShippingAddress?.City}, {order.ShippingAddress?.State} {order.ShippingAddress?.PostalCode}").SetFont(normalFont));
-                doc.Add(new Paragraph(order.ShippingAddress?.Country ?? string.Empty).SetFont(normalFont));
+
+                var cityStatePostal = string.Join(", ", new[]
+                {
+                  string.Join(" ", new[]
+                  {
+                    order.ShippingAddress?.City,
+                    order.ShippingAddress?.State
+                  }.Where(v => !string.IsNullOrWhiteSpace(v))),
+                  order.ShippingAddress?.PostalCode
+                }.Where(v => !string.IsNullOrWhiteSpace(v)));
+
+                if (!string.IsNullOrWhiteSpace(cityStatePostal))
+                {
+                  doc.Add(new Paragraph(cityStatePostal).SetFont(normalFont));
+                }
+
+                if (!string.IsNullOrWhiteSpace(order.ShippingAddress?.Country))
+                {
+                  doc.Add(new Paragraph(order.ShippingAddress.Country).SetFont(normalFont));
+                }
+
                 doc.Add(new Paragraph(" "));
 
                 var table = new Table(new float[] { 4, 1, 2, 2 }).UseAllAvailableWidth();
@@ -315,7 +343,11 @@ namespace ECommerceAPI.Application.Services
                 table.AddHeaderCell(new Cell().Add(new Paragraph("Unit Price").SetFont(boldFont)));
                 table.AddHeaderCell(new Cell().Add(new Paragraph("Total").SetFont(boldFont)));
 
-                foreach (var item in order.Items ?? new List<OrderItemDto>())
+                var safeItems = (order.Items ?? new List<OrderItemDto>())
+                  .Where(i => i != null)
+                  .ToList();
+
+                foreach (var item in safeItems)
                 {
                     table.AddCell(new Cell().Add(new Paragraph(item.ProductName ?? string.Empty).SetFont(normalFont)));
                     table.AddCell(new Cell().Add(new Paragraph(item.Quantity.ToString()).SetFont(normalFont)));
@@ -324,7 +356,7 @@ namespace ECommerceAPI.Application.Services
                 }
                 doc.Add(table);
 
-                var subtotal = order.Items?.Sum(i => i.Price * i.Quantity) ?? 0;
+                var subtotal = safeItems.Sum(i => i.Price * i.Quantity);
                 var tax = subtotal * 0.05m;
                 var shipping = subtotal > 500 ? 0 : 50;
                 var total = subtotal + tax + shipping;
@@ -347,6 +379,17 @@ namespace ECommerceAPI.Application.Services
 
             private OrderDto BuildInvoiceOrderDto(MongoOrder order, MongoUser customer, AddressMongo address)
             {
+              var safeItems = (order.Items ?? new List<MongoOrderItem>())
+                .Where(item => item != null)
+                .Select(item => new OrderItemDto
+                {
+                  ProductId = item.ProductId,
+                  ProductName = item.ProductName,
+                  Quantity = item.Quantity,
+                  Price = item.Price
+                })
+                .ToList();
+
               return new OrderDto
               {
                 Id = order.Id,
@@ -355,13 +398,7 @@ namespace ECommerceAPI.Application.Services
                 TotalAmount = order.TotalAmount,
                 Status = order.Status,
                 CreatedAt = order.CreatedAt,
-                Items = order.Items?.Select(item => new OrderItemDto
-                {
-                  ProductId = item.ProductId,
-                  ProductName = item.ProductName,
-                  Quantity = item.Quantity,
-                  Price = item.Price
-                }).ToList(),
+                Items = safeItems,
                 CustomerName = customer?.FullName ?? "Valued Customer",
                 CustomerEmail = customer?.Email ?? string.Empty,
                 CustomerPhone = customer?.Mobile ?? string.Empty,
