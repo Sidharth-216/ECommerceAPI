@@ -293,14 +293,14 @@ namespace ECommerceAPI.Application.Services
                     {
                       row.RelativeItem().Column(column =>
                       {
-                        column.Item().Text(BrandName).FontSize(22).Bold().FontColor(PrimaryColor);
+                        column.Item().Text(BrandName).FontSize(22).Bold().FontColor(Colors.Teal.Darken2);
                         column.Item().Text("Professional E-Commerce Solutions").FontSize(10).FontColor(Colors.Grey.Darken1);
                       });
 
                       row.ConstantItem(170).AlignRight().Column(column =>
                       {
-                        column.Item().Text("INVOICE").FontSize(18).Bold().FontColor(DarkColor);
-                        column.Item().Text(order.OrderNumber).FontSize(12).FontColor(PrimaryColor).Bold();
+                        column.Item().Text("INVOICE").FontSize(18).Bold().FontColor(Colors.Teal.Darken3);
+                        column.Item().Text(order.OrderNumber).FontSize(12).FontColor(Colors.Teal.Darken2).Bold();
                         column.Item().Text(order.CreatedAt.ToString("dd MMM yyyy")).FontSize(10).FontColor(Colors.Grey.Darken1);
                       });
                     });
@@ -351,8 +351,8 @@ namespace ECommerceAPI.Application.Services
                         {
                           table.Cell().Element(CellBodyStyle).Text(item.ProductName);
                           table.Cell().Element(CellBodyStyle).AlignCenter().Text(item.Quantity.ToString());
-                          table.Cell().Element(CellBodyStyle).AlignRight().Text($"₹{item.Price:N2}");
-                          table.Cell().Element(CellBodyStyle).AlignRight().Text($"₹{(item.Price * item.Quantity):N2}");
+                          table.Cell().Element(CellBodyStyle).AlignRight().Text($"INR {item.Price:N2}");
+                          table.Cell().Element(CellBodyStyle).AlignRight().Text($"INR {(item.Price * item.Quantity):N2}");
                         }
                       });
 
@@ -363,14 +363,14 @@ namespace ECommerceAPI.Application.Services
 
                       column.Item().AlignRight().Border(1).BorderColor(Colors.Grey.Lighten2).Padding(12).Column(box =>
                       {
-                        box.Item().Row(r => { r.RelativeItem().Text("Subtotal"); r.ConstantItem(120).AlignRight().Text($"₹{subtotal:N2}"); });
-                        box.Item().Row(r => { r.RelativeItem().Text("Tax (5%)"); r.ConstantItem(120).AlignRight().Text($"₹{tax:N2}"); });
-                        box.Item().Row(r => { r.RelativeItem().Text("Shipping"); r.ConstantItem(120).AlignRight().Text($"₹{shipping:N2}"); });
+                        box.Item().Row(r => { r.RelativeItem().Text("Subtotal"); r.ConstantItem(120).AlignRight().Text($"INR {subtotal:N2}"); });
+                        box.Item().Row(r => { r.RelativeItem().Text("Tax (5%)"); r.ConstantItem(120).AlignRight().Text($"INR {tax:N2}"); });
+                        box.Item().Row(r => { r.RelativeItem().Text("Shipping"); r.ConstantItem(120).AlignRight().Text($"INR {shipping:N2}"); });
                         box.Item().LineHorizontal(1).LineColor(Colors.Grey.Lighten2);
                         box.Item().Row(r =>
                         {
                           r.RelativeItem().Text("TOTAL").Bold();
-                          r.ConstantItem(120).AlignRight().Text($"₹{total:N2}").Bold().FontColor(PrimaryColor);
+                          r.ConstantItem(120).AlignRight().Text($"INR {total:N2}").Bold().FontColor(Colors.Teal.Darken2);
                         });
                       });
                     });

@@ -31,16 +31,10 @@ const ScannedItemsList = ({
         const response = await adminAPI.lookupMultipleBarcodes(scannedBarcodes);
 
         if (response.data?.results) {
-          const foundByBarcode = new Set(
-            response.data.results
-              .map(product => product.barcode)
-              .filter(Boolean)
-          );
-
           // Create items list with default quantity 1
           const newItems = response.data.results.map((product, index) => ({
             id: product.id || product._id || `${product.barcode || 'barcode'}-${index}-${Date.now()}`,
-            barcode: product.barcode || scannedBarcodes[index] || '',
+            barcode: scannedBarcodes[index] || product.barcode || '',
             ...product,
             quantity: 1
           }));
@@ -49,7 +43,8 @@ const ScannedItemsList = ({
 
           // Track not found barcodes
           if (response.data.results.length < scannedBarcodes.length) {
-            const unfound = scannedBarcodes.filter(barcode => !foundByBarcode.has(barcode));
+            const foundByIndex = new Set(newItems.map(item => item.barcode).filter(Boolean));
+            const unfound = scannedBarcodes.filter(barcode => !foundByIndex.has(barcode));
             setNotFound(unfound);
           }
         }
@@ -200,7 +195,7 @@ const ScannedItemsList = ({
                         <span className="font-semibold">Category:</span> {item.category || 'N/A'}
                       </p>
                       <p className="text-sm text-blue-600 font-mono">
-                        ₹{item.price?.toFixed(2) || '0.00'}
+                        ₹{(Number(item.price) || 0).toFixed(2)}
                       </p>
                     </div>
 
