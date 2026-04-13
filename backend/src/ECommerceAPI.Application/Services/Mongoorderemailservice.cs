@@ -940,6 +940,10 @@ namespace ECommerceAPI.Application.Services
         {
             try
             {
+                var safeFirstName = string.IsNullOrWhiteSpace(customerName)
+                  ? "there"
+                  : customerName.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "there";
+
                 _logger.LogInformation(
                     "📧 Sending invoice email to {Email} for order {OrderNumber}",
                     toEmail, order.OrderNumber);
@@ -991,10 +995,29 @@ namespace ECommerceAPI.Application.Services
   <tr>
     <td style='padding:24px 32px 0;'>
       <h2 style='margin:0 0 8px;font-size:18px;color:#1f2937;font-weight:800;'>
-        Invoice for your order, {customerName.Split(' ')[0]}!</h2>
+        Invoice for your order, {safeFirstName}!</h2>
       <p style='margin:0;color:#6b7280;font-size:14px;line-height:1.6;'>
         Your order #{order.OrderNumber} has been delivered! Here's your complete invoice for your records.
       </p>
+    </td>
+  </tr>
+
+  <!-- Download Note -->
+  <tr>
+    <td style='padding:18px 32px 0;'>
+      <table width='100%' cellpadding='0' cellspacing='0'
+             style='background:#ecfeff;border-left:4px solid {AccentColor};border-radius:10px;'>
+        <tr>
+          <td style='padding:16px 18px;'>
+            <p style='margin:0 0 4px;font-size:13px;font-weight:800;color:{DarkColor};'>
+              📎 Invoice PDF attached</p>
+            <p style='margin:0;font-size:12px;color:#475569;line-height:1.6;'>
+              Download the attached file named <strong>Invoice-{order.OrderNumber}.pdf</strong>.
+              If your email app blocks attachments, you can still use the invoice details below.
+            </p>
+          </td>
+        </tr>
+      </table>
     </td>
   </tr>
 
@@ -1031,7 +1054,8 @@ namespace ECommerceAPI.Application.Services
                     new
                     {
                       name = $"Invoice-{order.OrderNumber}.pdf",
-                      content = Convert.ToBase64String(invoicePdfBytes)
+                      content = Convert.ToBase64String(invoicePdfBytes),
+                      contentType = "application/pdf"
                     }
                   }
                   : null;
